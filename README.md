@@ -1,5 +1,4 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f4f8ef02c45748d9b2b477d7f29d219d)](https://app.codacy.com/gh/AGBV/YASF/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-
 <p align="center">
 <img src="assets/images/logo_white.svg#gh-dark-mode-only", height="300">
 <img src="assets/images/logo_black.svg#gh-light-mode-only", height="300">
