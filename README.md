@@ -5,8 +5,8 @@
 <img height="400" width="49%" src="assets/images/yasf_white.svg#gh-dark-mode-only">
 </p>
 <p align="center" width="100%">
-<img height="400" width="49%" src="assets/images/yasf_black.svg#gh-light-mode-only">
 <img height="400" width="49%" src="assets/images/logo_black.svg#gh-light-mode-only">
+<img height="400" width="49%" src="assets/images/yasf_black.svg#gh-light-mode-only">
 </p>
 
 # Yet Another Scattering Framework
