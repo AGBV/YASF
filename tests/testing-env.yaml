@@ -1,0 +1,21 @@
+name: yasf-testing
+channels:
+  - numba
+  - conda-forge
+variables:
+  NUMBA_DISABLE_INTEL_SVML: 0
+  NUMBA_CUDA_USE_NVIDIA_BINDING: 0
+dependencies:
+  - astropy
+  - cudatoolkit=11.7
+  - icc_rt
+  - networkx
+  - numba
+  - numpy
+  - pandas
+  - pip
+  - psutil
+  - python=3.9
+  - scipy
+  - pip:
+    - pywigxjpf
