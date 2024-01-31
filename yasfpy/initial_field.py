@@ -1,4 +1,4 @@
-import src.log as log
+import yasfpy.log as log
 
 import numpy as np
 

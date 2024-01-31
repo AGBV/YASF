@@ -1,4 +1,4 @@
-import src.log as log
+import yasfpy.log as log
 
 import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres, lgmres, bicgstab
@@ -18,7 +18,7 @@ class Solver:
             x0 = np.copy(b)
 
         if np.any(np.isnan(b)):
-          print(b)
+            print(b)
 
         if self.type == 'bicgstab':
             counter = GMResCounter(callback_type='x')

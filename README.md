@@ -11,15 +11,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-success.svg)](https://opensource.org/licenses/MIT)
 
 # Yet Another Scattering Framework
-YASF is a T-Matrix implementation in python based on the Matlab framework [CELES](https://github.com/disordered-photonics/celes) developed by [Egel et al.](https://arxiv.org/abs/1706.02145).
+YASF is a T-Matrix implementation in Python based on the Matlab framework [CELES](https://github.com/disordered-photonics/celes) developed by [Egel et al.](https://arxiv.org/abs/1706.02145).
 
 # Examples
 - Small [dashboard](https://agbv-lpsc2023-arnaut.streamlit.app/) displaying various parameters calculated using YASF
 
 # Development
 This repository is still under development!
-After the baseline has been finalized, the implementation will be available on [PyPI](https://pypi.org/) as a package to be downloaded using pip.
 
 # Documentation
 The code is documented using [MkDocs](https://www.mkdocs.org/). If you discover mistakes, feel free to create a pull request or open up an issue.
 
+# TODO
+The [`pywigxjpf`](http://fy.chalmers.se/subatom/wigxjpf/) package is not following PEP 517 and PEP 518 standards, so it may happen, that it won't install properly as a dependency of YASF. Please install it manually if that happens using `pip install pywigxjpf` (before that, run `pip install pycparser` as stated in their [pypi page](https://pypi.org/project/pywigxjpf/)).
+One could convert the `setup.py` file to a `pyproject.toml` file. Providing `pycparser` as a dependency could also solve the known issue of having to preinstall it.

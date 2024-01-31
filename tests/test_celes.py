@@ -8,12 +8,12 @@ sys.path.append(str(Path(__file__).parents[1]))
 import numpy as np
 from astropy.io import fits
 
-from src.particles import Particles
-from src.initial_field import InitialField
-from src.parameters import Parameters
-from src.solver import Solver
-from src.numerics import Numerics
-from src.simulation import Simulation
+from yasfpy.particles import Particles
+from yasfpy.initial_field import InitialField
+from yasfpy.parameters import Parameters
+from yasfpy.solver import Solver
+from yasfpy.numerics import Numerics
+from yasfpy.simulation import Simulation
 
 class TestCELES(unittest.TestCase):
     @classmethod

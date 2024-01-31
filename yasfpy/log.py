@@ -32,7 +32,7 @@ def scattering_logger(name):
             #print('{} already defined in logger class'.format(method_name))
             continue
 
-        
+
         logging.addLevelName(level_value, level_name)
         setattr(logging, level_name, level_value)
         setattr(logging.getLoggerClass(), method_name, methods[i])

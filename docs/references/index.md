@@ -6,4 +6,4 @@
 - [Solver][yasfpy.solver]
 - [Numerics][yasfpy.numerics]
 - [Simulation][yasfpy.simulation]
-- [Optics][yasfpy.optics]
+- [Optics]

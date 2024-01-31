@@ -118,7 +118,7 @@ def compute_electric_field_angle_components_gpu(lmax: int, particles_position: n
     )
 
     if tau == 1:
-        e_field_theta =  t * pilm[l,  abs(m), a_idx] * 1j * m 
+        e_field_theta =  t * pilm[l,  abs(m), a_idx] * 1j * m
         e_field_phi   = -t * taulm[l, abs(m), a_idx]
     else:
         e_field_theta =  t * taulm[l, abs(m), a_idx]
@@ -135,7 +135,7 @@ def compute_polarization_components_gpu(number_of_wavelengths: int, number_of_an
     a_idx, w_idx = cuda.grid(2)
     if (w_idx >= number_of_wavelengths) or (a_idx >= number_of_angles):
         return
-        
+
     # Jones vector components (1,2,4)
     e_field_theta_abs = e_field_theta_real[a_idx, w_idx]**2 + e_field_theta_imag[a_idx, w_idx]**2
     e_field_phi_abs   = e_field_phi_real[a_idx, w_idx]**2   + e_field_phi_imag[a_idx, w_idx]**2
@@ -191,6 +191,6 @@ def compute_field_gpu(lmax: int, idx: np.ndarray, size_parameter: np.ndarray, sp
             b_term = b_term_1 * (b_term_2 + b_term_3)
 
             term *= p_term + b_term
-    
+
         cuda.atomic.add(field_real, (w, sampling_idx, c),  term.real)
         cuda.atomic.add(field_imag, (w, sampling_idx, c),  term.imag)

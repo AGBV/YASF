@@ -8,7 +8,7 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - ".github/workflows/mkdocs.yml"
-      - "!src/**"
+      - "!yasfpy/**"
       - "!tests/**"
       - "!.github/workflows/test-self-hosted-conda.yml"
       - "!sonar-project.properties"

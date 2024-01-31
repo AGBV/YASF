@@ -63,7 +63,7 @@ def mutual_lookup(lmax: int, positions_1: np.ndarray, positions_2: np.ndarray, r
     cosine_theta[cosine_theta < -1] = -1
     cosine_theta[cosine_theta >  1] =  1
     sine_theta = np.sqrt(1 - cosine_theta**2)
-    phi = np.arctan2(differences[:, :, 1], differences[:, :, 0]) 
+    phi = np.arctan2(differences[:, :, 1], differences[:, :, 0])
     e_theta = np.stack([
         cosine_theta * np.cos(phi),
         cosine_theta * np.sin(phi),
@@ -115,7 +115,7 @@ def mutual_lookup(lmax: int, positions_1: np.ndarray, positions_2: np.ndarray, r
         p_range = p_range[:, np.newaxis, np.newaxis]
         e_j_dm_phi = np.exp(1j * p_range * phi)
 
-        
+
 
     return spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm, e_r, e_theta, e_phi, cosine_theta, sine_theta, size_parameter, spherical_hankel_derivative
 
@@ -159,7 +159,7 @@ def material_handler(links):
 def handle_refractiveindex_info(url):
     url_split = url.replace('=', '/').split('/')
     material = unquote(url_split[-2])
-        
+
     if np.any([('data_csv' in part) or ('data_txt' in part) for part in url_split]):
         print('Please use the [Full database record] option for refractiveindex.info!')
         print('Reverting url:')
@@ -167,7 +167,7 @@ def handle_refractiveindex_info(url):
         url_split[3] = 'database'
         url = "/".join(url_split)
         print(f' to:   {url}')
-    
+
     req = urllib.request.Request(url)
     with urllib.request.urlopen(req) as resp:
         data = resp.read()
@@ -193,7 +193,7 @@ def handle_refractiveindex_info(url):
                     df['wavelength'] = wavelengths
                     df['n'] = ref_idx(wavelengths)
 
-        
+
         if df is not None:
             df = df.fillna(0)
             data = pd.concat([data, df])
@@ -206,7 +206,7 @@ def handle_eodg(url):
     url_split = url.split('/')
     # material = unquote(url_split[-1][:-3]).replace('_', ' ')
     material = unquote(url_split[6])
-    
+
     req = urllib.request.Request(url)
     with urllib.request.urlopen(req) as resp:
         data = resp.read()
@@ -225,7 +225,7 @@ def handle_eodg(url):
 
 
         return data, material
-    
+
 def handle_csv(path):
     name = re.split('\._-', path)
     material = unquote(name[0])

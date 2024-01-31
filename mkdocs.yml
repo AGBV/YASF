@@ -13,10 +13,10 @@ nav:
       - references/solver.md
       - references/numerics.md
       - references/simulation.md
-      - references/optics.md
+      #- references/optics.md
   - Testing:
       - testing/index.md
-      - coverage.md
+      #- coverage.md
   - TODO: todo.md
 
 theme:
@@ -30,17 +30,17 @@ theme:
 
 plugins:
   - autorefs
-  - coverage:
-      page_name: coverage
-      html_report_dir: coverage-report/htmlcov
+  # - coverage:
+  #     page_name: coverage
+  #     html_report_dir: coverage-report/htmlcov
   - search:
-      lang: end
+      lang: en
   - mkdocstrings:
       default_handler: python
       handlers:
         python:
           paths:
-            - src
+            - yasfpy
           options:
             docstring_style: numpy
             docstring_section_style: table
