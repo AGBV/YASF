@@ -1,3 +1,6 @@
+# Ignore wheel files
+/*.whl
+
 # Ignore current project files
 src/optics.py
 
