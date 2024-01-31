@@ -13,6 +13,13 @@
 # Yet Another Scattering Framework
 YASF is a T-Matrix implementation in Python based on the Matlab framework [CELES](https://github.com/disordered-photonics/celes) developed by [Egel et al.](https://arxiv.org/abs/1706.02145).
 
+# Install
+```sh
+pip install yasfpy
+```
+
+Sadly [`yasf`](https://pypi.org/project/yasf/) was already taken, so the package is called `yasfpy` for the Python version and can be found on [pypi](https://pypi.org/project/yasfpy/).
+
 # Examples
 - Small [dashboard](https://agbv-lpsc2023-arnaut.streamlit.app/) displaying various parameters calculated using YASF
 
