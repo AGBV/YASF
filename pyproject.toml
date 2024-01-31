@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "yasfpy"
+version = "0.0.1"
+description = "Light scattering code using T-Matrix"
+authors = ["Mirza Arnaut <mirza.arnaut@tu-dortmund.de>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
