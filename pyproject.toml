@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "yasfpy"
-version = "0.0.3"
+version = "0.0.4"
 description = "Light scattering code using T-Matrix"
 authors = ["Mirza Arnaut <mirza.arnaut@tu-dortmund.de>"]
 license = "MIT"
