@@ -1,6 +1,6 @@
 import sys, os
 sys.path.append(os.getcwd())
-import src.log as log
+import yasf.log as log
 
 from scipy.special import spherical_jn, spherical_yn
 
