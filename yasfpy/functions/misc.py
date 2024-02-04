@@ -4,7 +4,7 @@ import numpy as np
 from scipy.special import spherical_jn, spherical_yn
 from scipy.special import hankel1, lpmv
 
-from src.functions.legendre_normalized_trigon import legendre_normalized_trigon
+from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
 
 def jmult_max(num_part, lmax):
