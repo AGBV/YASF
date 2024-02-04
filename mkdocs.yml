@@ -13,7 +13,7 @@ nav:
       - references/solver.md
       - references/numerics.md
       - references/simulation.md
-      #- references/optics.md
+      - references/optics.md
   - Testing:
       - testing/index.md
       #- coverage.md
@@ -21,6 +21,7 @@ nav:
 
 theme:
   name: "material"
+  logo: "assets/img/logo_white.svg"
   features:
     - navigation.indexes
     - navigation.tabs

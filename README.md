@@ -1,10 +1,10 @@
 <p align="center" width="100%">
-<img height="400" width="49%" src="assets/images/logo_white.svg#gh-dark-mode-only">
-<img height="400" width="49%" src="assets/images/yasf_white.svg#gh-dark-mode-only">
+<img height="400" width="49%" src="docs/assets/img/logo_white.svg#gh-dark-mode-only">
+<img height="400" width="49%" src="docs/assets/img/yasf_white.svg#gh-dark-mode-only">
 </p>
 <p align="center" width="100%">
-<img height="400" width="49%" src="assets/images/logo_black.svg#gh-light-mode-only">
-<img height="400" width="49%" src="assets/images/yasf_black.svg#gh-light-mode-only">
+<img height="400" width="49%" src="docs/assets/img/logo_black.svg#gh-light-mode-only">
+<img height="400" width="49%" src="docs/assets/img/yasf_black.svg#gh-light-mode-only">
 </p>
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f4f8ef02c45748d9b2b477d7f29d219d)](https://app.codacy.com/gh/AGBV/YASF/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
