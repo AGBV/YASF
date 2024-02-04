@@ -1,1 +1,1 @@
-[//]: <> (::: yasfpy.optics)
+::: yasfpy.optics
