@@ -215,9 +215,10 @@ def handle_eodg(url):
         header_yml=['wavelength', 'n', 'k']
         if 'n' not in data_format:
             header_yml=['wavelength', 'k', 'n']
-            data = re.sub(r'^#.*\n', '', data, flags=re.MULTILINE)
-            data = pd.read_csv(io.StringIO(data), delim_whitespace=True, header=None, names=header_yml)
-            data = data.fillna(0)
+
+        data = re.sub(r'^#.*\n', '', data, flags=re.MULTILINE)
+        data = pd.read_csv(io.StringIO(data), delim_whitespace=True, header=None, names=header_yml)
+        data = data.fillna(0)
         # eodg uses wavenumbers in cm-1 instead of wavelengths in um, hence um = 1e4 / cm-1
         if 'wavn' in data_format:
             data['wavelength'] = 1e4 / data['wavelength']
