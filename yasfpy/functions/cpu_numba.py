@@ -1,4 +1,4 @@
-from numba import jit, prange, complex128, float64, int64, uint64, types
+from numba import jit, prange, complex128, float64, int64
 
 import numpy as np
 from scipy.special import spherical_jn, hankel1, lpmv

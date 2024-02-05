@@ -70,7 +70,7 @@ class TestCELES(unittest.TestCase):
                 solver=cls.data[input_file]['solver'])
 
             cls.data[input_file]['simulation'] = Simulation(
-                cls.data[input_file]['parameters'], 
+                cls.data[input_file]['parameters'],
                 cls.data[input_file]['numerics'])
             
 

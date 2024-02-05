@@ -8,8 +8,11 @@ from yasfpy.functions.spherical_functions_trigon import spherical_functions_trig
 
 from yasfpy.simulation import Simulation
 
-from yasfpy.functions.cpu_numba import compute_scattering_cross_section, compute_radial_independent_scattered_field, compute_electric_field_angle_components, compute_polarization_components
-from yasfpy.functions.cuda_numba import compute_scattering_cross_section_gpu, compute_radial_independent_scattered_field_gpu, compute_electric_field_angle_components_gpu, compute_polarization_components_gpu
+from yasfpy.functions.cpu_numba import compute_scattering_cross_section, compute_electric_field_angle_components, compute_polarization_components
+from yasfpy.functions.cuda_numba import compute_scattering_cross_section_gpu, compute_electric_field_angle_components_gpu, compute_polarization_components_gpu
+
+# from yasfpy.functions.cpu_numba import compute_scattering_cross_section, compute_radial_independent_scattered_field, compute_electric_field_angle_components, compute_polarization_components
+# from yasfpy.functions.cuda_numba import compute_scattering_cross_section_gpu, compute_radial_independent_scattered_field_gpu, compute_electric_field_angle_components_gpu, compute_polarization_components_gpu
 
 class Optics:
   def __init__(self, simulation: Simulation):
@@ -185,7 +188,6 @@ class Optics:
 
       intensity, dop, dolp, dolq, dolu, docp = compute_polarization_components(self.simulation.parameters.k_medium.size, self.simulation.numerics.azimuthal_angles.size, e_field_theta, e_field_phi)
     
-
     self.scattering_angles = self.simulation.numerics.polar_angles
 
     self.phase_function_3d = intensity * 4 * np.pi / np.power(np.abs(self.simulation.parameters.k_medium), 2) / self.c_sca[np.newaxis, :]
