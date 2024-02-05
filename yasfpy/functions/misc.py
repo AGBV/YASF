@@ -182,7 +182,7 @@ def handle_refractiveindex_info(url):
             #   header_yml=['wavelength', 'n']
                 if line['type'].lower()[-2:] == ' k':
                     header_yml=['wavelength', 'k', 'n']
-                    df = pd.read_csv(io.StringIO(line['data']), delim_whitespace=True, header=None, names=header_yml)
+                df = pd.read_csv(io.StringIO(line['data']), delim_whitespace=True, header=None, names=header_yml)
             elif 'formula' in line['type'].lower():
                 if line['type'].lower() == 'formula 1':
                     wavelengths = [float(c) for c in line['wavelength_range'].split()]
