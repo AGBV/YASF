@@ -1,37 +1,42 @@
 import logging
 
 NUMERICS = 15
-SCATTER  = 25
+SCATTER = 25
+
 
 def _log_for_numerics(self, message, *args, **kwargs):
     if self.isEnabledFor(NUMERICS):
         self._log(NUMERICS, message, args, **kwargs)
+
+
 def _log_for_scatter(self, message, *args, **kwargs):
     if self.isEnabledFor(SCATTER):
         self._log(SCATTER, message, args, **kwargs)
+
+
 # def _log_to_root(message, *args, **kwargs):
 #     logging.log(level_value, message, *args, **kwargs)
+
 
 # Sources:
 # https://stackoverflow.com/questions/7621897/python-logging-module-globally
 # https://stackoverflow.com/questions/2183233/how-to-add-a-custom-loglevel-to-pythons-logging-facility
 def scattering_logger(name):
-    levels = ['NUMERICS', 'SCATTER']
+    levels = ["NUMERICS", "SCATTER"]
     methods = [_log_for_numerics, _log_for_scatter]
-    for i,level in enumerate(levels):
+    for i, level in enumerate(levels):
         level_name = level
         level_value = globals()[level]
         method_name = level_name.lower()
         if hasattr(logging, level_name):
-            #print('{} already defined in logging module'.format(level_name))
+            # print('{} already defined in logging module'.format(level_name))
             continue
         if hasattr(logging, method_name):
-            #print('{} already defined in logging module'.format(method_name))
+            # print('{} already defined in logging module'.format(method_name))
             continue
         if hasattr(logging.getLoggerClass(), method_name):
-            #print('{} already defined in logger class'.format(method_name))
+            # print('{} already defined in logger class'.format(method_name))
             continue
-
 
         logging.addLevelName(level_value, level_name)
         setattr(logging, level_name, level_value)
@@ -40,7 +45,7 @@ def scattering_logger(name):
 
     logger = logging.getLogger(name)
     if not logger.hasHandlers():
-        formatter = logging.Formatter(fmt='%(levelname)s (%(name)s): %(message)s')
+        formatter = logging.Formatter(fmt="%(levelname)s (%(name)s): %(message)s")
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         logger.addHandler(handler)

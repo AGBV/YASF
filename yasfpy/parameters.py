@@ -5,12 +5,13 @@ from yasfpy.initial_field import InitialField
 
 
 class Parameters:
-
-    def __init__(self, wavelength: np.array,
-                 medium_refractive_index: np.array,
-                 particles: Particles,
-                 initial_field: InitialField):
-
+    def __init__(
+        self,
+        wavelength: np.array,
+        medium_refractive_index: np.array,
+        particles: Particles,
+        initial_field: InitialField,
+    ):
         self.wavelength = wavelength
         self.medium_refractive_index = medium_refractive_index
         self.wavelengths_number = wavelength.size
@@ -27,11 +28,26 @@ class Parameters:
         self.omega = 2 * np.pi / self.wavelength
 
     def __interpolate_refractive_index_from_table(self):
-        refractive_index_interpolated = np.zeros((self.particles.num_unique_refractive_indices, self.wavelength.size), dtype=complex)
+        refractive_index_interpolated = np.zeros(
+            (self.particles.num_unique_refractive_indices, self.wavelength.size),
+            dtype=complex,
+        )
         for idx, data in enumerate(self.particles.refractive_index_table):
-            table = data['ref_idx'].to_numpy().astype(float)
-            n = np.interp(self.wavelength / 1e3, table[:, 0], table[:, 1], left=table[0, 1], right=table[-1, 1])
-            k = np.interp(self.wavelength / 1e3, table[:, 0], table[:, 2], left=table[0, 2], right=table[-1, 2])
+            table = data["ref_idx"].to_numpy().astype(float)
+            n = np.interp(
+                self.wavelength / 1e3,
+                table[:, 0],
+                table[:, 1],
+                left=table[0, 1],
+                right=table[-1, 1],
+            )
+            k = np.interp(
+                self.wavelength / 1e3,
+                table[:, 0],
+                table[:, 2],
+                left=table[0, 2],
+                right=table[-1, 2],
+            )
             refractive_index_interpolated[idx, :] = n + 1j * k
         return refractive_index_interpolated
 
@@ -45,10 +61,25 @@ class Parameters:
             self.k_particle = np.outer(self.particles.refractive_index, self.omega)
         else:
             table = self.__interpolate_refractive_index_from_table()
-            self.k_particle = np.take(table, self.particles.refractive_index, axis=0) * self.omega[np.newaxis, :]
+            self.k_particle = (
+                np.take(table, self.particles.refractive_index, axis=0)
+                * self.omega[np.newaxis, :]
+            )
 
-            unique_radius_index_pairs = np.zeros((self.particles.unique_radius_index_pairs.shape[0], self.wavelength.size + 1), dtype=complex)
-            unique_radius_index_pairs[:, 0] = self.particles.unique_radius_index_pairs[:, 0]
-            unique_radius_index_pairs[:, 1:] = np.take(table, self.particles.unique_radius_index_pairs[:, 1].astype(int), axis=0)
+            unique_radius_index_pairs = np.zeros(
+                (
+                    self.particles.unique_radius_index_pairs.shape[0],
+                    self.wavelength.size + 1,
+                ),
+                dtype=complex,
+            )
+            unique_radius_index_pairs[:, 0] = self.particles.unique_radius_index_pairs[
+                :, 0
+            ]
+            unique_radius_index_pairs[:, 1:] = np.take(
+                table,
+                self.particles.unique_radius_index_pairs[:, 1].astype(int),
+                axis=0,
+            )
 
             self.particles.unique_radius_index_pairs = unique_radius_index_pairs

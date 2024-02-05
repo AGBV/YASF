@@ -5,8 +5,10 @@ import numpy as np
 from math import ceil
 from numba import cuda
 from scipy.sparse.linalg import LinearOperator
+
 # from scipy.spatial.distance import pdist, squareform
 from scipy.special import spherical_jn, spherical_yn
+
 # from scipy.special import hankel1
 # from scipy.special import lpmv
 
@@ -20,7 +22,7 @@ from yasfpy.functions.misc import multi2single_index
 from yasfpy.functions.misc import mutual_lookup
 
 from yasfpy.functions.cpu_numba import compute_idx_lookups
-from yasfpy.functions.cpu_numba  import particle_interaction,     compute_field
+from yasfpy.functions.cpu_numba import particle_interaction, compute_field
 from yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_gpu
 
 
@@ -68,10 +70,13 @@ class Simulation:
         # add two zeros at beginning to allow interpolation
         # also in the first segment
         step = self.numerics.particle_distance_resolution
-        maxdist = self.parameters.particles.max_particle_distance + \
-          3 * self.numerics.particle_distance_resolution
+        maxdist = (
+            self.parameters.particles.max_particle_distance
+            + 3 * self.numerics.particle_distance_resolution
+        )
         self.lookup_particle_distances = np.concatenate(
-          (np.array([0]), np.arange(0, maxdist + np.finfo(float).eps, step)))
+            (np.array([0]), np.arange(0, maxdist + np.finfo(float).eps, step))
+        )
 
     def legacy_compute_h3_table(self):
         """
@@ -89,16 +94,19 @@ class Simulation:
         but is not used by Pyles!
         """
         self.h3_table = np.zeros(
-          (2 * self.numerics.lmax + 1,
-           self.lookup_particle_distances.shape[0], self.parameters.medium_refractive_index.shape[0]),
-          dtype=complex)
-        size_param = np.outer(
-          self.lookup_particle_distances, self.parameters.k_medium)
+            (
+                2 * self.numerics.lmax + 1,
+                self.lookup_particle_distances.shape[0],
+                self.parameters.medium_refractive_index.shape[0],
+            ),
+            dtype=complex,
+        )
+        size_param = np.outer(self.lookup_particle_distances, self.parameters.k_medium)
 
         for p in range(2 * self.numerics.lmax + 1):
-            self.h3_table[p, :, :] = \
-              spherical_jn(p, size_param) + 1j * \
-              spherical_yn(p, size_param)
+            self.h3_table[p, :, :] = spherical_jn(p, size_param) + 1j * spherical_yn(
+                p, size_param
+            )
 
     def __compute_idx_lookup(self):
         """
@@ -114,7 +122,9 @@ class Simulation:
         -----
         This function uses [numba](https://numba.pydata.org/) under the hood to speed up the computations.
         """
-        self.idx_lookup = compute_idx_lookups(self.numerics.lmax, self.parameters.particles.number)
+        self.idx_lookup = compute_idx_lookups(
+            self.numerics.lmax, self.parameters.particles.number
+        )
 
     def __compute_lookups(self):
         """
@@ -147,11 +157,15 @@ class Simulation:
         """
         lookup_computation_time_start = time()
         # TODO: new, could be error prone and is not tested yet!
-        self.sph_j, self.sph_h, self.e_j_dm_phi, self.plm = mutual_lookup(self.numerics.lmax, self.parameters.particles.position, self.parameters.particles.position, self.parameters.k_medium)[:4]
+        self.sph_j, self.sph_h, self.e_j_dm_phi, self.plm = mutual_lookup(
+            self.numerics.lmax,
+            self.parameters.particles.position,
+            self.parameters.particles.position,
+            self.parameters.k_medium,
+        )[:4]
 
         # lmax = self.numerics.lmax
         # particle_number = self.parameters.particles.number
-
 
         # dists = squareform(pdist(self.parameters.particles.position))
         # ct = np.divide(
@@ -195,7 +209,10 @@ class Simulation:
         #   self.sph_h, nan=0) + np.isnan(self.sph_h) * 1
 
         lookup_computation_time_stop = time()
-        self.log.scatter('Computing lookup tables took %f s' % (lookup_computation_time_stop - lookup_computation_time_start))
+        self.log.scatter(
+            "Computing lookup tables took %f s"
+            % (lookup_computation_time_stop - lookup_computation_time_start)
+        )
 
     def __setup(self):
         """
@@ -228,28 +245,51 @@ class Simulation:
         it could be rewritten using `numba` to speed the process up.
         """
         self.mie_coefficients = np.zeros(
-          (self.parameters.particles.num_unique_pairs,
-           self.numerics.nmax,
-           self.parameters.wavelength.shape[0]),
-          dtype=complex)
+            (
+                self.parameters.particles.num_unique_pairs,
+                self.numerics.nmax,
+                self.parameters.wavelength.shape[0],
+            ),
+            dtype=complex,
+        )
 
         self.scatter_to_internal = np.zeros_like(self.mie_coefficients)
 
         for u_i in range(self.parameters.particles.num_unique_pairs):
             for tau in range(1, 3):
-                for l in range(1, self.numerics.lmax+1):
-                    for m in range(-l, l+1):
+                for l in range(1, self.numerics.lmax + 1):
+                    for m in range(-l, l + 1):
                         jmult = multi2single_index(0, tau, l, m, self.numerics.lmax)
-                        self.mie_coefficients[u_i, jmult, :] = t_entry(tau=tau, l=l,
-                                                 k_medium=self.parameters.k_medium,
-                                                 k_sphere=self.parameters.omega * self.parameters.particles.unique_radius_index_pairs[u_i, 1:],
-                                                 radius=np.real(self.parameters.particles.unique_radius_index_pairs[u_i, 0]))
+                        self.mie_coefficients[u_i, jmult, :] = t_entry(
+                            tau=tau,
+                            l=l,
+                            k_medium=self.parameters.k_medium,
+                            k_sphere=self.parameters.omega
+                            * self.parameters.particles.unique_radius_index_pairs[
+                                u_i, 1:
+                            ],
+                            radius=np.real(
+                                self.parameters.particles.unique_radius_index_pairs[
+                                    u_i, 0
+                                ]
+                            ),
+                        )
 
-                        self.scatter_to_internal[u_i, jmult, :] = t_entry(tau=tau, l=l,
-                                                 k_medium=self.parameters.k_medium,
-                                                 k_sphere=self.parameters.omega * self.parameters.particles.unique_radius_index_pairs[u_i, 1:],
-                                                 radius=np.real(self.parameters.particles.unique_radius_index_pairs[u_i, 0]),
-                                                 field_type='ratio')
+                        self.scatter_to_internal[u_i, jmult, :] = t_entry(
+                            tau=tau,
+                            l=l,
+                            k_medium=self.parameters.k_medium,
+                            k_sphere=self.parameters.omega
+                            * self.parameters.particles.unique_radius_index_pairs[
+                                u_i, 1:
+                            ],
+                            radius=np.real(
+                                self.parameters.particles.unique_radius_index_pairs[
+                                    u_i, 0
+                                ]
+                            ),
+                            field_type="ratio",
+                        )
 
     def compute_initial_field_coefficients(self):
         """
@@ -264,19 +304,21 @@ class Simulation:
         initial_field_coefficients : np.ndarray
           Initial field coefficients
         """
-        self.log.scatter('compute initial field coefficients ...')
+        self.log.scatter("compute initial field coefficients ...")
 
-        if np.isfinite(self.parameters.initial_field.beam_width) and (self.parameters.initial_field.beam_width > 0):
-            self.log.scatter('\t Gaussian beam ...')
+        if np.isfinite(self.parameters.initial_field.beam_width) and (
+            self.parameters.initial_field.beam_width > 0
+        ):
+            self.log.scatter("\t Gaussian beam ...")
             if self.parameters.initial_field.normal_incidence:
                 self.__compute_initial_field_coefficients_wavebundle_normal_incidence()
             else:
-                self.log.error('\t this case is not implemented')
+                self.log.error("\t this case is not implemented")
         else:
-            self.log.scatter('\t plane wave ...')
+            self.log.scatter("\t plane wave ...")
             self.__compute_initial_field_coefficients_planewave()
 
-        self.log.scatter('done')
+        self.log.scatter("done")
 
     def compute_right_hand_side(self):
         """
@@ -291,7 +333,10 @@ class Simulation:
         -----
         For more information regarding the equation, please have a look at the paper of [Celes](https://arxiv.org/abs/1706.02145).
         """
-        self.right_hand_side = self.mie_coefficients[self.parameters.particles.single_unique_array_idx, :] * self.initial_field_coefficients
+        self.right_hand_side = (
+            self.mie_coefficients[self.parameters.particles.single_unique_array_idx, :]
+            * self.initial_field_coefficients
+        )
 
     def __compute_initial_field_coefficients_planewave(self):
         lmax = self.numerics.lmax
@@ -307,22 +352,43 @@ class Simulation:
         pilm, taulm = spherical_functions_trigon(lmax, beta)
 
         # cylindrical coordinates for relative particle positions
-        relative_particle_positions = self.parameters.particles.position - \
-          self.parameters.initial_field.focal_point
-        kvec = np.outer(
-          np.array((sb * np.cos(alpha), sb * np.sin(alpha), cb)), k)
+        relative_particle_positions = (
+            self.parameters.particles.position
+            - self.parameters.initial_field.focal_point
+        )
+        kvec = np.outer(np.array((sb * np.cos(alpha), sb * np.sin(alpha), cb)), k)
         eikr = np.exp(1j * np.matmul(relative_particle_positions, kvec))
 
         # clean up some memory?
         del (k, beta, cb, sb, kvec, relative_particle_positions)
 
         self.initial_field_coefficients = np.zeros(
-          (self.parameters.particles.number, self.numerics.nmax, self.parameters.k_medium.size), dtype=complex)
-        for m in range(-lmax, lmax+1):
+            (
+                self.parameters.particles.number,
+                self.numerics.nmax,
+                self.parameters.k_medium.size,
+            ),
+            dtype=complex,
+        )
+        for m in range(-lmax, lmax + 1):
             for tau in range(1, 3):
-                for l in range(np.max([1, np.abs(m)]), lmax+1):
+                for l in range(np.max([1, np.abs(m)]), lmax + 1):
                     n = multi2single_index(0, tau, l, m, lmax)
-                    self.initial_field_coefficients[:, n, :] = 4 * E0 * np.exp(-1j * m * alpha) * eikr * transformation_coefficients(pilm, taulm, tau, l, m, self.parameters.initial_field.pol, dagger=True)
+                    self.initial_field_coefficients[:, n, :] = (
+                        4
+                        * E0
+                        * np.exp(-1j * m * alpha)
+                        * eikr
+                        * transformation_coefficients(
+                            pilm,
+                            taulm,
+                            tau,
+                            l,
+                            m,
+                            self.parameters.initial_field.pol,
+                            dagger=True,
+                        )
+                    )
 
     def __compute_initial_field_coefficients_wavebundle_normal_incidence(self):
         """
@@ -330,10 +396,20 @@ class Simulation:
         ----
         Implement this function using the celes function [initial_field_coefficients_wavebundle_normal_incidence.m](https://github.com/disordered-photonics/celes/blob/master/src/initial/initial_field_coefficients_wavebundle_normal_incidence.m)
         """
-        self.initial_field_coefficients = np.zeros((self.parameters.particles.number, self.numerics.nmax, self.parameters.k_medium.size), dtype=complex) * np.nan
+        self.initial_field_coefficients = (
+            np.zeros(
+                (
+                    self.parameters.particles.number,
+                    self.numerics.nmax,
+                    self.parameters.k_medium.size,
+                ),
+                dtype=complex,
+            )
+            * np.nan
+        )
 
     def coupling_matrix_multiply(self, x: np.ndarray, idx: int = None):
-        self.log.scatter('prepare particle coupling ... ')
+        self.log.scatter("prepare particle coupling ... ")
         preparation_time = time()
 
         lmax = self.numerics.lmax
@@ -350,10 +426,11 @@ class Simulation:
         if idx != None:
             spherical_hankel_lookup = spherical_hankel_lookup[:, :, :, idx]
             spherical_hankel_lookup = np.copy(
-              spherical_hankel_lookup[:, :, :, np.newaxis])
+                spherical_hankel_lookup[:, :, :, np.newaxis]
+            )
             wavelengths_size = 1
 
-        self.log.scatter('\t Starting Wx computation')
+        self.log.scatter("\t Starting Wx computation")
         if self.numerics.gpu:
             wx_real = np.zeros(x.shape + (wavelengths_size,), dtype=float)
             wx_imag = np.zeros_like(wx_real)
@@ -363,8 +440,7 @@ class Simulation:
             wx_real_device = cuda.to_device(wx_real)
             wx_imag_device = cuda.to_device(wx_imag)
             translation_device = cuda.to_device(translation_table)
-            associated_legendre_device = cuda.to_device(
-              associated_legendre_lookup)
+            associated_legendre_device = cuda.to_device(associated_legendre_lookup)
             spherical_hankel_device = cuda.to_device(spherical_hankel_lookup)
             e_j_dm_phi_device = cuda.to_device(e_j_dm_phi_loopup)
 
@@ -372,32 +448,53 @@ class Simulation:
             blocks_per_grid_x = ceil(jmax / threads_per_block[0])
             blocks_per_grid_y = ceil(jmax / threads_per_block[1])
             blocks_per_grid_z = ceil(wavelengths_size / threads_per_block[2])
-            blocks_per_grid = (blocks_per_grid_x,
-                       blocks_per_grid_y, blocks_per_grid_z)
+            blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y, blocks_per_grid_z)
 
             coupling_matrix_time = time()
-            particle_interaction_gpu[blocks_per_grid, threads_per_block](lmax, particle_number,
-                                           idx_device, x_device, wx_real_device, wx_imag_device,
-                                           translation_device, associated_legendre_device,
-                                           spherical_hankel_device, e_j_dm_phi_device)
+            particle_interaction_gpu[blocks_per_grid, threads_per_block](
+                lmax,
+                particle_number,
+                idx_device,
+                x_device,
+                wx_real_device,
+                wx_imag_device,
+                translation_device,
+                associated_legendre_device,
+                spherical_hankel_device,
+                e_j_dm_phi_device,
+            )
             wx_real = wx_real_device.copy_to_host()
             wx_imag = wx_imag_device.copy_to_host()
             wx = wx_real + 1j * wx_imag
             # particle_interaction.parallel_diagnostics(level=4)
             time_end = time()
-            self.log.scatter("\t Time taken for preparation: %f" % (coupling_matrix_time - preparation_time))
-            self.log.scatter("\t Time taken for coupling matrix: %f" % (time_end - coupling_matrix_time))
+            self.log.scatter(
+                "\t Time taken for preparation: %f"
+                % (coupling_matrix_time - preparation_time)
+            )
+            self.log.scatter(
+                "\t Time taken for coupling matrix: %f"
+                % (time_end - coupling_matrix_time)
+            )
         else:
             # from numba_progress import ProgressBar
             # num_iterations = jmax * jmax * wavelengths
             # progress = ProgressBar(total=num_iterations)
             # progress = None
-            wx = particle_interaction(lmax, particle_number,
-                          idx_lookup, x,
-                          translation_table, associated_legendre_lookup,
-                          spherical_hankel_lookup, e_j_dm_phi_loopup)
+            wx = particle_interaction(
+                lmax,
+                particle_number,
+                idx_lookup,
+                x,
+                translation_table,
+                associated_legendre_lookup,
+                spherical_hankel_lookup,
+                e_j_dm_phi_loopup,
+            )
             time_end = time()
-            self.log.scatter("\t Time taken for coupling matrix: %f" % (time_end - preparation_time))
+            self.log.scatter(
+                "\t Time taken for coupling matrix: %f" % (time_end - preparation_time)
+            )
 
         if idx != None:
             wx = np.squeeze(wx)
@@ -407,95 +504,170 @@ class Simulation:
     def master_matrix_multiply(self, value: np.ndarray, idx: int):
         wx = self.coupling_matrix_multiply(value, idx)
 
-        self.log.scatter('apply T-matrix ...')
+        self.log.scatter("apply T-matrix ...")
         t_matrix_start = time()
 
-        twx = self.mie_coefficients[self.parameters.particles.single_unique_array_idx, :, idx].ravel(
-          order='C') * wx
+        twx = (
+            self.mie_coefficients[
+                self.parameters.particles.single_unique_array_idx, :, idx
+            ].ravel(order="C")
+            * wx
+        )
         mx = value - twx
 
         t_matrix_stop = time()
-        self.log.scatter(f'\t done in {t_matrix_stop - t_matrix_start} seconds.')
+        self.log.scatter(f"\t done in {t_matrix_stop - t_matrix_start} seconds.")
 
         return mx
 
     def compute_scattered_field_coefficients(self, guess=None):
-        self.log.scatter('compute scattered field coefficients ...')
+        self.log.scatter("compute scattered field coefficients ...")
         jmax = self.parameters.particles.number * self.numerics.nmax
-        self.scattered_field_coefficients = np.zeros_like(self.initial_field_coefficients)
+        self.scattered_field_coefficients = np.zeros_like(
+            self.initial_field_coefficients
+        )
         self.scattered_field_err_codes = np.zeros(self.parameters.wavelengths_number)
         if guess is None:
             guess = self.right_hand_side
         for w in range(self.parameters.wavelengths_number):
-            def mmm(x): return self.master_matrix_multiply(x, w)
+
+            def mmm(x):
+                return self.master_matrix_multiply(x, w)
+
             A = LinearOperator(shape=(jmax, jmax), matvec=mmm)
             b = self.right_hand_side[:, :, w].ravel()
             x0 = guess[:, :, w].ravel()
-            self.log.scatter('Solver run %d/%d' % (w+1, self.parameters.wavelengths_number))
+            self.log.scatter(
+                "Solver run %d/%d" % (w + 1, self.parameters.wavelengths_number)
+            )
             x, err_code = self.numerics.solver.run(A, b, x0)
             self.scattered_field_coefficients[:, :, w] = x.reshape(
-              self.right_hand_side.shape[:2])
+                self.right_hand_side.shape[:2]
+            )
             self.scattered_field_err_codes[w] = err_code
 
     def compute_fields(self, sampling_points: np.ndarray):
         if sampling_points.shape[0] < 1:
-            self.log.error('Number of sampling points must be bigger than zero!')
+            self.log.error("Number of sampling points must be bigger than zero!")
             return
         elif sampling_points.shape[1] != 3:
-            self.log.error('The points have to have three coordinates (x,y,z)!')
+            self.log.error("The points have to have three coordinates (x,y,z)!")
             return
 
         # scatter_to_internal_table = np.sum((self.parameters.particles.position[:, np.newaxis, :] - sampling_points[np.newaxis, :, :])**2, axis = 2)
         # scatter_to_internal_table = scatter_to_internal_table < self.parameters.particles.r[:, np.newaxis]**2
 
-
-        print('Computing mutual lookup')
-        _, sph_h, e_j_dm_phi, p_lm, e_r, e_theta, e_phi, cosine_theta, sine_theta, size_parameter, sph_h_derivative = mutual_lookup(self.numerics.lmax, self.parameters.particles.position, sampling_points, self.parameters.k_medium, derivatives = True, parallel = False)
-        pi_lm, tau_lm = spherical_functions_trigon(self.numerics.lmax, cosine_theta, sine_theta)
+        print("Computing mutual lookup")
+        (
+            _,
+            sph_h,
+            e_j_dm_phi,
+            p_lm,
+            e_r,
+            e_theta,
+            e_phi,
+            cosine_theta,
+            sine_theta,
+            size_parameter,
+            sph_h_derivative,
+        ) = mutual_lookup(
+            self.numerics.lmax,
+            self.parameters.particles.position,
+            sampling_points,
+            self.parameters.k_medium,
+            derivatives=True,
+            parallel=False,
+        )
+        pi_lm, tau_lm = spherical_functions_trigon(
+            self.numerics.lmax, cosine_theta, sine_theta
+        )
         # print(sph_h.size)
 
-        print('Computing field...')
+        print("Computing field...")
         field_time_start = time()
         self.sampling_points = sampling_points
         if self.numerics.gpu:
-            print('\t...using GPU')
-            field_real = np.zeros((self.parameters.k_medium.size, sampling_points.shape[0], 3), dtype=float)
+            print("\t...using GPU")
+            field_real = np.zeros(
+                (self.parameters.k_medium.size, sampling_points.shape[0], 3),
+                dtype=float,
+            )
             field_imag = np.zeros_like(field_real)
 
-            idx_device =              cuda.to_device(self.idx_lookup)
-            size_parameter_device =   cuda.to_device(np.ascontiguousarray(size_parameter))
-            sph_h_device =            cuda.to_device(np.ascontiguousarray(sph_h))
-            sph_h_derivative_device = cuda.to_device(np.ascontiguousarray(sph_h_derivative))
-            e_j_dm_phi_device =       cuda.to_device(np.ascontiguousarray(e_j_dm_phi))
-            p_lm_device =             cuda.to_device(np.ascontiguousarray(p_lm))
-            pi_lm_device =            cuda.to_device(np.ascontiguousarray(pi_lm))
-            tau_lm_device =           cuda.to_device(np.ascontiguousarray(tau_lm))
-            e_r_device =              cuda.to_device(np.ascontiguousarray(e_r))
-            e_theta_device =          cuda.to_device(np.ascontiguousarray(e_theta))
-            e_phi_device =            cuda.to_device(np.ascontiguousarray(e_phi))
-            sfc_device =              cuda.to_device(np.ascontiguousarray(self.scattered_field_coefficients))
+            idx_device = cuda.to_device(self.idx_lookup)
+            size_parameter_device = cuda.to_device(np.ascontiguousarray(size_parameter))
+            sph_h_device = cuda.to_device(np.ascontiguousarray(sph_h))
+            sph_h_derivative_device = cuda.to_device(
+                np.ascontiguousarray(sph_h_derivative)
+            )
+            e_j_dm_phi_device = cuda.to_device(np.ascontiguousarray(e_j_dm_phi))
+            p_lm_device = cuda.to_device(np.ascontiguousarray(p_lm))
+            pi_lm_device = cuda.to_device(np.ascontiguousarray(pi_lm))
+            tau_lm_device = cuda.to_device(np.ascontiguousarray(tau_lm))
+            e_r_device = cuda.to_device(np.ascontiguousarray(e_r))
+            e_theta_device = cuda.to_device(np.ascontiguousarray(e_theta))
+            e_phi_device = cuda.to_device(np.ascontiguousarray(e_phi))
+            sfc_device = cuda.to_device(
+                np.ascontiguousarray(self.scattered_field_coefficients)
+            )
 
             field_real_device = cuda.to_device(field_real)
             field_imag_device = cuda.to_device(field_imag)
 
             threads_per_block = (16, 16, 2)
-            blocks_per_grid = (sampling_points.shape[0], sph_h.shape[1] * 2 * self.numerics.lmax * (self.numerics.lmax + 2), self.parameters.k_medium.size)
-            blocks_per_grid = tuple([ceil(blocks_per_grid[i] / threads_per_block[i]) for i in range(len(threads_per_block))])
+            blocks_per_grid = (
+                sampling_points.shape[0],
+                sph_h.shape[1] * 2 * self.numerics.lmax * (self.numerics.lmax + 2),
+                self.parameters.k_medium.size,
+            )
+            blocks_per_grid = tuple(
+                [
+                    ceil(blocks_per_grid[i] / threads_per_block[i])
+                    for i in range(len(threads_per_block))
+                ]
+            )
 
             compute_field_gpu[blocks_per_grid, threads_per_block](
-              self.numerics.lmax, idx_device, size_parameter_device,
-              sph_h_device, sph_h_derivative_device, e_j_dm_phi_device,
-              p_lm_device, pi_lm_device, tau_lm_device,
-              e_r_device, e_theta_device, e_phi_device, sfc_device,
-              field_real_device, field_imag_device)
+                self.numerics.lmax,
+                idx_device,
+                size_parameter_device,
+                sph_h_device,
+                sph_h_derivative_device,
+                e_j_dm_phi_device,
+                p_lm_device,
+                pi_lm_device,
+                tau_lm_device,
+                e_r_device,
+                e_theta_device,
+                e_phi_device,
+                sfc_device,
+                field_real_device,
+                field_imag_device,
+            )
 
             field_real = field_real_device.copy_to_host()
             field_imag = field_imag_device.copy_to_host()
             self.scattered_field = field_real + 1j * field_imag
 
         else:
-            print('\t...using CPU')
-            self.scattered_field = compute_field(self.numerics.lmax, self.idx_lookup, size_parameter, sph_h, sph_h_derivative, e_j_dm_phi, p_lm, pi_lm, tau_lm, e_r, e_theta, e_phi, scattered_field_coefficients = self.scattered_field_coefficients)
+            print("\t...using CPU")
+            self.scattered_field = compute_field(
+                self.numerics.lmax,
+                self.idx_lookup,
+                size_parameter,
+                sph_h,
+                sph_h_derivative,
+                e_j_dm_phi,
+                p_lm,
+                pi_lm,
+                tau_lm,
+                e_r,
+                e_theta,
+                e_phi,
+                scattered_field_coefficients=self.scattered_field_coefficients,
+            )
 
         field_time_stop = time()
-        self.log.scatter(f'\t Time taken for field calculation: {field_time_stop - field_time_start}')
+        self.log.scatter(
+            f"\t Time taken for field calculation: {field_time_stop - field_time_start}"
+        )
