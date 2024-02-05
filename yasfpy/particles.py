@@ -8,7 +8,7 @@ from yasfpy.functions.misc import material_handler
 
 
 class Particles:
-    def __init__(self, position: np.array, r: np.array, refractive_index: np.array, refractive_index_table: list=None, type: str = 'sphere'):
+    def __init__(self, position: np.array, r: np.array, refractive_index: np.array, refractive_index_table: list = None, type: str = 'sphere'):
         self.position = position
         self.r = r
         self.refractive_index = refractive_index

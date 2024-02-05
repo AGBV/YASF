@@ -128,7 +128,7 @@ class Optics:
       blocks_per_grid = tuple([ceil(sizes[k] / threads_per_block[k]) for k in range(len(threads_per_block))])
       # blocks_per_grid = (
       #   ceil(jmax / threads_per_block[0]),
-      #   ceil(angles / threads_per_block[1]), 
+      #   ceil(angles / threads_per_block[1]),
       #   ceil(wavelengths / threads_per_block[2]))
 
       compute_electric_field_angle_components_gpu[blocks_per_grid, threads_per_block](
@@ -187,7 +187,7 @@ class Optics:
         pilm, taulm)
 
       intensity, dop, dolp, dolq, dolu, docp = compute_polarization_components(self.simulation.parameters.k_medium.size, self.simulation.numerics.azimuthal_angles.size, e_field_theta, e_field_phi)
-    
+
     self.scattering_angles = self.simulation.numerics.polar_angles
 
     self.phase_function_3d = intensity * 4 * np.pi / np.power(np.abs(self.simulation.parameters.k_medium), 2) / self.c_sca[np.newaxis, :]

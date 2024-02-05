@@ -5,10 +5,10 @@ import numpy as np
 from math import ceil
 from numba import cuda
 from scipy.sparse.linalg import LinearOperator
-from scipy.spatial.distance import pdist, squareform
+# from scipy.spatial.distance import pdist, squareform
 from scipy.special import spherical_jn, spherical_yn
-from scipy.special import hankel1
-from scipy.special import lpmv
+# from scipy.special import hankel1
+# from scipy.special import lpmv
 
 from yasfpy.parameters import Parameters
 from yasfpy.numerics import Numerics
@@ -391,7 +391,7 @@ class Simulation:
             # from numba_progress import ProgressBar
             # num_iterations = jmax * jmax * wavelengths
             # progress = ProgressBar(total=num_iterations)
-            progress = None
+            # progress = None
             wx = particle_interaction(lmax, particle_number,
                           idx_lookup, x,
                           translation_table, associated_legendre_lookup,
