@@ -315,7 +315,7 @@ def handle_eodg(url):
 
 
 def handle_csv(path):
-    name = re.split("\._-", path)
+    name = re.split(r"\._-", path)
     material = unquote(name[0])
     data = pd.read_csv(
         path, delim_whitespace=False, header=0, names=["wavelength", "n", "k"]
