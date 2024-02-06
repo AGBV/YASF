@@ -28,7 +28,7 @@ from yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_
 
 class Simulation:
     """
-    Pyles Simulation Class
+    YASF Simulation Class
 
     Attributes
     ----------
@@ -65,7 +65,7 @@ class Simulation:
         Notes
         -----
         This function has been ported from the Matlab Celes framework
-        but is not used by Pyles!
+        but is not used by YASF!
         """
         # add two zeros at beginning to allow interpolation
         # also in the first segment
@@ -91,7 +91,7 @@ class Simulation:
         Notes
         -----
         This function has been ported from the Matlab Celes framework
-        but is not used by Pyles!
+        but is not used by YASF!
         """
         self.h3_table = np.zeros(
             (

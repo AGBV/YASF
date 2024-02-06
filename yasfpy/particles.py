@@ -14,12 +14,12 @@ class Particles:
         r: np.array,
         refractive_index: np.array,
         refractive_index_table: list = None,
-        type: str = "sphere",
+        shape_type: str = "sphere",
     ):
         self.position = position
         self.r = r
         self.refractive_index = refractive_index
-        self.type = type
+        self.type = shape_type
 
         self.log = log.scattering_logger(__name__)
 

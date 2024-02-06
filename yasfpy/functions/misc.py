@@ -181,7 +181,7 @@ def mutual_lookup(
 import io
 import pandas as pd
 import yaml
-import urllib.request
+# import urllib.request
 from urllib.parse import unquote
 import requests as req
 
