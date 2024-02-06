@@ -1,5 +1,5 @@
 import numpy as np
-
+import math
 
 def spherical_functions_trigon(lmax, theta, st=None):
     size = np.array([1])
@@ -47,7 +47,7 @@ def spherical_functions_trigon(lmax, theta, st=None):
     for m in range(1, lmax + 1):
         plm[m - 1, m, :] = np.zeros_like(ct)
         pilm[m - 1, m, :] = np.zeros_like(ct)
-        coeff = np.sqrt((2 * m + 1) / 2 / np.math.factorial(2 * m)) * np.prod(
+        coeff = np.sqrt((2 * m + 1) / 2 / math.factorial(2 * m)) * np.prod(
             np.arange(1, 2 * m, 2)
         )
         plm[m, m, :] = coeff * np.power(st, m)
