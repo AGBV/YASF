@@ -33,11 +33,11 @@ class Simulation:
     Attributes
     ----------
     parameters : Parameters
-      Provided object of the instance `Parameters`
+        Provided object of the instance `Parameters`
     numerics : Numerics
-      Provided object of the instance `Numerics`
+        Provided object of the instance `Numerics`
     log : logging
-      Object for writing logs to
+        Object for writing logs to
     """
 
     def __init__(self, parameters: Parameters, numerics: Numerics):
@@ -45,9 +45,9 @@ class Simulation:
         Parameters
         ----------
         parameters
-          Object of the instance `Parameters`
+            Object of the instance `Parameters`
         numerics
-          Object of the instance `Numerics`
+            Object of the instance `Numerics`
         """
         self.parameters = parameters
         self.numerics = numerics
@@ -86,7 +86,7 @@ class Simulation:
         Attributes
         ----------
         h3_table : np.ndarray
-          Lookup table of the spherical hankel function values at `self.lookup_particle_distances`
+            Lookup table of the spherical hankel function values at `self.lookup_particle_distances`
 
         Notes
         -----
@@ -116,7 +116,7 @@ class Simulation:
         Attributes
         ----------
         idx_lookup : np.ndarray
-          Lookup table of the indices to iterate over large arrays.
+            Lookup table of the indices to iterate over large arrays.
 
         Notes
         -----
@@ -138,18 +138,18 @@ class Simulation:
         Attributes
         ----------
         sph_j : np.ndarray
-          Spherical Bessel function lookup table calculated
-          for pair-wise particles distances
+            Spherical Bessel function lookup table calculated
+            for pair-wise particles distances
         sph_h : np.ndarray
-          Spherical Hankel function lookup table calculated
-          for pair-wise particles distances
+            Spherical Hankel function lookup table calculated
+            for pair-wise particles distances
         plm : np.ndarray
-          Associated Legendre polynomial lookup table calculated
-          for the cosine value of the pairwise particle
-          inclination angles
+            Associated Legendre polynomial lookup table calculated
+            for the cosine value of the pairwise particle
+            inclination angles
         e_j_dm_phi : np.ndarray
-          Exponential function lookup table calculated for
-          the pairwise particle azimuthal angles
+            Exponential function lookup table calculated for
+            the pairwise particle azimuthal angles
 
         Notes
         -----
@@ -233,7 +233,7 @@ class Simulation:
         Attributes
         ----------
         mie_coefficients : np.ndarray
-          Mie coefficients table
+            Mie coefficients table
 
         See Also
         --------
@@ -302,7 +302,7 @@ class Simulation:
         Attributes
         ----------
         initial_field_coefficients : np.ndarray
-          Initial field coefficients
+            Initial field coefficients
         """
         self.log.scatter("compute initial field coefficients ...")
 
@@ -327,7 +327,7 @@ class Simulation:
         Attributes
         ----------
         right_hand_side : np.ndarray
-          Right hand side of $M \\cdot b = T \\cdot a_I$
+            Right hand side of $M \\cdot b = T \\cdot a_I$
 
         Notes
         -----
