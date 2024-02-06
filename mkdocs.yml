@@ -28,9 +28,10 @@ theme:
     - navigation.tabs.sticky
     - navigation.top
     - toc.integrate
+  custom_dir: docs/overrides
 
 plugins:
-  - autorefs
+  - autorefs:
   # - coverage:
   #     page_name: coverage
   #     html_report_dir: coverage-report/htmlcov
