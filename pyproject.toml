@@ -28,6 +28,10 @@ mkdocstrings = "^0.24.0"
 mkdocstrings-python = "^1.8.0"
 pymdown-extensions = "^10.7"
 
+[tool.poetry.group.tests]
+optional = true
+[tool.poetry.group.tests.dependencies]
+astropy = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]
