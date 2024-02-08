@@ -17,6 +17,7 @@ dependencies:
   - plotly
   - psutil
   - pyyaml
+  - scipy
   # Testing dependencies
   - astropy
   - coverage
@@ -25,5 +26,4 @@ dependencies:
   # Pip dependencies
   - pip
   - pip:
-      - scipy
       - pywigxjpf
