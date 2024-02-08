@@ -1,4 +1,4 @@
-name: Unit tests on self-hosted with Conda
+name: Unit tests
 
 on:
   ## This is a bit overkill... ideally we only merge into master after a PR is approved
