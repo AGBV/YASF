@@ -7,6 +7,7 @@ variables:
   NUMBA_DISABLE_INTEL_SVML: 0
   NUMBA_CUDA_USE_NVIDIA_BINDING: 0
 dependencies:
+  # Base dependencies
   - python=3.10
   - cudatoolkit=11.4
   - icc_rt
@@ -15,7 +16,14 @@ dependencies:
   - pandas
   - plotly
   - psutil
+  - pyyaml
   - scipy
+  # Testing dependencies
+  - astropy
+  - coverage
+  - pytest
+  - pytest-cov
+  # Pip dependencies
   - pip
   - pip:
       - pywigxjpf
