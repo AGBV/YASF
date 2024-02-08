@@ -1,0 +1,110 @@
+name: Unit tests on self-hosted with Conda
+
+on:
+  ## This is a bit overkill... ideally we only merge into master after a PR is approved
+  # push:
+  #   branches:
+  #     - master
+  #   paths:
+  #     - "src/**"
+  #     - "tests/**"
+  #     - ".github/workflows/testing.yml"
+  workflow_dispatch:
+
+jobs:
+  unittest:
+    runs-on:
+      - self-hosted
+      - gpu
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Cache conda
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('conda-env.yml') }}
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: "latest"
+          activate-environment: pyles-conda
+          environment-file: yasf-env-test.yml
+          use-only-tar-bz2: true
+          auto-activate-base: false
+
+      - name: Install testing dependencies
+        run: |
+          conda install pytest pytest-cov coverage
+
+      - name: Running pytest
+        run: |
+          pytest -v --cov --cov-report=xml
+          coverage xml -i
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 1
+
+  codacy-coverage-reporter:
+    runs-on: ubuntu-latest
+    name: codacy-coverage-reporter
+    needs: unittest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          lfs: false
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-report
+      - name: Run codacy-coverage-reporter
+        uses: codacy/codacy-coverage-reporter-action@v1
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          # or
+          # api-token: ${{ secrets.CODACY_API_TOKEN }}
+          coverage-reports: ./coverage.xml
+          # or a comma-separated list for multiple reports
+          # coverage-reports: <PATH_TO_REPORT>, <PATH_TO_REPORT>
+
+  # coverage:
+  #   name: Sonarqube coverage report
+  #   needs: unittest
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Set up Git repository
+  #       uses: actions/checkout@v2
+  #       with:
+  #         fetch-depth: 0
+  #         lfs: false
+
+  #     - name: Download artifact
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: coverage-report
+
+  #     - name: SonarQube Scan
+  #       uses: sonarsource/sonarqube-scan-action@master
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

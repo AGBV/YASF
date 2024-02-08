@@ -1,0 +1,21 @@
+name: yasf-env
+channels:
+  - numba
+  - conda-forge
+  - defaults
+variables:
+  NUMBA_DISABLE_INTEL_SVML: 0
+  NUMBA_CUDA_USE_NVIDIA_BINDING: 0
+dependencies:
+  - python=3.10
+  - cudatoolkit=11.4
+  - icc_rt
+  - numba
+  - numpy
+  - pandas
+  - plotly
+  - psutil
+  - scipy
+  - pip
+  - pip:
+      - pywigxjpf
