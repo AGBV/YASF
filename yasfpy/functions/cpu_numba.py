@@ -297,7 +297,7 @@ def compute_radial_independent_scattered_field(
     return e_1_sca
 
 
-@jit(nopython=False, parallel=True, nogil=False, fastmath=False, forceobj=True)
+@jit(nopython=True, parallel=True, nogil=False, fastmath=False, forceobj=True)
 def compute_lookup_tables(
     lmax: int, size_parameter: np.ndarray, phi: np.ndarray, cosine_theta: np.ndarray
 ):
