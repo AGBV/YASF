@@ -17,7 +17,7 @@ jobs:
     name: Poetry dependencies to requirements.txt
     steps:
       - name: Set up Git repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: false
@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Set up Git repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: false
@@ -103,7 +103,7 @@ jobs:
     needs: unittest
     steps:
       - name: Set up Git repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: false
@@ -115,31 +115,4 @@ jobs:
         uses: codacy/codacy-coverage-reporter-action@v1
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-          # or
-          # api-token: ${{ secrets.CODACY_API_TOKEN }}
           coverage-reports: ./coverage.xml
-          # or a comma-separated list for multiple reports
-          # coverage-reports: <PATH_TO_REPORT>, <PATH_TO_REPORT>
-
-  # coverage:
-  #   name: Sonarqube coverage report
-  #   needs: unittest
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Set up Git repository
-  #       uses: actions/checkout@v2
-  #       with:
-  #         fetch-depth: 0
-  #         lfs: false
-
-  #     - name: Download artifact
-  #       uses: actions/download-artifact@v3
-  #       with:
-  #         name: coverage-report
-
-  #     - name: SonarQube Scan
-  #       uses: sonarsource/sonarqube-scan-action@master
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
