@@ -9,21 +9,6 @@ variables:
 dependencies:
   - python=3.10
   - cudatoolkit=11.4
-  # Base dependencies
-  - icc_rt
-  - numba
-  - numpy
-  - pandas
-  - plotly
-  - psutil
-  - pyyaml
-  - scipy
-  # Testing dependencies
-  - astropy
-  - coverage
-  - pytest
-  - pytest-cov
-  # Pip dependencies
   - pip
   - pip:
-      - pywigxjpf
+      - -r requirements.txt

@@ -28,6 +28,12 @@ jobs:
           fetch-depth: 0
           lfs: false
 
+      - name: Install poetry
+        uses: abatilo/actions-poetry@v2
+
+      - name: Export dependencies
+        run: poetry export --with tests -f requirements.txt -o requirements.txt --without-hashes
+
       - name: Cache conda
         uses: actions/cache@v2
         env:
