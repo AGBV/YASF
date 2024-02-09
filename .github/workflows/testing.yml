@@ -41,6 +41,7 @@ jobs:
           retention-days: 1
 
   unittest:
+    name: Unit tests
     runs-on:
       - self-hosted
       - gpu
@@ -99,7 +100,7 @@ jobs:
 
   codacy-coverage-reporter:
     runs-on: ubuntu-latest
-    name: codacy-coverage-reporter
+    name: Codacy coverage reporter
     needs: unittest
     steps:
       - name: Set up Git repository
