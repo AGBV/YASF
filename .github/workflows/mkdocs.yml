@@ -38,10 +38,16 @@ jobs:
           workflow: ${{ github.event.workflow_run.workflow_id }}
           workflow_conclusion: success
 
+      - name: Install poetry
+        uses: abatilo/actions-poetry@v2
+
+      - name: Export dependencies
+        run: poetry export -f requirements.txt -o requirements.txt --without-hashes
+
       - name: Deploy docs
         uses: mhausenblas/mkdocs-deploy-gh-pages@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CONFIG_FILE: mkdocs.yml
           # EXTRA_PACKAGES: build-base
-          REQUIREMENTS: docs/requirements.txt
+          REQUIREMENTS: ./requirements.txt
