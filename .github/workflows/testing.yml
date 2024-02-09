@@ -32,7 +32,9 @@ jobs:
         uses: abatilo/actions-poetry@v2
 
       - name: Export dependencies
-        run: poetry export --with tests -f requirements.txt -o requirements.txt --without-hashes
+        run: |
+          poetry export --with tests -f requirements.txt -o requirements.txt --without-hashes
+          cat requirements.txt
 
       - name: Cache conda
         uses: actions/cache@v2
