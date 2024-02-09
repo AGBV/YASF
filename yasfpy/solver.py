@@ -56,7 +56,7 @@ class Solver:
                 a,
                 b,
                 x0,
-                rtol=self.tolerance,
+                tol=self.tolerance,
                 atol=self.tolerance**2,
                 maxiter=self.max_iter,
                 callback=counter,
