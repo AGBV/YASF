@@ -80,9 +80,8 @@ jobs:
           use-only-tar-bz2: true
           auto-activate-base: false
 
-      # - name: Install testing dependencies
-      #   run: |
-      #     conda install pytest pytest-cov coverage
+      - name: List installed packages with their versions
+        run: conda list
 
       - name: Running pytest
         run: |
