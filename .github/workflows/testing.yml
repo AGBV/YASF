@@ -12,15 +12,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  unittest:
-    runs-on:
-      - self-hosted
-      - gpu
-
-    defaults:
-      run:
-        shell: bash -l {0}
-
+  requirements:
+    runs-on: ubuntu-latest
+    name: Poetry dependencies to requirements.txt
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v2
@@ -38,6 +32,36 @@ jobs:
         run: |
           poetry export --with tests -f requirements.txt -o requirements.txt --without-hashes
           cat requirements.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: requirements-file
+          path: requirements.txt
+          retention-days: 1
+
+  unittest:
+    runs-on:
+      - self-hosted
+      - gpu
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    needs: requirements
+
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Download requirements file
+        uses: actions/download-artifact@v3
+        with:
+          name: requirements-file
 
       - name: Cache conda
         uses: actions/cache@v2
