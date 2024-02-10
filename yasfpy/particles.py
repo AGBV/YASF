@@ -4,7 +4,7 @@ import numpy as np
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import pdist
 
-from yasfpy.functions.misc import material_handler
+from yasfpy.functions.material_handler import material_handler
 
 
 class Particles:
