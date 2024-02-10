@@ -6,6 +6,7 @@ import yaml
 from urllib.parse import unquote
 import requests as req
 
+import numpy as np
 
 def material_handler(links):
     if not isinstance(links, list):
