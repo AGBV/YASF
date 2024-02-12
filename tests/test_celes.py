@@ -27,7 +27,6 @@ class TestCELES(unittest.TestCase):
 
         p = re.compile(cls.id_regex)
         for data_file in glob.glob(cls.path):
-
             res = p.search(data_file)
             input_file = res.group(1)
             cls.data[input_file] = {}
