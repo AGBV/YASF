@@ -1,6 +1,7 @@
 import numpy as np
 import math
 
+
 def spherical_functions_trigon(lmax, theta, st=None):
     size = np.array([1])
     if isinstance(theta, np.ndarray):

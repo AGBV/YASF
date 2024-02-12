@@ -1,4 +1,5 @@
 import unittest
+
 # import glob
 # import re
 import sys
@@ -10,6 +11,7 @@ import pandas as pd
 from itertools import takewhile
 
 from yasfpy.functions.material_handler import material_handler
+
 
 class TestHandlers(unittest.TestCase):
     # @classmethod
@@ -24,15 +26,15 @@ class TestHandlers(unittest.TestCase):
         csv_data = pd.read_csv(csv_file, sep="\s+", comment="#")
 
         header = None
-        with open(csv_file, 'r') as fobj:
+        with open(csv_file, "r") as fobj:
             # takewhile returns an iterator over all the lines
             # that start with the comment string
-            header = takewhile(lambda s: s.startswith('#'), fobj)
+            header = takewhile(lambda s: s.startswith("#"), fobj)
             header = [s.strip("# \n").split(": ") for s in header]
             header = {s[0]: s[1].strip() for s in header}
         self.assertTrue(header is not None)
 
-        url = header['data']
+        url = header["data"]
         url_data = material_handler(url)
 
-        pd.testing.assert_frame_equal(csv_data, url_data['ref_idx'])
+        pd.testing.assert_frame_equal(csv_data, url_data["ref_idx"])
