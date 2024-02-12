@@ -71,7 +71,7 @@ jobs:
           CACHE_NUMBER: 0
         with:
           path: ~/conda_pkgs_dir
-          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('yasf-env-test.yml') }}
+          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('**/poetry.lock') }}
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -117,6 +117,21 @@ jobs:
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
           coverage-reports: ./coverage.xml
+
+  deepsource-coverage-reporter:
+    runs-on: ubuntu-latest
+    name: Codacy coverage reporter
+    needs: unittest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-report
       - name: Report test coverage to DeepSource
         uses: deepsourcelabs/test-coverage-action@master
         with:
