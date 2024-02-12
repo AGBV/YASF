@@ -2,11 +2,13 @@ import re
 import io
 import pandas as pd
 import yaml
+
 # import urllib.request
 from urllib.parse import unquote
 import requests as req
 
 import numpy as np
+
 
 def material_handler(links):
     if not isinstance(links, list):
@@ -50,7 +52,7 @@ def handle_refractiveindex_info(url):
         print(f" to:   {url}")
 
     # req = urllib.request.Request(url)
-    #with urllib.request.urlopen(req) as resp:
+    # with urllib.request.urlopen(req) as resp:
     resp = req.get(url)
     if resp.status_code >= 400:
         raise Exception(f"Failed to retrieve data from {url}")
