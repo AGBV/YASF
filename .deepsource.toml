@@ -3,6 +3,9 @@ version = 1
 test_patterns = ["tests/test_*.py"]
 
 [[analyzers]]
+name = "test-coverage"
+
+[[analyzers]]
 name = "python"
 
   [analyzers.meta]
