@@ -351,41 +351,41 @@ class Optics:
         return (1 - cb[0]) / 2 * p1 + (1 + cb[0]) / 2 * p2
 
     def __compute_c_and_b(self):
-            """
-            Compute the values of c and b parameters for the double Henyey-Greenstein phase function.
+        """
+        Compute the values of c and b parameters for the double Henyey-Greenstein phase function.
 
-            If the number of parameters is not 2 (b,c) or 3 (b1,b2,c), the function reverts to two parameters (b,c)
-            and sets the bounds to standard values: b in [0, 1] and c in [-1, 1].
+        If the number of parameters is not 2 (b,c) or 3 (b1,b2,c), the function reverts to two parameters (b,c)
+        and sets the bounds to standard values: b in [0, 1] and c in [-1, 1].
 
-            Uses scipy's least_squares optimization method to find the optimal values of c and b.
+        Uses scipy's least_squares optimization method to find the optimal values of c and b.
 
-            Returns:
-                None
-            """
-            # double henyey greenstein
-            if len(self.c_and_b_bounds[0]) not in [2, 3]:
-                self.c_and_b_bounds = ([-1, 0], [1, 1])
-                self.log.warning(
-                    "Number of parameters need to be 2 (b,c) or 3 (b1,b2,c). Reverting to two parameters (b,c) and setting the bounds to standard: b in [0, 1] and c in [-1, 1]"
+        Returns:
+            None
+        """
+        # double henyey greenstein
+        if len(self.c_and_b_bounds[0]) not in [2, 3]:
+            self.c_and_b_bounds = ([-1, 0], [1, 1])
+            self.log.warning(
+                "Number of parameters need to be 2 (b,c) or 3 (b1,b2,c). Reverting to two parameters (b,c) and setting the bounds to standard: b in [0, 1] and c in [-1, 1]"
+            )
+
+        from scipy.optimize import least_squares
+
+        if len(self.c_and_b_bounds) == 2:
+            bc0 = np.array([0, 0.5])
+        else:
+            bc0 = np.array([0, 0.5, 0.5])
+
+        self.cb = np.empty((self.phase_function.shape[1], len(self.c_and_b_bounds)))
+        for w in range(self.phase_function.shape[1]):
+
+            def dhg_optimization(bc):
+                return (
+                    Optics.compute_double_henyey_greenstein(self.scattering_angles, bc)
+                    - self.phase_function[:, w]
                 )
 
-            from scipy.optimize import least_squares
-
-            if len(self.c_and_b_bounds) == 2:
-                bc0 = np.array([0, 0.5])
-            else:
-                bc0 = np.array([0, 0.5, 0.5])
-
-            self.cb = np.empty((self.phase_function.shape[1], len(self.c_and_b_bounds)))
-            for w in range(self.phase_function.shape[1]):
-
-                def dhg_optimization(bc):
-                    return (
-                        Optics.compute_double_henyey_greenstein(self.scattering_angles, bc)
-                        - self.phase_function[:, w]
-                    )
-
-                bc = least_squares(
-                    dhg_optimization, bc0, jac="2-point", bounds=self.c_and_b_bounds
-                )
-                self.cb[w, :] = bc.x
+            bc = least_squares(
+                dhg_optimization, bc0, jac="2-point", bounds=self.c_and_b_bounds
+            )
+            self.cb[w, :] = bc.x

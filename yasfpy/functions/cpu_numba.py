@@ -219,9 +219,9 @@ def compute_radial_independent_scattered_field_legacy(
     pilm: np.ndarray,
     taulm: np.ndarray,
 ):
-    '''The function `compute_radial_independent_scattered_field_legacy` calculates the scattered field for
+    """The function `compute_radial_independent_scattered_field_legacy` calculates the scattered field for
     a given set of parameters and returns the result.
-    
+
     Parameters
     ----------
     lmax : int
@@ -263,13 +263,13 @@ def compute_radial_independent_scattered_field_legacy(
         `taulm` is a numpy array that represents the scattering coefficients for each combination of `l`,
     `m`, and azimuthal angle `a`. It has a shape of `(lmax+1, lmax+1, azimuthal_angles.size)`. The
     values in `taulm
-    
+
     Returns
     -------
         The function `compute_radial_independent_scattered_field_legacy` returns the variable `e_1_sca`,
     which is a numpy array of complex numbers.
-    
-    '''
+
+    """
     e_1_sca = np.zeros(
         azimuthal_angles.size * 3 * k_medium.size, dtype=complex128
     ).reshape((azimuthal_angles.size, 3, k_medium.size))
@@ -324,9 +324,9 @@ def compute_electric_field_angle_components(
     pilm: np.ndarray,
     taulm: np.ndarray,
 ):
-    '''The function `compute_electric_field_angle_components` calculates the electric field components in
+    """The function `compute_electric_field_angle_components` calculates the electric field components in
     the theta and phi directions for given input parameters.
-    
+
     Parameters
     ----------
     lmax : int
@@ -361,13 +361,13 @@ def compute_electric_field_angle_components(
         `taulm` is a numpy array that represents the angular momentum coupling coefficients. It has a shape
     of `(lmax+1, lmax+1, azimuthal_angles.size)`. The first dimension represents the value of `l`, the
     second dimension represents the value of `m`, and
-    
+
     Returns
     -------
         The function `compute_electric_field_angle_components` returns two arrays: `e_field_theta` and
     `e_field_phi`.
-    
-    '''
+
+    """
     e_field_theta = np.zeros(
         azimuthal_angles.size * k_medium.size, dtype=complex128
     ).reshape((azimuthal_angles.size, k_medium.size))
