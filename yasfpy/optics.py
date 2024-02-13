@@ -24,28 +24,20 @@ from yasfpy.functions.cuda_numba import (
 
 
 class Optics:
-    """
-    Class representing the optics of a simulation.
-
-    Args:
-        simulation (Simulation): The simulation object.
-
-    Attributes:
-        c_ext (ndarray): Array of complex numbers representing the extinction cross sections.
-        c_sca (ndarray): Array of complex numbers representing the scattering cross sections.
-        log (Logger): Logger object for logging messages.
-        albedo (ndarray): Array of real numbers representing the albedo.
-        scattering_angles (ndarray): Array of scattering angles.
-        phase_function_3d (ndarray): Array of phase function values in 3D.
-        phase_function_legendre_coefficients (ndarray): Array of Legendre coefficients of the phase function.
-        degree_of_polarization_3d (ndarray): Array of degree of polarization values in 3D.
-        degree_of_linear_polarization_3d (ndarray): Array of degree of linear polarization values in 3D.
-        degree_of_linear_polarization_q_3d (ndarray): Array of degree of linear polarization (Q) values in 3D.
-        degree_of_linear_polarization_u_3d (ndarray): Array of degree of linear polarization (U) values in 3D.
-        degree_of_circular_polarization_3d (ndarray): Array of degree of circular polarization values in 3D.
+    """The above code is a Python program that is likely related to optics. However, without seeing
+    the actual code, it is difficult to determine exactly what it is doing.
     """
 
     def __init__(self, simulation: Simulation):
+        """The function initializes the simulation object and sets up arrays for storing complex values.
+        
+        Parameters
+        ----------
+        simulation : Simulation
+            The `simulation` parameter is an instance of the `Simulation` class. It is being passed to the
+            `__init__` method as an argument.
+        
+        """
         self.simulation = simulation
 
         self.c_ext = np.zeros_like(simulation.parameters.wavelength, dtype=complex)
@@ -64,15 +56,25 @@ class Optics:
         legendre_coefficients_number: int = 15,
         c_and_b: Union[bool, tuple] = False,
     ):
-        """
-        Compute the phase function.
-
-        Args:
-            legendre_coefficients_number (int): Number of Legendre coefficients to compute.
-            c_and_b (Union[bool, tuple]): Whether to compute the C and B matrices.
-
-        Returns:
-            None
+        """The function `compute_phase_function` calculates various polarization components and phase
+        function coefficients for a given simulation.
+        
+        Parameters
+        ----------
+        legendre_coefficients_number : int, optional
+            The `legendre_coefficients_number` parameter is an integer that specifies the number of
+            Legendre coefficients to compute for the phase function. These coefficients are used to
+            approximate the phase function using Legendre polynomials. The higher the number of
+            coefficients, the more accurate the approximation will be.
+        c_and_b : Union[bool, tuple], optional
+            The `c_and_b` parameter is a boolean value or a tuple. If it is `True`, it indicates that the
+            `c` and `b` bounds should be computed. If it is `False`, the function will return without
+            computing the `c` and `b` bounds. If
+        
+        Returns
+        -------
+            The function does not explicitly return anything.
+        
         """
         pilm, taulm = spherical_functions_trigon(
             self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
@@ -323,17 +325,24 @@ class Optics:
         self.__compute_c_and_b()
 
     @staticmethod
+        """The `compute_double_henyey_greenstein` function calculates the scattering phase function using
+        the double Henyey-Greenstein model.
+        
+        Parameters
+        ----------
+        theta : np.ndarray
+            The parameter `theta` is a numpy array representing the scattering angle. It contains the
+            values at which you want to compute the double Henyey-Greenstein phase function.
+        cb : np.ndarray
+            The parameter `cb` is a numpy array that represents the coefficients of the double
+            Henyey-Greenstein phase function. It should have a size of either 2 or 3.
+        
+        Returns
+        -------
+            the result of the computation, which is a numpy array.
+        
+        """
     def compute_double_henyey_greenstein(theta: np.ndarray, cb: np.ndarray):
-        """
-        Compute the double Henyey-Greenstein phase function.
-
-        Parameters:
-        theta (np.ndarray): Array of angles at which to compute the phase function.
-        cb (np.ndarray): Array of phase function coefficients.
-
-        Returns:
-        np.ndarray: Array of phase function values corresponding to the given angles.
-        """
         cb = np.squeeze(cb)
         if cb.size < 2:
             cb = np.array([0, 0.5, 0.5])
@@ -351,16 +360,8 @@ class Optics:
         return (1 - cb[0]) / 2 * p1 + (1 + cb[0]) / 2 * p2
 
     def __compute_c_and_b(self):
-        """
-        Compute the values of c and b parameters for the double Henyey-Greenstein phase function.
-
-        If the number of parameters is not 2 (b,c) or 3 (b1,b2,c), the function reverts to two parameters (b,c)
-        and sets the bounds to standard values: b in [0, 1] and c in [-1, 1].
-
-        Uses scipy's least_squares optimization method to find the optimal values of c and b.
-
-        Returns:
-            None
+        """The function computes the values of parameters 'b' and 'c' using the double Henyey-Greenstein
+        phase function.
         """
         # double henyey greenstein
         if len(self.c_and_b_bounds[0]) not in [2, 3]:
