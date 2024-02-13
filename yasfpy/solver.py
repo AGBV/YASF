@@ -8,6 +8,7 @@ import numpy as np
 from scipy.sparse.linalg import LinearOperator, bicgstab, gmres, lgmres
 from . import log
 
+
 class Solver:
     """
     A class that represents a solver for linear systems of equations.
@@ -130,6 +131,7 @@ class Solver:
 
 import numpy as np
 
+
 class GMResCounter(object):
     """
     A class that counts the number of iterations and displays the residual or current iterate during the GMRES solver.
@@ -140,21 +142,21 @@ class GMResCounter(object):
     """
 
     def __init__(self, disp=False, callback_type="pr_norm"):
-            """
-            Initialize the Solver object.
+        """
+        Initialize the Solver object.
 
-            Parameters:
-            - disp (bool): Whether to display intermediate results. Default is False.
-            - callback_type (str): The type of callback to use. Possible values are "pr_norm" and "x".
-                                   Default is "pr_norm".
-            """
-            self.log = log.scattering_logger(__name__)
-            self._disp = disp
-            self.niter = 0
-            if callback_type == "pr_norm":
-                self.header = "% 10s \t % 15s" % ("Iteration", "Residual")
-            elif callback_type == "x":
-                self.header = "% 10s \t %s" % ("Iteration", "Current Iterate")
+        Parameters:
+        - disp (bool): Whether to display intermediate results. Default is False.
+        - callback_type (str): The type of callback to use. Possible values are "pr_norm" and "x".
+                               Default is "pr_norm".
+        """
+        self.log = log.scattering_logger(__name__)
+        self._disp = disp
+        self.niter = 0
+        if callback_type == "pr_norm":
+            self.header = "% 10s \t % 15s" % ("Iteration", "Residual")
+        elif callback_type == "x":
+            self.header = "% 10s \t %s" % ("Iteration", "Current Iterate")
 
     def __call__(self, rk=None):
         """

@@ -6,6 +6,7 @@ from yasfpy.initial_field import InitialField
 
 import numpy as np
 
+
 class Parameters:
     """
     Class representing the parameters for a simulation.
@@ -101,38 +102,38 @@ class Parameters:
         pass
 
     def __compute_ks(self):
-            """
-            Compute the wave vectors for the medium and particles.
+        """
+        Compute the wave vectors for the medium and particles.
 
-            This method calculates the wave vectors for the medium and particles based on their refractive indices and the angular frequency.
+        This method calculates the wave vectors for the medium and particles based on their refractive indices and the angular frequency.
 
-            Returns:
-                None
-            """
-            self.k_medium = self.omega * self.medium_refractive_index
-            if self.particles.refractive_index_table is None:
-                self.k_particle = np.outer(self.particles.refractive_index, self.omega)
-            else:
-                table = self.__interpolate_refractive_index_from_table()
-                self.k_particle = (
-                    np.take(table, self.particles.refractive_index, axis=0)
-                    * self.omega[np.newaxis, :]
-                )
+        Returns:
+            None
+        """
+        self.k_medium = self.omega * self.medium_refractive_index
+        if self.particles.refractive_index_table is None:
+            self.k_particle = np.outer(self.particles.refractive_index, self.omega)
+        else:
+            table = self.__interpolate_refractive_index_from_table()
+            self.k_particle = (
+                np.take(table, self.particles.refractive_index, axis=0)
+                * self.omega[np.newaxis, :]
+            )
 
-                unique_radius_index_pairs = np.zeros(
-                    (
-                        self.particles.unique_radius_index_pairs.shape[0],
-                        self.wavelength.size + 1,
-                    ),
-                    dtype=complex,
-                )
-                unique_radius_index_pairs[:, 0] = self.particles.unique_radius_index_pairs[
-                    :, 0
-                ]
-                unique_radius_index_pairs[:, 1:] = np.take(
-                    table,
-                    self.particles.unique_radius_index_pairs[:, 1].astype(int),
-                    axis=0,
-                )
+            unique_radius_index_pairs = np.zeros(
+                (
+                    self.particles.unique_radius_index_pairs.shape[0],
+                    self.wavelength.size + 1,
+                ),
+                dtype=complex,
+            )
+            unique_radius_index_pairs[:, 0] = self.particles.unique_radius_index_pairs[
+                :, 0
+            ]
+            unique_radius_index_pairs[:, 1:] = np.take(
+                table,
+                self.particles.unique_radius_index_pairs[:, 1].astype(int),
+                axis=0,
+            )
 
-                self.particles.unique_radius_index_pairs = unique_radius_index_pairs
+            self.particles.unique_radius_index_pairs = unique_radius_index_pairs
