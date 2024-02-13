@@ -4,7 +4,6 @@ import numpy as np
 
 
 class InitialField:
-
     def __init__(
         self,
         beam_width,
@@ -15,8 +14,8 @@ class InitialField:
         azimuthal_angle: float = 0,
         polarization: str = "TE",
     ):
-        '''The function initializes an object with various parameters for a beam of light.
-        
+        """The function initializes an object with various parameters for a beam of light.
+
         Parameters
         ----------
         beam_width
@@ -41,8 +40,8 @@ class InitialField:
         polarization : str, optional
             The "polarization" parameter determines the polarization of the beam. It can have two possible
         values: "TE" for transverse electric polarization and "TM" for transverse magnetic polarization.
-        
-        '''
+
+        """
         self.field_type = field_type
         self.amplitude = amplitude
         self.polar_angle = polar_angle
@@ -110,7 +109,7 @@ class InitialField:
         Performs the initial setup of the field.
 
         This method sets the polarization index and normal incidence for the field.
-        
+
         Returns:
         -------
             None
