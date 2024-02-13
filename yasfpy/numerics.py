@@ -260,13 +260,13 @@ class Numerics:
         wig.wig_temp_free()
 
     @staticmethod
-    def compute_fibonacci_sphere_points(n=100):
+    def compute_fibonacci_sphere_points(n: int = 100):
         """The `compute_fibonacci_sphere_points` function computes the points on a Fibonacci sphere using
         the given number of points.
 
         Parameters
         ----------
-        n, optional
+        n: int, optional
             The parameter `n` represents the number of points to be computed on the Fibonacci sphere. It is
             an optional parameter with a default value of 100.
 
