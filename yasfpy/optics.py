@@ -325,6 +325,7 @@ class Optics:
         self.__compute_c_and_b()
 
     @staticmethod
+    def compute_double_henyey_greenstein(theta: np.ndarray, cb: np.ndarray):
         """The `compute_double_henyey_greenstein` function calculates the scattering phase function using
         the double Henyey-Greenstein model.
         
@@ -342,7 +343,6 @@ class Optics:
             the result of the computation, which is a numpy array.
         
         """
-    def compute_double_henyey_greenstein(theta: np.ndarray, cb: np.ndarray):
         cb = np.squeeze(cb)
         if cb.size < 2:
             cb = np.array([0, 0.5, 0.5])
