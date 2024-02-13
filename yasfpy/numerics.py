@@ -260,20 +260,24 @@ class Numerics:
         wig.wig_temp_free()
 
     @staticmethod
-    def compute_fibonacci_sphere_points(n=100):
+    def compute_fibonacci_sphere_points(n: int = 100):
         """The `compute_fibonacci_sphere_points` function computes the points on a Fibonacci sphere using
         the given number of points.
 
         Parameters
         ----------
-        n, optional
+        n: int, optional
             The parameter `n` represents the number of points to be computed on the Fibonacci sphere. It is
-        an optional parameter with a default value of 100.
+            an optional parameter with a default value of 100.
 
         Returns
         -------
-            The function `compute_fibonacci_sphere_points` returns a tuple containing the Cartesian
-        coordinates, polar angles, and azimuthal angles of the points on a Fibonacci sphere.
+        points : np.ndarray
+            The Cartesian points of the Fibonacci sphere.
+        theta : np.ndarray
+            The polar angles of the points on the Fibonacci sphere.
+        phi : np.ndarray
+            The azimuthal angles of the points on the Fibonacci sphere.
 
         """
         golden_ratio = (1 + 5**0.5) / 2

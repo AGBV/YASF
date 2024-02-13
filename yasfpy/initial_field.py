@@ -40,7 +40,6 @@ class InitialField:
         polarization : str, optional
             The "polarization" parameter determines the polarization of the beam. It can have two possible
             values: "TE" for transverse electric polarization and "TM" for transverse magnetic polarization.
-
         """
         self.field_type = field_type
         self.amplitude = amplitude
