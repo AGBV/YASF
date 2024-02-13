@@ -10,6 +10,10 @@ from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trig
 
 
 class Numerics:
+    """
+    Class for numerical computations in YASF.
+    """
+
     def __init__(
         self,
         lmax: int,
@@ -21,6 +25,19 @@ class Numerics:
         particle_distance_resolution=10.0,
         solver=None,
     ):
+        """
+        Initialize the Numerics class.
+
+        Args:
+            lmax (int): The maximum degree of the spherical harmonics expansion.
+            sampling_points_number (Union[int, np.ndarray], optional): The number of sampling points on the unit sphere. Defaults to 100.
+            polar_angles (np.ndarray, optional): The polar angles of the sampling points. Defaults to None.
+            polar_weight_func (Callable, optional): The weight function for the polar angles. Defaults to lambda x: x.
+            azimuthal_angles (np.ndarray, optional): The azimuthal angles of the sampling points. Defaults to None.
+            gpu (bool, optional): Flag indicating whether to use GPU acceleration. Defaults to False.
+            particle_distance_resolution (float, optional): The resolution of the particle distance. Defaults to 10.0.
+            solver (optional): The solver to use for the numerical computations. Defaults to None.
+        """
         self.log = log.scattering_logger(__name__)
         self.lmax = lmax
 
@@ -84,10 +101,15 @@ class Numerics:
         self.__setup()
 
     def __compute_nmax(self):
+        """
+        Compute the maximum number of coefficients.
+        """
         self.nmax = 2 * self.lmax * (self.lmax + 2)
 
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.lpmn.html
     def __plm_coefficients(self):
+        """
+        Compute the coefficients for the associated Legendre polynomials.
+        """
         import sympy as sym
 
         self.plm_coeff_table = np.zeros(
@@ -104,14 +126,23 @@ class Numerics:
                 self.plm_coeff_table[l, m, 0 : len(cf)] = cf
 
     def __setup(self):
+        """
+        Perform the setup for the numerical computations.
+        """
         self.__compute_nmax()
         # self.compute_translation_table()
         # self.__plm_coefficients()
 
     def compute_plm_coefficients(self):
+        """
+        Compute the coefficients for the associated Legendre polynomials.
+        """
         self.__plm_coefficients()
 
     def compute_translation_table(self):
+        """
+        Compute the translation table.
+        """
         self.log.scatter("Computing the translation table")
         jmax = jmult_max(1, self.lmax)
         self.translation_ab5 = np.zeros((jmax, jmax, 2 * self.lmax + 1), dtype=complex)
@@ -207,6 +238,15 @@ class Numerics:
 
     @staticmethod
     def compute_fibonacci_sphere_points(n=100):
+        """
+        Compute the points on a Fibonacci sphere.
+
+        Args:
+            n (int, optional): The number of points. Defaults to 100.
+
+        Returns:
+            tuple: A tuple containing the Cartesian coordinates, polar angles, and azimuthal angles of the points.
+        """
         golden_ratio = (1 + 5**0.5) / 2
         i = np.arange(0, n)
         phi = 2 * np.pi * (i / golden_ratio % 1)
@@ -226,6 +266,9 @@ class Numerics:
         )
 
     def compute_spherical_unity_vectors(self):
+        """
+        Compute the spherical unity vectors.
+        """
         self.e_r = np.stack(
             (
                 np.sin(self.polar_angles) * np.cos(self.azimuthal_angles),
