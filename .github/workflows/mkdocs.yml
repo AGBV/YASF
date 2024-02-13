@@ -11,8 +11,8 @@ on:
       - ".github/workflows/mkdocs.yml"
       - "!yasfpy/**"
       - "!tests/**"
-      - "!.github/workflows/test-self-hosted-conda.yml"
-      - "!sonar-project.properties"
+      #- "!.github/workflows/test-self-hosted-conda.yml"
+      #- "!sonar-project.properties"
   # workflow_run:
   #   workflows:
   #     - Unit tests on self-hosted with Conda
