@@ -4,34 +4,6 @@ import numpy as np
 
 
 class InitialField:
-    """
-    Represents an initial field used in a simulation.
-
-    Args:
-        beam_width (float): The beam width of the field.
-        focal_point (float): The focal point of the field.
-        field_type (str, optional): The type of the field. Defaults to "gaussian".
-        amplitude (float, optional): The amplitude of the field. Defaults to 1.
-        polar_angle (float, optional): The polar angle of the field. Defaults to 0.
-        azimuthal_angle (float, optional): The azimuthal angle of the field. Defaults to 0.
-        polarization (str, optional): The polarization of the field. Defaults to "TE".
-
-    Attributes:
-        field_type (str): The type of the field.
-        amplitude (float): The amplitude of the field.
-        polar_angle (float): The polar angle of the field.
-        azimuthal_angle (float): The azimuthal angle of the field.
-        polarization (str): The polarization of the field.
-        beam_width (float): The beam width of the field.
-        focal_point (float): The focal point of the field.
-        log: The logger for logging messages.
-
-    Methods:
-        __set_pol_idx: Sets the polarization index based on the polarization type.
-        __set_normal_incidence: Sets the normal incidence flag based on the polar angle.
-        __setup: Performs the initial setup of the field.
-
-    """
 
     def __init__(
         self,
@@ -43,18 +15,34 @@ class InitialField:
         azimuthal_angle: float = 0,
         polarization: str = "TE",
     ):
-        """
-        Initialize the InitialField object.
-
-        Args:
-            beam_width (float): The beam width of the field.
-            focal_point (float): The focal point of the field.
-            field_type (str, optional): The type of the field. Defaults to "gaussian".
-            amplitude (float, optional): The amplitude of the field. Defaults to 1.
-            polar_angle (float, optional): The polar angle of the field. Defaults to 0.
-            azimuthal_angle (float, optional): The azimuthal angle of the field. Defaults to 0.
-            polarization (str, optional): The polarization of the field. Defaults to "TE".
-        """
+        '''The function initializes an object with various parameters for a beam of light.
+        
+        Parameters
+        ----------
+        beam_width
+            The beam width parameter represents the width of the beam. It determines the spread of the beam
+        and is typically measured as the full width at half maximum (FWHM) of the beam intensity
+        distribution.
+        focal_point
+            The focal point is the point in space where the beam is focused. It is a coordinate in
+        three-dimensional space (x, y, z) that represents the position of the focal point.
+        field_type : str, optional
+            The `field_type` parameter specifies the type of field for the beam. It can be set to
+        "gaussian" or any other type of field that is supported by the code.
+        amplitude : float, optional
+            The amplitude parameter represents the maximum value or intensity of the beam. It determines
+        the overall strength or power of the beam.
+        polar_angle : float, optional
+            The `polar_angle` parameter represents the angle between the positive z-axis and the direction
+        of propagation of the beam. It is measured in radians.
+        azimuthal_angle : float, optional
+            The azimuthal angle is a measure of the angle between the projection of the vector onto the
+        xy-plane and the positive x-axis. It determines the orientation of the beam in the xy-plane.
+        polarization : str, optional
+            The "polarization" parameter determines the polarization of the beam. It can have two possible
+        values: "TE" for transverse electric polarization and "TM" for transverse magnetic polarization.
+        
+        '''
         self.field_type = field_type
         self.amplitude = amplitude
         self.polar_angle = polar_angle
@@ -77,6 +65,7 @@ class InitialField:
         If the `polarization` is not a valid value, the polarization index is set to 0 and a warning message is logged.
 
         Returns:
+        -------
             None
         """
         if (
@@ -109,6 +98,10 @@ class InitialField:
         This method checks the value of the polar angle and determines if it is close to zero.
         If the absolute value of the sine of the polar angle is less than 1e-5, the normal incidence flag is set to True.
         Otherwise, the normal incidence flag is set to False.
+
+        Returns:
+        -------
+            None
         """
         self.normal_incidence = np.abs(np.sin(self.polar_angle)) < 1e-5
 
@@ -117,6 +110,10 @@ class InitialField:
         Performs the initial setup of the field.
 
         This method sets the polarization index and normal incidence for the field.
+        
+        Returns:
+        -------
+            None
         """
         self.__set_pol_idx()
         self.__set_normal_incidence()
