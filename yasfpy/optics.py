@@ -30,13 +30,13 @@ class Optics:
 
     def __init__(self, simulation: Simulation):
         """The function initializes the simulation object and sets up arrays for storing complex values.
-        
+
         Parameters
         ----------
         simulation : Simulation
             The `simulation` parameter is an instance of the `Simulation` class. It is being passed to the
             `__init__` method as an argument.
-        
+
         """
         self.simulation = simulation
 
@@ -58,7 +58,7 @@ class Optics:
     ):
         """The function `compute_phase_function` calculates various polarization components and phase
         function coefficients for a given simulation.
-        
+
         Parameters
         ----------
         legendre_coefficients_number : int, optional
@@ -70,11 +70,11 @@ class Optics:
             The `c_and_b` parameter is a boolean value or a tuple. If it is `True`, it indicates that the
             `c` and `b` bounds should be computed. If it is `False`, the function will return without
             computing the `c` and `b` bounds. If
-        
+
         Returns
         -------
             The function does not explicitly return anything.
-        
+
         """
         pilm, taulm = spherical_functions_trigon(
             self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
@@ -328,7 +328,7 @@ class Optics:
     def compute_double_henyey_greenstein(theta: np.ndarray, cb: np.ndarray):
         """The `compute_double_henyey_greenstein` function calculates the scattering phase function using
         the double Henyey-Greenstein model.
-        
+
         Parameters
         ----------
         theta : np.ndarray
@@ -337,11 +337,11 @@ class Optics:
         cb : np.ndarray
             The parameter `cb` is a numpy array that represents the coefficients of the double
             Henyey-Greenstein phase function. It should have a size of either 2 or 3.
-        
+
         Returns
         -------
             the result of the computation, which is a numpy array.
-        
+
         """
         cb = np.squeeze(cb)
         if cb.size < 2:
