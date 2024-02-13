@@ -4,7 +4,6 @@ import numpy as np
 
 
 class InitialField:
-
     def __init__(
         self,
         beam_width,
