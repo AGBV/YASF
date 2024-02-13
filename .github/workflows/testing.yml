@@ -120,7 +120,7 @@ jobs:
 
   deepsource-coverage-reporter:
     runs-on: ubuntu-latest
-    name: Codacy coverage reporter
+    name: DeepSource coverage reporter
     needs: unittest
     steps:
       - name: Set up Git repository
