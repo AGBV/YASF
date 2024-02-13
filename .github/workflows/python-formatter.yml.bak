@@ -1,4 +1,4 @@
-name: python formatter check
+name: Python Formatter Check
 on: [pull_request]
 jobs:
   linter_name:
