@@ -95,10 +95,7 @@ class Particles:
         return data
 
     def compute_unique_refractive_indices(self):
-        """
-        Computes the unique refractive indices and their indices.
-
-        """
+        """Computes the unique refractive indices and their indices."""
         self.unique_refractive_indices, self.refractive_index_array_idx = np.unique(
             self.refractive_index, return_inverse=True, axis=0
         )

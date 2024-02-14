@@ -148,9 +148,7 @@ class Numerics:
                 self.plm_coeff_table[l, m, 0 : len(cf)] = cf
 
     def __setup(self):
-        """
-        The function performs the setup for numerical computations.
-        """
+        """The function performs the setup for numerical computations."""
         self.__compute_nmax()
         # self.compute_translation_table()
         # self.__plm_coefficients()
