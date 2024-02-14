@@ -24,8 +24,8 @@ class Solver:
         max_iter: int = 1e4,
         restart: int = 1e2,
     ):
-        '''The function initializes a solver object with specified parameters and creates a logger object.
-        
+        """The function initializes a solver object with specified parameters and creates a logger object.
+
         Parameters
         ----------
         solver_type : str, optional
@@ -43,8 +43,8 @@ class Solver:
             solver will restart. This is used in iterative solvers like GMRES to improve convergence. After
             `restart` iterations, the solver discards the current solution and starts again from the initial
             guess.
-        
-        '''
+
+        """
         self.type = solver_type.lower()
         self.tolerance = tolerance
         self.max_iter = int(max_iter)
@@ -126,7 +126,6 @@ class Solver:
 import numpy as np
 
 
-
 class GMResCounter(object):
     """
     The GMResCounter class is a helper class that counts the number of iterations and displays the
@@ -134,8 +133,8 @@ class GMResCounter(object):
     """
 
     def __init__(self, disp: bool = False, callback_type: str = "pr_norm"):
-        '''The function initializes an object with optional display and callback type parameters.
-        
+        """The function initializes an object with optional display and callback type parameters.
+
         Parameters
         ----------
         disp: bool, optional
@@ -145,8 +144,8 @@ class GMResCounter(object):
         callback_type: str, optional
             The `callback_type` parameter is used to specify the type of callback to be used. It can have
             two possible values:
-        
-        '''
+
+        """
         self.log = log.scattering_logger(__name__)
         self._disp = disp
         self.niter = 0
@@ -156,15 +155,15 @@ class GMResCounter(object):
             self.header = "% 10s \t %s" % ("Iteration", "Current Iterate")
 
     def __call__(self, rk=None):
-        '''The function increments a counter, formats a message based on the input, logs the header and
+        """The function increments a counter, formats a message based on the input, logs the header and
         message, and prints the header and message if the `_disp` flag is True.
-        
+
         Parameters
         ----------
         rk: np.array, float
             The parameter `rk` can be either a float or a numpy array.
-        
-        '''
+
+        """
         self.niter += 1
         if isinstance(rk, float):
             msg = "% 10i \t % 15.5f" % (self.niter, rk)
