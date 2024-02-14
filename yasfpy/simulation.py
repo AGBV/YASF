@@ -339,6 +339,10 @@ class Simulation:
         )
 
     def __compute_initial_field_coefficients_planewave(self):
+        """The function computes the initial field coefficients for a plane wave based on given parameters
+        and spherical coordinates.
+
+        """
         lmax = self.numerics.lmax
         E0 = self.parameters.initial_field.amplitude
         k = self.parameters.k_medium
@@ -391,7 +395,8 @@ class Simulation:
                     )
 
     def __compute_initial_field_coefficients_wavebundle_normal_incidence(self):
-        """
+        """The function initializes the field coefficients for a wave bundle incident at normal incidence.
+
         TODO
         ----
         Implement this function using the celes function [initial_field_coefficients_wavebundle_normal_incidence.m](https://github.com/disordered-photonics/celes/blob/master/src/initial/initial_field_coefficients_wavebundle_normal_incidence.m)
@@ -409,6 +414,28 @@ class Simulation:
         )
 
     def coupling_matrix_multiply(self, x: np.ndarray, idx: int = None):
+        """The function `coupling_matrix_multiply` computes the coupling matrix `wx` based on the input
+        parameters `x` and `idx`.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            An input array of shape (n,) or (n, m), where n is the number of particles and m is the number
+            of features for each particle. This array represents the input data for which the coupling
+            matrix needs to be computed.
+        idx : int
+            The parameter `idx` is an optional integer that specifies the index of a specific spherical
+            harmonic mode. If `idx` is provided, the computation will only be performed for that specific
+            mode. If `idx` is not provided or set to `None`, the computation will be performed for all
+            spherical harmonic
+
+        Returns
+        -------
+        wx : np.ndarray
+            The variable `wx` is an array of shape (n, m, p), where n is the number of particles, m is the
+            number of features for each particle, and p is the number of wavelengths.
+
+        """
         self.log.scatter("prepare particle coupling ... ")
         preparation_time = time()
 
@@ -502,6 +529,22 @@ class Simulation:
         return wx
 
     def master_matrix_multiply(self, value: np.ndarray, idx: int):
+        """The function `master_matrix_multiply` applies a T-matrix to a given value and returns the
+        result.
+
+        Parameters
+        ----------
+        value : np.ndarray
+            The parameter "value" is an np.ndarray, which is a multi-dimensional array-like object in
+        NumPy. It represents the input value for the matrix multiplication operation.
+        idx : int
+            The parameter `idx` is an integer that represents the index of the matrix to be multiplied.
+
+        Returns
+        -------
+            the variable "mx".
+
+        """
         wx = self.coupling_matrix_multiply(value, idx)
 
         self.log.scatter("apply T-matrix ...")
@@ -521,6 +564,16 @@ class Simulation:
         return mx
 
     def compute_scattered_field_coefficients(self, guess=None):
+        """The function computes the scattered field coefficients using a linear operator and a solver.
+
+        Parameters
+        ----------
+        guess
+            The `guess` parameter is an optional input that represents the initial guess for the solution
+            of the linear system. If no guess is provided, the `right_hand_side` variable is used as the
+            initial guess.
+
+        """
         self.log.scatter("compute scattered field coefficients ...")
         jmax = self.parameters.particles.number * self.numerics.nmax
         self.scattered_field_coefficients = np.zeros_like(
@@ -547,6 +600,17 @@ class Simulation:
             self.scattered_field_err_codes[w] = err_code
 
     def compute_fields(self, sampling_points: np.ndarray):
+        """The function `compute_fields` calculates the field at given sampling points using either CPU or
+        GPU computation.
+
+        Parameters
+        ----------
+        sampling_points : np.ndarray
+            The `sampling_points` parameter is a numpy array that represents the coordinates of the
+            sampling points. It should have a shape of `(n, 3)`, where `n` is the number of sampling points
+            and each row represents the `(x, y, z)` coordinates of a point.
+
+        """
         if sampling_points.shape[0] < 1:
             self.log.error("Number of sampling points must be bigger than zero!")
             return

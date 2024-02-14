@@ -8,48 +8,9 @@ from yasfpy.functions.material_handler import material_handler
 
 
 class Particles:
-    """
-    Class representing a collection of particles.
-
-    Args:
-        position (np.array): Array of particle positions.
-        r (np.array): Array of particle radii.
-        refractive_index (np.array): Array of particle refractive indices.
-        refractive_index_table (list, optional): List of refractive index tables. Defaults to None.
-        shape_type (str, optional): Type of particle shape. Defaults to "sphere".
-
-    Attributes:
-        position (np.array): Array of particle positions.
-        r (np.array): Array of particle radii.
-        refractive_index (np.array): Array of particle refractive indices.
-        type (str): Type of particle shape.
-        refractive_index_table (list): List of refractive index tables.
-        number (int): Number of particles.
-        log: Logging object.
-        unique_refractive_indices (np.array): Array of unique refractive indices.
-        refractive_index_array_idx (np.array): Array of indices mapping refractive indices to unique indices.
-        num_unique_refractive_indices (int): Number of unique refractive indices.
-        unqiue_radii (np.array): Array of unique radii.
-        radius_array_idx (np.array): Array of indices mapping radii to unique indices.
-        num_unique_radii (int): Number of unique radii.
-        unique_radius_index_pairs (np.array): Array of unique radius-index pairs.
-        single_unique_array_idx (np.array): Array of indices mapping unique radius-index pairs to unique indices.
-        unique_single_radius_index_pairs (np.array): Array of unique single radius-index pairs.
-        single_unique_idx (np.array): Array of single unique indices.
-        num_unique_pairs (int): Number of unique radius-index pairs.
-        max_particle_distance (float): Maximum distance between particles.
-        geometric_projection (float): Geometric projection of the particles.
-
-    Methods:
-        generate_refractive_index_table(urls): Generates a refractive index table from a list of URLs.
-        compute_unique_refractive_indices(): Computes the unique refractive indices and their indices.
-        compute_unique_radii(): Computes the unique radii and their indices.
-        compute_unique_radii_index_pairs(): Computes the unique radius-index pairs.
-        compute_single_unique_idx(): Computes the single unique indices.
-        compute_maximal_particle_distance(): Computes the maximum distance between particles.
-        compute_volume_equivalent_area(): Computes the volume equivalent area.
-        __setup_impl(): Helper method to set up the class.
-
+    """The `Particles` class represents a collection of particles with various properties such as position,
+    radius, and refractive index, and provides methods for computing unique properties and
+    characteristics of the particles.
     """
 
     def __init__(
@@ -60,15 +21,30 @@ class Particles:
         refractive_index_table: list = None,
         shape_type: str = "sphere",
     ):
-        """
-        Initialize a Particle object.
+        """The function initializes an object with position, radius, refractive index, refractive index
+        table, and shape type attributes.
 
-        Args:
-            position (np.array): The position of the particle.
-            r (np.array): The radius of the particle.
-            refractive_index (np.array): The refractive index of the particle.
-            refractive_index_table (list, optional): A table of refractive indices for different wavelengths. Defaults to None.
-            shape_type (str, optional): The shape type of the particle. Defaults to "sphere".
+        Parameters
+        ----------
+        position : np.array
+            The position parameter is a numpy array that represents the position of the shape. It can have
+            multiple dimensions, depending on the shape being represented.
+        r : np.array
+            The parameter `r` represents the radius of the shape. It is a numpy array that contains the
+            radius values for each shape in the system.
+        refractive_index : np.array
+            The `refractive_index` parameter is a numpy array that represents the refractive index of the
+            shape. It can be either a complex number or a two-column matrix. If it is a complex number, it
+            represents the refractive index directly. If it is a two-column matrix, the first
+        refractive_index_table : list
+            The `refractive_index_table` parameter is a list that contains the refractive index values for
+            different materials. Each element in the list represents a material, and the refractive index
+            values for that material are stored as a complex number. The refractive index values can be
+            either a single complex number
+        shape_type : str, optional
+            The `shape_type` parameter is a string that specifies the type of shape for the object. It can
+            be set to "sphere" or any other shape type that is supported by the code.
+
         """
         self.position = position
         self.r = r
@@ -98,14 +74,18 @@ class Particles:
 
     @staticmethod
     def generate_refractive_index_table(urls: list):
-        """
-        Generates a refractive index table from a list of URLs.
+        """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
+        URL using the `material_handler` function, and returns a list of the retrieved data.
 
-        Args:
-            urls (list): List of URLs.
+        Parameters
+        ----------
+        urls : list
+            A list of URLs representing different materials.
 
-        Returns:
-            list: List of refractive index tables.
+        Returns
+        -------
+            The method is returning a list of data. Each element in the list corresponds to a URL in the
+        input list, and the data is obtained by calling the `material_handler` function on each URL.
 
         """
         data = [None] * len(urls)
@@ -125,18 +105,15 @@ class Particles:
         self.num_unique_refractive_indices = self.unique_refractive_indices.shape[0]
 
     def compute_unique_radii(self):
-        """
-        Computes the unique radii and their indices.
-
-        """
+        """The function computes the unique radii from an array and stores them in a variable."""
         self.unqiue_radii, self.radius_array_idx = np.unique(
             self.r, return_inverse=True, axis=0
         )
         self.num_unique_radii = self.unqiue_radii.shape[0]
 
     def compute_unique_radii_index_pairs(self):
-        """
-        Computes the unique radius-index pairs.
+        """The function computes unique pairs of radii and refractive indices and stores them in different
+        arrays.
 
         """
         self.unique_radius_index_pairs, self.single_unique_array_idx = np.unique(
@@ -150,8 +127,8 @@ class Particles:
         )
 
     def compute_single_unique_idx(self):
-        """
-        Computes the single unique indices.
+        """The function computes a single unique index based on the sum of pairs of values and their
+        corresponding indices.
 
         """
         self.single_unique_idx = (
@@ -172,25 +149,19 @@ class Particles:
         self.num_unique_pairs = self.unique_radius_index_pairs.shape[0]
 
     def compute_maximal_particle_distance(self):
-        """
-        Computes the maximum distance between particles.
-
-        """
+        """The function computes the maximum distance between particles using the ConvexHull algorithm."""
         hull = ConvexHull(self.position)
         vert = self.position[hull.vertices, :]
         self.max_particle_distance = max(pdist(vert))
 
     def compute_volume_equivalent_area(self):
-        """
-        Computes the volume equivalent area.
-
-        """
+        """The function computes the volume equivalent area by calculating the geometric projection."""
         r3 = np.power(self.r, 3)
         self.geometric_projection = np.pi * np.power(np.sum(r3), 2 / 3)
 
     def __setup_impl(self):
-        """
-        Helper method to set up the class.
+        """The function sets up various computations related to refractive indices, radii, and particle
+        distances.
 
         """
         self.compute_unique_refractive_indices()

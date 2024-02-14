@@ -9,13 +9,9 @@ import numpy as np
 
 class Parameters:
     """
-    Class representing the parameters for a simulation.
-
-    Args:
-        wavelength (np.array): Array of wavelengths.
-        medium_refractive_index (np.array): Array of refractive indices for the medium.
-        particles (Particles): Instance of the Particles class.
-        initial_field (InitialField): Instance of the InitialField class.
+    The Parameters class represents the parameters for a simulation, including wavelength, refractive
+    indices, scattering particles, and initial field, and provides methods for computing angular
+    frequency and wave vectors.
     """
 
     def __init__(
@@ -25,17 +21,25 @@ class Parameters:
         particles: Particles,
         initial_field: InitialField,
     ):
-        """
-        Initialize the Parameters object.
+        """The function initializes the class with the given parameters and sets up the necessary
+        variables.
 
-        Args:
-            wavelength (np.array): Array of wavelengths.
-            medium_refractive_index (np.array): Array of refractive indices for the medium.
-            particles (Particles): Particles object representing the scattering particles.
-            initial_field (InitialField): InitialField object representing the initial field.
+        Parameters
+        ----------
+        wavelength : np.array
+            The `wavelength` parameter is an array that represents the wavelengths of the light being used.
+            It contains the values of the wavelengths at which the simulation will be performed.
+        medium_refractive_index : np.array
+            The `medium_refractive_index` parameter is an array that represents the refractive index of the
+            medium in which the particles are located. It contains the refractive index values at different
+            wavelengths.
+        particles : Particles
+            The "particles" parameter is an instance of the "Particles" class. It represents the particles
+            present in the medium.
+        initial_field : InitialField
+            The `initial_field` parameter is an object of the `InitialField` class. It represents the
+            initial field configuration for the simulation.
 
-        Returns:
-            None
         """
         self.wavelength = wavelength
         self.medium_refractive_index = medium_refractive_index
@@ -46,33 +50,23 @@ class Parameters:
         self.__setup()
 
     def __setup(self):
-        """
-        Performs the setup operations for the object.
-        This method computes the omega and ks values.
-        """
+        """The function sets up the necessary computations for omega and ks."""
         self.__compute_omega()
         self.__compute_ks()
 
     def __compute_omega(self):
-        """
-        Compute the angular frequency (omega) based on the wavelength.
-
-        The angular frequency is calculated as 2 * pi divided by the wavelength.
-
-        Parameters:
-            None
-
-        Returns:
-            None
-        """
+        """The function calculates the value of omega using the wavelength."""
         self.omega = 2 * np.pi / self.wavelength
 
     def __interpolate_refractive_index_from_table(self):
-        """
-        Interpolates the refractive index from a table.
+        """The function interpolates the refractive index values from a table for different wavelengths.
 
-        Returns:
-            numpy.ndarray: An array of interpolated refractive indices.
+        Returns
+        -------
+        refractive_index_interpolated : np.array
+            an array that contains the interpolated refractive index values for the particles
+            at different wavelengths.
+
         """
         refractive_index_interpolated = np.zeros(
             (self.particles.num_unique_refractive_indices, self.wavelength.size),
@@ -102,13 +96,9 @@ class Parameters:
         pass
 
     def __compute_ks(self):
-        """
-        Compute the wave vectors for the medium and particles.
+        """The function computes the values of k_medium and k_particle based on the refractive index of the
+        medium and particles.
 
-        This method calculates the wave vectors for the medium and particles based on their refractive indices and the angular frequency.
-
-        Returns:
-            None
         """
         self.k_medium = self.omega * self.medium_refractive_index
         if self.particles.refractive_index_table is None:

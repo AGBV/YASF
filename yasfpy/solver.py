@@ -11,37 +11,10 @@ from . import log
 
 class Solver:
     """
-    A class that represents a solver for linear systems of equations.
-
-    Parameters
-    ----------
-    solver_type : str, optional
-        The type of solver to use. Valid options are "gmres", "bicgstab", and "lgmres".
-    tolerance : float, optional
-        The tolerance for convergence.
-    max_iter : int, optional
-        The maximum number of iterations.
-    restart : int, optional
-        The number of iterations before restarting the GMRES solver.
-
-    Attributes
-    ----------
-    type : str
-        The type of solver.
-    tolerance : float
-        The tolerance for convergence.
-    max_iter : int
-        The maximum number of iterations.
-    restart : int
-        The number of iterations before restarting the GMRES solver.
-    log : logger
-        The logger for logging solver information.
-
-    Methods
-    -------
-    run(a, b, x0=None)
-        Runs the solver on the given linear system of equations.
-
+    The Solver class provides a generic interface for solving linear systems of equations using
+    different iterative solvers such as GMRES, BiCGSTAB, and LGMRES, and the GMResCounter class is used
+    to count the number of iterations and display the residual or current iterate during the GMRES
+    solver.
     """
 
     def __init__(
@@ -51,6 +24,27 @@ class Solver:
         max_iter: int = 1e4,
         restart: int = 1e2,
     ):
+        '''The function initializes a solver object with specified parameters and creates a logger object.
+        
+        Parameters
+        ----------
+        solver_type : str, optional
+            The `solver_type` parameter is a string that specifies the type of solver to be used. It is set
+            to "gmres" by default, which stands for Generalized Minimal RESidual method. Other possible
+            values for `solver_type` could be "cg" for Conjugate Gradient method or
+        tolerance : float
+            The tolerance parameter determines the desired accuracy of the solver. It specifies the maximum
+            acceptable error between the computed solution and the true solution.
+        max_iter : int
+            The `max_iter` parameter specifies the maximum number of iterations that the solver will
+            perform before terminating.
+        restart : int
+            The `restart` parameter is an integer that determines the number of iterations after which the
+            solver will restart. This is used in iterative solvers like GMRES to improve convergence. After
+            `restart` iterations, the solver discards the current solution and starts again from the initial
+            guess.
+        
+        '''
         self.type = solver_type.lower()
         self.tolerance = tolerance
         self.max_iter = int(max_iter)
@@ -132,24 +126,27 @@ class Solver:
 import numpy as np
 
 
+
 class GMResCounter(object):
     """
-    A class that counts the number of iterations and displays the residual or current iterate during the GMRES solver.
-
-    Parameters:
-    - disp (bool): Whether to display the iteration information.
-    - callback_type (str): The type of information to display. Can be "pr_norm" for residual or "x" for current iterate.
+    The GMResCounter class is a helper class that counts the number of iterations and displays the
+    residual or current iterate during the GMRES solver.
     """
 
-    def __init__(self, disp=False, callback_type="pr_norm"):
-        """
-        Initialize the Solver object.
-
-        Parameters:
-        - disp (bool): Whether to display intermediate results. Default is False.
-        - callback_type (str): The type of callback to use. Possible values are "pr_norm" and "x".
-                               Default is "pr_norm".
-        """
+    def __init__(self, disp: bool = False, callback_type: str = "pr_norm"):
+        '''The function initializes an object with optional display and callback type parameters.
+        
+        Parameters
+        ----------
+        disp: bool, optional
+            The `disp` parameter is a boolean flag that determines whether or not to display the progress
+            of the algorithm. If `disp` is set to `True`, the algorithm will display the progress. If `disp`
+            is set to `False`, the algorithm will not display the progress.
+        callback_type: str, optional
+            The `callback_type` parameter is used to specify the type of callback to be used. It can have
+            two possible values:
+        
+        '''
         self.log = log.scattering_logger(__name__)
         self._disp = disp
         self.niter = 0
@@ -159,15 +156,15 @@ class GMResCounter(object):
             self.header = "% 10s \t %s" % ("Iteration", "Current Iterate")
 
     def __call__(self, rk=None):
-        """
-        Perform the solver iteration.
-
-        Parameters:
-            rk (float or np.ndarray): The residual value or array.
-
-        Returns:
-            None
-        """
+        '''The function increments a counter, formats a message based on the input, logs the header and
+        message, and prints the header and message if the `_disp` flag is True.
+        
+        Parameters
+        ----------
+        rk: np.array, float
+            The parameter `rk` can be either a float or a numpy array.
+        
+        '''
         self.niter += 1
         if isinstance(rk, float):
             msg = "% 10i \t % 15.5f" % (self.niter, rk)
