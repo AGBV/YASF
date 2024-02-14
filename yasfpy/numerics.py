@@ -253,7 +253,7 @@ class Numerics:
         """Computes the points on a Fibonacci sphere using the given number of points.
 
         Args:
-            n (int, optional): The number of points to be computed on the Fibonacci sphere. 
+            n (int, optional): The number of points to be computed on the Fibonacci sphere.
                 Defaults to 100.
 
         Returns:
