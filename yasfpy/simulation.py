@@ -252,7 +252,7 @@ class Simulation:
                         )
 
     def compute_initial_field_coefficients(self):
-        """
+        r"""
         Computes initial field coefficients $a_{\\tau ,l,m}$ and $b_{\\tau ,l,m}$.
         Depending on the `beam_width`, one of two functions is called:
 
@@ -279,7 +279,7 @@ class Simulation:
         self.log.scatter("done")
 
     def compute_right_hand_side(self):
-        """
+        r"""
         Computes the right hand side $T \\cdot a_I$ of the equation $M \\cdot b = T \\cdot a_I$.
 
         Attributes

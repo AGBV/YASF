@@ -21,25 +21,18 @@ class Parameters:
         particles: Particles,
         initial_field: InitialField,
     ):
-        """The function initializes the class with the given parameters and sets up the necessary
-        variables.
+        """Initializes the class with the given parameters and sets up the necessary variables.
 
-        Parameters
-        ----------
-        wavelength : np.array
-            The `wavelength` parameter is an array that represents the wavelengths of the light being used.
-            It contains the values of the wavelengths at which the simulation will be performed.
-        medium_refractive_index : np.array
-            The `medium_refractive_index` parameter is an array that represents the refractive index of the
-            medium in which the particles are located. It contains the refractive index values at different
-            wavelengths.
-        particles : Particles
-            The "particles" parameter is an instance of the "Particles" class. It represents the particles
-            present in the medium.
-        initial_field : InitialField
-            The `initial_field` parameter is an object of the `InitialField` class. It represents the
-            initial field configuration for the simulation.
-
+        Args:
+            wavelength (np.array): An array that represents the wavelengths of the light being used.
+                It contains the values of the wavelengths at which the simulation will be performed.
+            medium_refractive_index (np.array): An array that represents the refractive index of the
+                medium in which the particles are located. It contains the refractive index values at different
+                wavelengths.
+            particles (Particles): An instance of the "Particles" class. It represents the particles
+                present in the medium.
+            initial_field (InitialField): An object of the `InitialField` class. It represents the
+                initial field configuration for the simulation.
         """
         self.wavelength = wavelength
         self.medium_refractive_index = medium_refractive_index
@@ -59,14 +52,11 @@ class Parameters:
         self.omega = 2 * np.pi / self.wavelength
 
     def __interpolate_refractive_index_from_table(self):
-        """The function interpolates the refractive index values from a table for different wavelengths.
+        """Interpolates the refractive index values from a table for different wavelengths.
 
-        Returns
-        -------
-        refractive_index_interpolated : np.array
-            an array that contains the interpolated refractive index values for the particles
-            at different wavelengths.
-
+        Returns:
+            np.array: An array that contains the interpolated refractive index values for the particles
+                at different wavelengths.
         """
         refractive_index_interpolated = np.zeros(
             (self.particles.num_unique_refractive_indices, self.wavelength.size),
@@ -96,9 +86,8 @@ class Parameters:
         pass
 
     def __compute_ks(self):
-        """The function computes the values of k_medium and k_particle based on the refractive index of the
+        """Computes the values of k_medium and k_particle based on the refractive index of the
         medium and particles.
-
         """
         self.k_medium = self.omega * self.medium_refractive_index
         if self.particles.refractive_index_table is None:
