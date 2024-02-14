@@ -173,7 +173,6 @@ class GMResCounter(object):
         elif isinstance(rk, np.ndarray):
             # msg = "% 10i \t " % self.niter + np.array2string(rk)
             msg = f"{self.niter:10} \t {np.array2string(rk)}"
-            
 
         self.log.numerics(self.header)
         self.log.numerics(msg)

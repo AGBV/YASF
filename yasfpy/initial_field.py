@@ -81,7 +81,7 @@ class InitialField:
             self.pol = 0
             self.log.warning(
                 "%s is not a valid polarization type. Please use TE or TM. Reverting to unpolarized",
-                self.polarization
+                self.polarization,
             )
 
     def __set_normal_incidence(self):
