@@ -151,9 +151,11 @@ class GMResCounter(object):
         self._disp = disp
         self.niter = 0
         if callback_type == "pr_norm":
-            self.header = "% 10s \t % 15s" % ("Iteration", "Residual")
+            # self.header = "% 10s \t % 15s" % ("Iteration", "Residual")
+            self.header = " Iteration \t        Residual"
         elif callback_type == "x":
-            self.header = "% 10s \t %s" % ("Iteration", "Current Iterate")
+            # self.header = "% 10s \t %s" % ("Iteration", "Current Iterate")
+            self.header = " Iteration \t Current Iterate"
 
     def __call__(self, rk=None):
         '''The function increments a counter, formats a message based on the input, logs the header and
@@ -167,9 +169,12 @@ class GMResCounter(object):
         '''
         self.niter += 1
         if isinstance(rk, float):
-            msg = "% 10i \t % 15.5f" % (self.niter, rk)
+            # msg = "% 10i \t % 15.5f" % (self.niter, rk)
+            msg = f"{self.niter:10} \t {rk:15.5f}"
         elif isinstance(rk, np.ndarray):
-            msg = "% 10i \t " % self.niter + np.array2string(rk)
+            # msg = "% 10i \t " % self.niter + np.array2string(rk)
+            msg = f"{self.niter:10} \t {np.array2string(rk)}"
+            
 
         self.log.numerics(self.header)
         self.log.numerics(msg)
