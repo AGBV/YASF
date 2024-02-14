@@ -21,29 +21,17 @@ class Particles:
         refractive_index_table: list = None,
         shape_type: str = "sphere",
     ):
-        """The function initializes an object with position, radius, refractive index, refractive index
-        table, and shape type attributes.
+        """Initializes an object with position, radius, refractive index, refractive index table, and shape type attributes.
 
-        Parameters
-        ----------
-        position : np.array
-            The position parameter is a numpy array that represents the position of the shape. It can have
-            multiple dimensions, depending on the shape being represented.
-        r : np.array
-            The parameter `r` represents the radius of the shape. It is a numpy array that contains the
-            radius values for each shape in the system.
-        refractive_index : np.array
-            The `refractive_index` parameter is a numpy array that represents the refractive index of the
-            shape. It can be either a complex number or a two-column matrix. If it is a complex number, it
-            represents the refractive index directly. If it is a two-column matrix, the first
-        refractive_index_table : list
-            The `refractive_index_table` parameter is a list that contains the refractive index values for
-            different materials. Each element in the list represents a material, and the refractive index
-            values for that material are stored as a complex number. The refractive index values can be
-            either a single complex number
-        shape_type : str, optional
-            The `shape_type` parameter is a string that specifies the type of shape for the object. It can
-            be set to "sphere" or any other shape type that is supported by the code.
+        Args:
+            position (np.array): A numpy array representing the position of the shape.
+            r (np.array): A numpy array containing the radius values for each shape in the system.
+            refractive_index (np.array): A numpy array representing the refractive index of the shape. 
+                It can be either a complex number or a two-column matrix.
+            refractive_index_table (list): A list containing the refractive index values for different materials. 
+                Each element in the list represents a material, and the refractive index values for that material are stored as a complex number.
+            shape_type (str, optional): A string specifying the type of shape for the object. 
+                Defaults to "sphere" or any other supported shape type.
 
         """
         self.position = position
@@ -77,15 +65,12 @@ class Particles:
         """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
         URL using the `material_handler` function, and returns a list of the retrieved data.
 
-        Parameters
-        ----------
-        urls : list
-            A list of URLs representing different materials.
+        Args:
+            urls (list): A list of URLs representing different materials.
 
-        Returns
-        -------
-            The method is returning a list of data. Each element in the list corresponds to a URL in the
-        input list, and the data is obtained by calling the `material_handler` function on each URL.
+        Returns:
+            list: A list of data. Each element in the list corresponds to a URL in the input list, 
+                and the data is obtained by calling the `material_handler` function on each URL.
 
         """
         data = [None] * len(urls)

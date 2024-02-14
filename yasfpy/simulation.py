@@ -27,27 +27,17 @@ from yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_
 
 
 class Simulation:
-    """
-    YASF Simulation Class
-
-    Attributes
-    ----------
-    parameters : Parameters
-        Provided object of the instance `Parameters`
-    numerics : Numerics
-        Provided object of the instance `Numerics`
-    log : logging
-        Object for writing logs to
+    """This class represents the simulation of YASF (Yet Another Scattering Framework).
+    It contains methods for initializing the simulation, computing lookup tables, and calculating mie coefficients.
     """
 
     def __init__(self, parameters: Parameters, numerics: Numerics):
         """
-        Parameters
-        ----------
-        parameters
-            Object of the instance `Parameters`
-        numerics
-            Object of the instance `Numerics`
+        Initialize the Simulation object.
+
+        Args:
+            parameters (Parameters): The parameters for the simulation.
+            numerics (Numerics): The numerics for the simulation.
         """
         self.parameters = parameters
         self.numerics = numerics
@@ -57,17 +47,14 @@ class Simulation:
 
     def legacy_compute_lookup_particle_distances(self):
         """
-        The largest distance distance between two particles is
-        divided into segments provided by `Numerics.particle_distance_resolution`.
-        This array is then used as a lookup for the caolcuation
-        of the spherical hankel function.
+        The largest distance between two particles is divided into segments provided by `Numerics.particle_distance_resolution`.
+        This array is then used as a lookup for the calculation of the spherical Hankel function.
 
         Notes
         -----
-        This function has been ported from the Matlab Celes framework
-        but is not used by YASF!
+        This function has been ported from the Matlab Celes framework but is not used by YASF!
         """
-        # add two zeros at beginning to allow interpolation
+        # add two zeros at the beginning to allow interpolation
         # also in the first segment
         step = self.numerics.particle_distance_resolution
         maxdist = (
@@ -81,17 +68,13 @@ class Simulation:
     def legacy_compute_h3_table(self):
         """
         Computes the spherical hankel function
-        at the points calculated in [Simulation.legacy_compute_lookup_particle_distances()][yasfpy.simulation.Simulation.legacy_compute_lookup_particle_distances].
+        at the points calculated in `Simulation.legacy_compute_lookup_particle_distances()`.
 
-        Attributes
-        ----------
-        h3_table : np.ndarray
-            Lookup table of the spherical hankel function values at `self.lookup_particle_distances`
+        Attributes:
+            h3_table (np.ndarray): Lookup table of the spherical hankel function values at `self.lookup_particle_distances`
 
-        Notes
-        -----
-        This function has been ported from the Matlab Celes framework
-        but is not used by YASF!
+        Notes:
+            This function has been ported from the Matlab Celes framework but is not used by YASF!
         """
         self.h3_table = np.zeros(
             (
@@ -110,17 +93,14 @@ class Simulation:
 
     def __compute_idx_lookup(self):
         """
-        Creates a lookup table with the indices using in further calculations.
-        The lookup table is created using [compute_idx_lookups][yasfpy.functions.cpu_numba.compute_idx_lookups].
+        Creates a lookup table with the indices used in further calculations.
+        The lookup table is created using `compute_idx_lookups` function from `yasfpy.functions.cpu_numba`.
 
-        Attributes
-        ----------
-        idx_lookup : np.ndarray
-            Lookup table of the indices to iterate over large arrays.
+        Attributes:
+            idx_lookup (np.ndarray): Lookup table of the indices to iterate over large arrays.
 
-        Notes
-        -----
-        This function uses [numba](https://numba.pydata.org/) under the hood to speed up the computations.
+        Notes:
+            This function utilizes Numba to optimize the computations.
         """
         self.idx_lookup = compute_idx_lookups(
             self.numerics.lmax, self.parameters.particles.number
@@ -128,32 +108,16 @@ class Simulation:
 
     def __compute_lookups(self):
         """
-        Computes various lookup tables for each particle:
+        Computes various lookup tables for each particle.
 
-        - Spherical Bessel function $j_n$
-        - Spherical Hankel function $h_n^{(1)}$
-        - Associated Legendre polynomial values $P_l^m$
-        - Exponential function value $e^{j (m_2-m_1) \\phi}$
+        Attributes:
+            sph_j (np.ndarray): Spherical Bessel function lookup table calculated for pair-wise particle distances.
+            sph_h (np.ndarray): Spherical Hankel function lookup table calculated for pair-wise particle distances.
+            plm (np.ndarray): Associated Legendre polynomial lookup table calculated for the cosine value of the pairwise particle inclination angles.
+            e_j_dm_phi (np.ndarray): Exponential function lookup table calculated for the pairwise particle azimuthal angles.
 
-        Attributes
-        ----------
-        sph_j : np.ndarray
-            Spherical Bessel function lookup table calculated
-            for pair-wise particles distances
-        sph_h : np.ndarray
-            Spherical Hankel function lookup table calculated
-            for pair-wise particles distances
-        plm : np.ndarray
-            Associated Legendre polynomial lookup table calculated
-            for the cosine value of the pairwise particle
-            inclination angles
-        e_j_dm_phi : np.ndarray
-            Exponential function lookup table calculated for
-            the pairwise particle azimuthal angles
-
-        Notes
-        -----
-        This function uses [numba](https://numba.pydata.org/) under the hood to speed up the computations.
+        Notes:
+            This function uses numba (https://numba.pydata.org/) under the hood to speed up the computations.
         """
         lookup_computation_time_start = time()
         # TODO: new, could be error prone and is not tested yet!
@@ -230,19 +194,15 @@ class Simulation:
         Computes the mie coefficients for the unique pair
         of particle radius and the refractive index of the particle.
 
-        Attributes
-        ----------
-        mie_coefficients : np.ndarray
-            Mie coefficients table
+        Attributes:
+            mie_coefficients (np.ndarray): Mie coefficients table
 
-        See Also
-        --------
-        [t_entry][yasfpy.functions.t_entry.t_entry] : T-Matrix entry function
+        See Also:
+            [t_entry][yasfpy.functions.t_entry.t_entry] : T-Matrix entry function
 
-        Notes
-        -----
-        Due to the four nested loops (particles, tau, l, and m),
-        it could be rewritten using `numba` to speed the process up.
+        Notes:
+            Due to the four nested loops (particles, tau, l, and m),
+            it could be rewritten using `numba` to speed the process up.
         """
         self.mie_coefficients = np.zeros(
             (
@@ -299,10 +259,8 @@ class Simulation:
         - [__compute_initial_field_coefficients_wavebundle_normal_incidence][yasfpy.simulation.Simulation.__compute_initial_field_coefficients_wavebundle_normal_incidence], $\\text{beam width} \\in (0, \\infty)$
         - [__compute_initial_field_coefficients_planewave][yasfpy.simulation.Simulation.__compute_initial_field_coefficients_planewave], $\\text{beam width} = 0$ or $\\text{beam width} = \\infty$
 
-        Attributes
-        ----------
-        initial_field_coefficients : np.ndarray
-            Initial field coefficients
+        Attributes:
+            initial_field_coefficients (np.ndarray): Initial field coefficients
         """
         self.log.scatter("compute initial field coefficients ...")
 
@@ -322,16 +280,16 @@ class Simulation:
 
     def compute_right_hand_side(self):
         """
-        The right hand side $T \\cdot a_I$ of the equation $M \\cdot b = T \\cdot a_I$ is computed.
+        Computes the right hand side $T \\cdot a_I$ of the equation $M \\cdot b = T \\cdot a_I$.
 
         Attributes
         ----------
         right_hand_side : np.ndarray
-            Right hand side of $M \\cdot b = T \\cdot a_I$
+            Right hand side of the equation $M \\cdot b = T \\cdot a_I$
 
         Notes
         -----
-        For more information regarding the equation, please have a look at the paper of [Celes](https://arxiv.org/abs/1706.02145).
+        For more information regarding the equation, please refer to the paper by Celes (https://arxiv.org/abs/1706.02145).
         """
         self.right_hand_side = (
             self.mie_coefficients[self.parameters.particles.single_unique_array_idx, :]
@@ -397,9 +355,8 @@ class Simulation:
     def __compute_initial_field_coefficients_wavebundle_normal_incidence(self):
         """The function initializes the field coefficients for a wave bundle incident at normal incidence.
 
-        TODO
-        ----
-        Implement this function using the celes function [initial_field_coefficients_wavebundle_normal_incidence.m](https://github.com/disordered-photonics/celes/blob/master/src/initial/initial_field_coefficients_wavebundle_normal_incidence.m)
+        TODO:
+            Implement this function using the celes function [initial_field_coefficients_wavebundle_normal_incidence.m](https://github.com/disordered-photonics/celes/blob/master/src/initial/initial_field_coefficients_wavebundle_normal_incidence.m)
         """
         self.initial_field_coefficients = (
             np.zeros(
@@ -409,32 +366,23 @@ class Simulation:
                     self.parameters.k_medium.size,
                 ),
                 dtype=complex,
-            )
-            * np.nan
+            ) * np.nan
         )
 
     def coupling_matrix_multiply(self, x: np.ndarray, idx: int = None):
-        """The function `coupling_matrix_multiply` computes the coupling matrix `wx` based on the input
-        parameters `x` and `idx`.
+        """Computes the coupling matrix `wx` based on the input parameters.
 
-        Parameters
-        ----------
-        x : np.ndarray
-            An input array of shape (n,) or (n, m), where n is the number of particles and m is the number
-            of features for each particle. This array represents the input data for which the coupling
-            matrix needs to be computed.
-        idx : int
-            The parameter `idx` is an optional integer that specifies the index of a specific spherical
-            harmonic mode. If `idx` is provided, the computation will only be performed for that specific
-            mode. If `idx` is not provided or set to `None`, the computation will be performed for all
-            spherical harmonic
+        Args:
+            x (np.ndarray): An input array of shape (n,) or (n, m), where n is the number of particles and m is the number
+                of features for each particle. This array represents the input data for which the coupling
+                matrix needs to be computed.
+            idx (int): An optional integer that specifies the index of a specific spherical harmonic mode. If `idx` is provided,
+                the computation will only be performed for that specific mode. If `idx` is not provided or set to `None`,
+                the computation will be performed for all spherical harmonic modes.
 
-        Returns
-        -------
-        wx : np.ndarray
-            The variable `wx` is an array of shape (n, m, p), where n is the number of particles, m is the
-            number of features for each particle, and p is the number of wavelengths.
-
+        Returns:
+            wx (np.ndarray): An array of shape (n, m, p), where n is the number of particles, m is the number of features for each
+                particle, and p is the number of wavelengths. It represents the coupling matrix `wx`.
         """
         self.log.scatter("prepare particle coupling ... ")
         preparation_time = time()
@@ -529,20 +477,14 @@ class Simulation:
         return wx
 
     def master_matrix_multiply(self, value: np.ndarray, idx: int):
-        """The function `master_matrix_multiply` applies a T-matrix to a given value and returns the
-        result.
+        """Applies a T-matrix to a given value and returns the result.
 
-        Parameters
-        ----------
-        value : np.ndarray
-            The parameter "value" is an np.ndarray, which is a multi-dimensional array-like object in
-        NumPy. It represents the input value for the matrix multiplication operation.
-        idx : int
-            The parameter `idx` is an integer that represents the index of the matrix to be multiplied.
+        Args:
+            value (np.ndarray): The input value for the matrix multiplication operation.
+            idx (int): The index of the matrix to be multiplied.
 
-        Returns
-        -------
-            the variable "mx".
+        Returns:
+            mx (np.ndarray): The result of the matrix multiplication operation.
 
         """
         wx = self.coupling_matrix_multiply(value, idx)
@@ -563,15 +505,12 @@ class Simulation:
 
         return mx
 
-    def compute_scattered_field_coefficients(self, guess=None):
+    def compute_scattered_field_coefficients(self, guess: np.ndarray = None):
         """The function computes the scattered field coefficients using a linear operator and a solver.
 
-        Parameters
-        ----------
-        guess
-            The `guess` parameter is an optional input that represents the initial guess for the solution
-            of the linear system. If no guess is provided, the `right_hand_side` variable is used as the
-            initial guess.
+        Args:
+            guess (np.ndarray): Optional. The initial guess for the solution of the linear system. If no guess is provided,
+                the `right_hand_side` variable is used as the initial guess.
 
         """
         self.log.scatter("compute scattered field coefficients ...")
@@ -603,13 +542,10 @@ class Simulation:
         """The function `compute_fields` calculates the field at given sampling points using either CPU or
         GPU computation.
 
-        Parameters
-        ----------
-        sampling_points : np.ndarray
-            The `sampling_points` parameter is a numpy array that represents the coordinates of the
-            sampling points. It should have a shape of `(n, 3)`, where `n` is the number of sampling points
-            and each row represents the `(x, y, z)` coordinates of a point.
-
+        Args:
+            sampling_points (np.ndarray): The numpy array that represents the coordinates of the sampling points.
+                It should have a shape of `(n, 3)`, where `n` is the number of sampling points and each row
+                represents the `(x, y, z)` coordinates of a point.
         """
         if sampling_points.shape[0] < 1:
             self.log.error("Number of sampling points must be bigger than zero!")
