@@ -26,11 +26,11 @@ class Particles:
         Args:
             position (np.array): A numpy array representing the position of the shape.
             r (np.array): A numpy array containing the radius values for each shape in the system.
-            refractive_index (np.array): A numpy array representing the refractive index of the shape. 
+            refractive_index (np.array): A numpy array representing the refractive index of the shape.
                 It can be either a complex number or a two-column matrix.
-            refractive_index_table (list): A list containing the refractive index values for different materials. 
+            refractive_index_table (list): A list containing the refractive index values for different materials.
                 Each element in the list represents a material, and the refractive index values for that material are stored as a complex number.
-            shape_type (str, optional): A string specifying the type of shape for the object. 
+            shape_type (str, optional): A string specifying the type of shape for the object.
                 Defaults to "sphere" or any other supported shape type.
 
         """
@@ -69,7 +69,7 @@ class Particles:
             urls (list): A list of URLs representing different materials.
 
         Returns:
-            list: A list of data. Each element in the list corresponds to a URL in the input list, 
+            list: A list of data. Each element in the list corresponds to a URL in the input list,
                 and the data is obtained by calling the `material_handler` function on each URL.
 
         """
