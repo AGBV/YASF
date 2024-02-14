@@ -29,13 +29,11 @@ class Optics:
     """
 
     def __init__(self, simulation: Simulation):
-        """The function initializes the simulation object and sets up arrays for storing complex values.
+        """
+        Initializes the Optics object.
 
-        Parameters
-        ----------
-        simulation : Simulation
-            The `simulation` parameter is an instance of the `Simulation` class. It is being passed to the
-            `__init__` method as an argument.
+        Args:
+            simulation (Simulation): An instance of the Simulation class.
 
         """
         self.simulation = simulation
@@ -46,8 +44,95 @@ class Optics:
         self.log = logging.getLogger(__name__)
 
     def compute_cross_sections(self):
-        """Compute the cross sections."""
-        # Code for computing cross sections...
+        """
+        Compute the scattering and extinction cross sections.
+
+        This method calculates the scattering and extinction cross sections for the simulation.
+        It uses the initial field coefficients and scattered field coefficients to perform the calculations.
+        """
+        a = self.simulation.initial_field_coefficients
+        f = self.simulation.scattered_field_coefficients
+
+        self.c_ext = np.zeros(
+            self.simulation.parameters.wavelengths_number, dtype=complex
+        )
+        self.c_ext -= (
+            np.sum(np.conjugate(a) * f, axis=(0, 1))
+            / np.power(self.simulation.parameters.k_medium, 2)
+            * np.pi
+        )
+
+        lmax = self.simulation.numerics.lmax
+        particle_number = self.simulation.parameters.particles.number
+        wavelengths = self.simulation.parameters.k_medium.shape[0]
+        translation_table = self.simulation.numerics.translation_ab5
+        associated_legendre_lookup = self.simulation.plm
+        spherical_bessel_lookup = self.simulation.sph_j
+        e_j_dm_phi_loopup = self.simulation.e_j_dm_phi
+
+        idx_lookup = self.simulation.idx_lookup
+
+        if self.simulation.numerics.gpu:
+            c_sca_real = np.zeros(wavelengths, dtype=float)
+            c_sca_imag = np.zeros_like(c_sca_real)
+
+            idx_device = cuda.to_device(idx_lookup)
+            sfc_device = cuda.to_device(f)
+            c_sca_real_device = cuda.to_device(c_sca_real)
+            c_sca_imag_device = cuda.to_device(c_sca_imag)
+            translation_device = cuda.to_device(translation_table)
+            associated_legendre_device = cuda.to_device(associated_legendre_lookup)
+            spherical_bessel_device = cuda.to_device(spherical_bessel_lookup)
+            e_j_dm_phi_device = cuda.to_device(e_j_dm_phi_loopup)
+
+            jmax = particle_number * 2 * lmax * (lmax + 2)
+            threads_per_block = (16, 16, 2)
+            blocks_per_grid_x = ceil(jmax / threads_per_block[0])
+            blocks_per_grid_y = ceil(jmax / threads_per_block[1])
+            blocks_per_grid_z = ceil(wavelengths / threads_per_block[2])
+            blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y, blocks_per_grid_z)
+
+            compute_scattering_cross_section_gpu[blocks_per_grid, threads_per_block](
+                lmax,
+                particle_number,
+                idx_device,
+                sfc_device,
+                translation_device,
+                associated_legendre_device,
+                spherical_bessel_device,
+                e_j_dm_phi_device,
+                c_sca_real_device,
+                c_sca_imag_device,
+            )
+            c_sca_real = c_sca_real_device.copy_to_host()
+            c_sca_imag = c_sca_imag_device.copy_to_host()
+            c_sca = c_sca_real + 1j * c_sca_imag
+
+        else:
+            # from numba_progress import ProgressBar
+            # num_iterations = jmax * jmax * wavelengths
+            # progress = ProgressBar(total=num_iterations)
+            progress = None
+            c_sca = compute_scattering_cross_section(
+                lmax,
+                particle_number,
+                idx_lookup,
+                f,
+                translation_table,
+                associated_legendre_lookup,
+                spherical_bessel_lookup,
+                e_j_dm_phi_loopup,
+                progress,
+            )
+
+        self.c_sca = (
+            c_sca / np.power(np.abs(self.simulation.parameters.k_medium), 2) * np.pi
+        )
+
+        self.c_ext = np.real(self.c_ext)
+        self.c_sca = np.real(self.c_sca)
+
+        self.albedo = self.c_sca / self.c_ext
 
     def compute_phase_funcition(
         self,
@@ -57,22 +142,17 @@ class Optics:
         """The function `compute_phase_function` calculates various polarization components and phase
         function coefficients for a given simulation.
 
-        Parameters
-        ----------
-        legendre_coefficients_number : int, optional
-            The `legendre_coefficients_number` parameter is an integer that specifies the number of
-            Legendre coefficients to compute for the phase function. These coefficients are used to
-            approximate the phase function using Legendre polynomials. The higher the number of
-            coefficients, the more accurate the approximation will be.
-        c_and_b : Union[bool, tuple], optional
-            The `c_and_b` parameter is a boolean value or a tuple. If it is `True`, it indicates that the
-            `c` and `b` bounds should be computed. If it is `False`, the function will return without
-            computing the `c` and `b` bounds. If
+        Args:
+            legendre_coefficients_number (int, optional): The number of Legendre coefficients to compute
+                for the phase function. These coefficients are used to approximate the phase function
+                using Legendre polynomials. The higher the number of coefficients, the more accurate
+                the approximation will be.
+            c_and_b (Union[bool, tuple], optional): A boolean value or a tuple. If `True`, it indicates
+                that the `c` and `b` bounds should be computed. If `False`, the function will return
+                without computing the `c` and `b` bounds.
 
-        Returns
-        -------
-            The function does not explicitly return anything.
-
+        Returns:
+            None: The function does not explicitly return anything.
         """
         pilm, taulm = spherical_functions_trigon(
             self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
@@ -332,22 +412,17 @@ class Optics:
 
     @staticmethod
     def compute_double_henyey_greenstein(theta: np.ndarray, cb: np.ndarray):
-        """The `compute_double_henyey_greenstein` function calculates the scattering phase function using
-        the double Henyey-Greenstein model.
+        """
+        Calculates the scattering phase function using the double Henyey-Greenstein model.
 
-        Parameters
-        ----------
-        theta : np.ndarray
-            The parameter `theta` is a numpy array representing the scattering angle. It contains the
-            values at which you want to compute the double Henyey-Greenstein phase function.
-        cb : np.ndarray
-            The parameter `cb` is a numpy array that represents the coefficients of the double
-            Henyey-Greenstein phase function. It should have a size of either 2 or 3.
+        Args:
+            theta (np.ndarray): A numpy array representing the scattering angle. It contains the
+                values at which you want to compute the double Henyey-Greenstein phase function.
+            cb (np.ndarray): A numpy array that represents the coefficients of the double
+                Henyey-Greenstein phase function. It should have a size of either 2 or 3.
 
-        Returns
-        -------
-            the result of the computation, which is a numpy array.
-
+        Returns:
+            np.ndarray: The result of the computation, which is a numpy array.
         """
         cb = np.squeeze(cb)
         if cb.size < 2:

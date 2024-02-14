@@ -14,32 +14,24 @@ class InitialField:
         azimuthal_angle: float = 0,
         polarization: str = "TE",
     ):
-        """The function initializes an object with various parameters for a beam of light.
+        """Initializes an object with various parameters for a beam of light.
 
-        Parameters
-        ----------
-        beam_width
-            The beam width parameter represents the width of the beam. It determines the spread of the beam
-            and is typically measured as the full width at half maximum (FWHM) of the beam intensity
-            distribution.
-        focal_point
-            The focal point is the point in space where the beam is focused. It is a coordinate in
-            three-dimensional space (x, y, z) that represents the position of the focal point.
-        field_type : str, optional
-            The `field_type` parameter specifies the type of field for the beam. It can be set to
-            "gaussian" or any other type of field that is supported by the code.
-        amplitude : float, optional
-            The amplitude parameter represents the maximum value or intensity of the beam. It determines
-            the overall strength or power of the beam.
-        polar_angle : float, optional
-            The `polar_angle` parameter represents the angle between the positive z-axis and the direction
-            of propagation of the beam. It is measured in radians.
-        azimuthal_angle : float, optional
-            The azimuthal angle is a measure of the angle between the projection of the vector onto the
-            xy-plane and the positive x-axis. It determines the orientation of the beam in the xy-plane.
-        polarization : str, optional
-            The "polarization" parameter determines the polarization of the beam. It can have two possible
-            values: "TE" for transverse electric polarization and "TM" for transverse magnetic polarization.
+        Args:
+            beam_width (float): The beam width parameter represents the width of the beam. It determines the spread of the beam
+                and is typically measured as the full width at half maximum (FWHM) of the beam intensity
+                distribution.
+            focal_point (tuple): The focal point is the point in space where the beam is focused. It is a coordinate in
+                three-dimensional space (x, y, z) that represents the position of the focal point.
+            field_type (str, optional): The `field_type` parameter specifies the type of field for the beam. It can be set to
+                "gaussian" or any other type of field that is supported by the code. Defaults to "gaussian".
+            amplitude (float, optional): The amplitude parameter represents the maximum value or intensity of the beam. It determines
+                the overall strength or power of the beam. Defaults to 1.
+            polar_angle (float, optional): The `polar_angle` parameter represents the angle between the positive z-axis and the direction
+                of propagation of the beam. It is measured in radians. Defaults to 0.
+            azimuthal_angle (float, optional): The azimuthal angle is a measure of the angle between the projection of the vector onto the
+                xy-plane and the positive x-axis. It determines the orientation of the beam in the xy-plane. Defaults to 0.
+            polarization (str, optional): The "polarization" parameter determines the polarization of the beam. It can have two possible
+                values: "TE" for transverse electric polarization and "TM" for transverse magnetic polarization. Defaults to "TE".
         """
         self.field_type = field_type
         self.amplitude = amplitude

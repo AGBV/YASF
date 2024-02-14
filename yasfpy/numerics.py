@@ -30,33 +30,24 @@ class Numerics:
         """The `__init__` function initializes the Numerics class with various parameters and sets up the
         necessary attributes.
 
-        Parameters
-        ----------
-        lmax : int
-            The maximum degree of the spherical harmonics expansion.
-        sampling_points_number : Union[int, np.ndarray], optional
-            The `sampling_points_number` parameter specifies the number of sampling points on the unit
-            sphere. It can be either an integer or a numpy array. If it is an integer, it represents the
-            total number of sampling points. If it is a numpy array, it can have one or two dimensions. If
-        polar_angles : np.ndarray
-            An array containing the polar angles of the sampling points on the unit sphere.
-        polar_weight_func : Callable
-            The `polar_weight_func` parameter is a callable function that takes a single argument `x` and
-            returns a value. This function is used as a weight function for the polar angles of the sampling
-            points on the unit sphere. By default, it is set to `lambda x: x`, which
-        azimuthal_angles : np.ndarray
-            An array containing the azimuthal angles of the sampling points on the unit sphere.
-        gpu : bool, optional
-            A flag indicating whether to use GPU acceleration. If set to True, the computations will be
-            performed on a GPU if available. If set to False, the computations will be performed on the CPU.
-        particle_distance_resolution
-            The parameter "particle_distance_resolution" represents the resolution of the particle
-            distance. It determines the accuracy of the numerical computations related to particle distances
-            in the code. The value of this parameter is set to 10.0 by default.
-        solver
-            The `solver` parameter is an optional argument that specifies the solver to use for the
-            numerical computations. It is used to solve the scattering problem and obtain the scattering
-            amplitudes. If no solver is provided, the default solver will be used.
+        Args:
+            lmax (int): The maximum degree of the spherical harmonics expansion.
+            sampling_points_number (Union[int, np.ndarray], optional): The `sampling_points_number` parameter specifies the number of sampling points on the unit
+                sphere. It can be either an integer or a numpy array. If it is an integer, it represents the
+                total number of sampling points. If it is a numpy array, it can have one or two dimensions. If
+            polar_angles (np.ndarray): An array containing the polar angles of the sampling points on the unit sphere.
+            polar_weight_func (Callable): The `polar_weight_func` parameter is a callable function that takes a single argument `x` and
+                returns a value. This function is used as a weight function for the polar angles of the sampling
+                points on the unit sphere. By default, it is set to `lambda x: x`, which
+            azimuthal_angles (np.ndarray): An array containing the azimuthal angles of the sampling points on the unit sphere.
+            gpu (bool, optional): A flag indicating whether to use GPU acceleration. If set to True, the computations will be
+                performed on a GPU if available. If set to False, the computations will be performed on the CPU.
+            particle_distance_resolution: The parameter "particle_distance_resolution" represents the resolution of the particle
+                distance. It determines the accuracy of the numerical computations related to particle distances
+                in the code. The value of this parameter is set to 10.0 by default.
+            solver: The `solver` parameter is an optional argument that specifies the solver to use for the
+                numerical computations. It is used to solve the scattering problem and obtain the scattering
+                amplitudes. If no solver is provided, the default solver will be used.
 
         """
         self.log = log.scattering_logger(__name__)
@@ -259,24 +250,17 @@ class Numerics:
 
     @staticmethod
     def compute_fibonacci_sphere_points(n: int = 100):
-        """The `compute_fibonacci_sphere_points` function computes the points on a Fibonacci sphere using
-        the given number of points.
+        """Computes the points on a Fibonacci sphere using the given number of points.
 
-        Parameters
-        ----------
-        n: int, optional
-            The parameter `n` represents the number of points to be computed on the Fibonacci sphere. It is
-            an optional parameter with a default value of 100.
+        Args:
+            n (int, optional): The number of points to be computed on the Fibonacci sphere. 
+                Defaults to 100.
 
-        Returns
-        -------
-        points : np.ndarray
-            The Cartesian points of the Fibonacci sphere.
-        theta : np.ndarray
-            The polar angles of the points on the Fibonacci sphere.
-        phi : np.ndarray
-            The azimuthal angles of the points on the Fibonacci sphere.
-
+        Returns:
+            tuple: A tuple containing:
+                - points (np.ndarray): The Cartesian points of the Fibonacci sphere.
+                - theta (np.ndarray): The polar angles of the points on the Fibonacci sphere.
+                - phi (np.ndarray): The azimuthal angles of the points on the Fibonacci sphere.
         """
         golden_ratio = (1 + 5**0.5) / 2
         i = np.arange(0, n)
