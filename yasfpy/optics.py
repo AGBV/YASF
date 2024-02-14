@@ -46,9 +46,7 @@ class Optics:
         self.log = logging.getLogger(__name__)
 
     def compute_cross_sections(self):
-        """
-        Compute the cross sections.
-        """
+        """Compute the cross sections."""
         # Code for computing cross sections...
 
     def compute_phase_funcition(
