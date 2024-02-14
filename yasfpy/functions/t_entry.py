@@ -15,7 +15,6 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
       Now:    djx  = x *  spherical_jn(l-1, x)  - l * jx
       Possible: djx  = spherical_jn(l, x, derivative=True)
     """
-
     m = k_sphere / k_medium
     x = k_medium * radius
     mx = k_sphere * radius
