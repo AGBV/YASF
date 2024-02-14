@@ -117,11 +117,15 @@ class Optics:
 
             sizes = (jmax, angles, wavelengths)
             threads_per_block = (16, 16, 2)
+            # blocks_per_grid = tuple(
+            #     [
+            #         ceil(sizes[k] / threads_per_block[k])
+            #         for k in range(len(threads_per_block))
+            #     ]
+            # )
             blocks_per_grid = tuple(
-                [
-                    ceil(sizes[k] / threads_per_block[k])
-                    for k in range(len(threads_per_block))
-                ]
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
             )
             # blocks_per_grid = (
             #   ceil(jmax / threads_per_block[0]),
@@ -169,11 +173,15 @@ class Optics:
 
             sizes = (angles, wavelengths)
             threads_per_block = (32, 32)
+            # blocks_per_grid = tuple(
+            #     [
+            #         ceil(sizes[k] / threads_per_block[k])
+            #         for k in range(len(threads_per_block))
+            #     ]
+            # )
             blocks_per_grid = tuple(
-                [
-                    ceil(sizes[k] / threads_per_block[k])
-                    for k in range(len(threads_per_block))
-                ]
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
             )
             compute_polarization_components_gpu[blocks_per_grid, threads_per_block](
                 self.simulation.parameters.k_medium.size,

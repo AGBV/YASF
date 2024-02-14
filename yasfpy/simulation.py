@@ -684,11 +684,15 @@ class Simulation:
                 sph_h.shape[1] * 2 * self.numerics.lmax * (self.numerics.lmax + 2),
                 self.parameters.k_medium.size,
             )
+            # blocks_per_grid = tuple(
+            #     [
+            #         ceil(blocks_per_grid[i] / threads_per_block[i])
+            #         for i in range(len(threads_per_block))
+            #     ]
+            # )
             blocks_per_grid = tuple(
-                [
-                    ceil(blocks_per_grid[i] / threads_per_block[i])
-                    for i in range(len(threads_per_block))
-                ]
+                ceil(blocks_per_grid[i] / threads_per_block[i])
+                for i in range(len(threads_per_block))
             )
 
             compute_field_gpu[blocks_per_grid, threads_per_block](
