@@ -4,6 +4,8 @@ import numpy as np
 
 
 class InitialField:
+    """Represents an object with various parameters for a beam of light.
+    """
     def __init__(
         self,
         beam_width,
