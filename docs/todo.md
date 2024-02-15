@@ -4,6 +4,6 @@ These are needed for the new `optics` class to calculate parameters found in [MS
 Expanding the functionality of yasf and improving its code base will be tracked in the TODO list here.
 In the future, if needed, this will be presented more like a roadmap :)
 
-- [ ] Create pages for the documentation
+- [x] Create pages for the documentation
 - [ ] Orient the created documentation around the [Diátaxis](https://diataxis.fr/) framework
 - [ ] Complete the documentation of the code
