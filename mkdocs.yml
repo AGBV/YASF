@@ -6,15 +6,6 @@ repo_url: https://github.com/AGBV/YASF
 nav:
   - Home: index.md
   - Code Reference: reference/
-  # - Reference:
-  #     - references/index.md
-  #     - references/particles.md
-  #     - references/initial_field.md
-  #     - references/parameters.md
-  #     - references/solver.md
-  #     - references/numerics.md
-  #     - references/simulation.md
-  #     - references/optics.md
   - Testing:
       - testing/index.md
       #- coverage.md
@@ -44,7 +35,7 @@ plugins:
         - scripts/gen_ref_pages.py
         #- scripts/todo.py
   - literate-nav:
-      nav_file: SUMMARY.md
+      nav_file: summary.md
   - section-index
   - mkdocstrings:
       default_handler: python
