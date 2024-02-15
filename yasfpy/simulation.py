@@ -366,7 +366,8 @@ class Simulation:
                     self.parameters.k_medium.size,
                 ),
                 dtype=complex,
-            ) * np.nan
+            )
+            * np.nan
         )
 
     def coupling_matrix_multiply(self, x: np.ndarray, idx: int = None):
