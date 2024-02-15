@@ -6,10 +6,10 @@ import mkdocs_gen_files
 nav = mkdocs_gen_files.Nav()
 
 
-
 # Change this to match the file extension of your code
 FILE_EXTENSION = ".py"
 SRC_DIR = "yasfpy"
+
 
 def find_todo_comments(directory):
     todo_list = []
