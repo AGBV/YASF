@@ -19,14 +19,12 @@ def find_todo_comments(directory):
     return todo_list
 
 
-
 def generate_todo_md(directory, output_file):
     todo_list = find_todo_comments(directory)
     with open(output_file, "a") as f:
         f.write("\n\n## Source List\n")
         f.write("**This is an auto-generated list of TODOs in the codebase.**\n\n")
         f.write("\n".join(todo_list))
-
 
 
 if __name__ == "__main__":
