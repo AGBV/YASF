@@ -1,14 +1,11 @@
 """Generate the code reference pages and navigation."""
 
-SRC_DIR = "yasfpy"
-
 from pathlib import Path
-
 import mkdocs_gen_files
 
-nav = mkdocs_gen_files.Nav()
-
+SRC_DIR = "yasfpy"
 src = Path(__file__).parent.parent / SRC_DIR
+nav = mkdocs_gen_files.Nav()
 
 for path in sorted(src.rglob("*.py")):
     module_path = path.relative_to(src).with_suffix("")

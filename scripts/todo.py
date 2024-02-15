@@ -1,8 +1,15 @@
 import os
+from pathlib import Path
+
+import mkdocs_gen_files
+
+nav = mkdocs_gen_files.Nav()
+
+
 
 # Change this to match the file extension of your code
 FILE_EXTENSION = ".py"
-
+SRC_DIR = "yasfpy"
 
 def find_todo_comments(directory):
     todo_list = []
@@ -27,5 +34,7 @@ def generate_todo_md(directory, output_file):
         f.write("\n".join(todo_list))
 
 
-if __name__ == "__main__":
-    generate_todo_md("yasfpy", "docs/todo.md")
+# if __name__ == "__main__":
+src = Path(__file__).parent.parent
+print("HEHEHE")
+generate_todo_md(src / SRC_DIR, "docs/todo.md")

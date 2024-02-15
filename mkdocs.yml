@@ -8,7 +8,7 @@ nav:
   - Code Reference: reference/
   - Testing:
       - testing/index.md
-      #- coverage.md
+      - coverage.md
   - TODO: todo.md
 
 theme:
@@ -25,15 +25,15 @@ theme:
 
 plugins:
   - autorefs:
-  # - coverage:
-  #     page_name: coverage
-  #     html_report_dir: coverage-report/htmlcov
+  - coverage:
+      page_name: coverage
+      html_report_dir: htmlcov
   - search:
       lang: en
   - gen-files:
       scripts:
         - scripts/gen_ref_pages.py
-        #- scripts/todo.py
+        - scripts/todo.py
   - literate-nav:
       nav_file: summary.md
   - section-index

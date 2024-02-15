@@ -7,3 +7,12 @@ In the future, if needed, this will be presented more like a roadmap :)
 - [x] Create pages for the documentation
 - [ ] Orient the created documentation around the [Diátaxis](https://diataxis.fr/) framework
 - [ ] Complete the documentation of the code
+
+
+## Source List
+**This is an auto-generated list of TODOs in the codebase.**
+
+- [parameters.py:85](https://github.com/AGBV/YASF/blob/main//home/mirza/Projects/YASF/yasfpy/parameters.py#L85): do all the idx to value conversion here
+- [particles.py:44](https://github.com/AGBV/YASF/blob/main//home/mirza/Projects/YASF/yasfpy/particles.py#L44): Keep it for now, remove later...
+- [simulation.py:123](https://github.com/AGBV/YASF/blob/main//home/mirza/Projects/YASF/yasfpy/simulation.py#L123): new, could be error prone and is not tested yet!
+- [cuda_numba.py:6](https://github.com/AGBV/YASF/blob/main//home/mirza/Projects/YASF/yasfpy/functions/cuda_numba.py#L6): Implement data batching for GPUs with smaller memory
