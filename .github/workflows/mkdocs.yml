@@ -43,10 +43,14 @@ jobs:
 
       - name: Download artifact
         uses: dawidd6/action-download-artifact@v2
-        if: ${{ github.event_name == 'workflow_run' }}
         with:
-          workflow: ${{ github.event.workflow_run.workflow_id }}
-          workflow_conclusion: success
+          workflow: testing.yml
+          name: coverage-report
+        # uses: dawidd6/action-download-artifact@v2
+        # if: ${{ github.event_name == 'workflow_run' }}
+        # with:
+        #   workflow: ${{ github.event.workflow_run.workflow_id }}
+        #   workflow_conclusion: success
 
       - name: List files
         run: |
