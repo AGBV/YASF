@@ -1,23 +1,28 @@
 import os
 
+
 def find_todo_comments(directory):
     todo_list = []
     for root, dirs, files in os.walk(directory):
         for file in files:
-            if file.endswith('.py'):  # Change this to match the file extension of your code
-                with open(os.path.join(root, file), 'r') as f:
+            if file.endswith(
+                ".py"
+            ):  # Change this to match the file extension of your code
+                with open(os.path.join(root, file), "r") as f:
                     lines = f.readlines()
                     for i, line in enumerate(lines):
-                        if '# TODO' in line:
+                        if "# TODO" in line:
                             todo_list.append(f"- [{file}:{i + 1}] {line.strip()}")
     return todo_list
 
+
 def generate_todo_md(directory, output_file):
     todo_list = find_todo_comments(directory)
-    with open(output_file, 'a') as f:
+    with open(output_file, "a") as f:
         f.write("\n\n# TODO List\n")
         f.write("**This is an auto-generated list of TODOs in the codebase.**\n\n")
         f.write("\n".join(todo_list))
+
 
 if __name__ == "__main__":
     generate_todo_md("./yasfpy", "docs/todo.md")
