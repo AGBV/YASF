@@ -1,6 +1,8 @@
 name: Unit tests
 
 on:
+  schedule:
+    - cron: "0 5 * * 0"
   ## This is a bit overkill... ideally we only merge into master after a PR is approved
   # push:
   #   branches:
@@ -98,7 +100,7 @@ jobs:
           path: |
             coverage.xml
             htmlcov/
-          retention-days: 30
+          retention-days: 7
 
   codacy-coverage-reporter:
     runs-on: ubuntu-latest
