@@ -5,15 +5,16 @@ repo_url: https://github.com/AGBV/YASF
 
 nav:
   - Home: index.md
-  - Reference:
-      - references/index.md
-      - references/particles.md
-      - references/initial_field.md
-      - references/parameters.md
-      - references/solver.md
-      - references/numerics.md
-      - references/simulation.md
-      - references/optics.md
+  - Code Reference: reference/
+  # - Reference:
+  #     - references/index.md
+  #     - references/particles.md
+  #     - references/initial_field.md
+  #     - references/parameters.md
+  #     - references/solver.md
+  #     - references/numerics.md
+  #     - references/simulation.md
+  #     - references/optics.md
   - Testing:
       - testing/index.md
       #- coverage.md
@@ -38,6 +39,13 @@ plugins:
   #     html_report_dir: coverage-report/htmlcov
   - search:
       lang: en
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_pages.py
+        - scripts/todo.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
   - mkdocstrings:
       default_handler: python
       handlers:
