@@ -48,6 +48,10 @@ jobs:
           workflow: ${{ github.event.workflow_run.workflow_id }}
           workflow_conclusion: success
 
+      - name: List files
+        run: |
+          ls -l
+
       - name: Install poetry
         uses: abatilo/actions-poetry@v2
 
