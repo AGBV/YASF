@@ -42,10 +42,10 @@ class Numerics:
             azimuthal_angles (np.ndarray): An array containing the azimuthal angles of the sampling points on the unit sphere.
             gpu (bool, optional): A flag indicating whether to use GPU acceleration. If set to True, the computations will be
                 performed on a GPU if available. If set to False, the computations will be performed on the CPU.
-            particle_distance_resolution: The parameter "particle_distance_resolution" represents the resolution of the particle
+            particle_distance_resolution (float): The parameter "particle_distance_resolution" represents the resolution of the particle
                 distance. It determines the accuracy of the numerical computations related to particle distances
                 in the code. The value of this parameter is set to 10.0 by default.
-            solver: The `solver` parameter is an optional argument that specifies the solver to use for the
+            solver (Solver): The `solver` parameter is an optional argument that specifies the solver to use for the
                 numerical computations. It is used to solve the scattering problem and obtain the scattering
                 amplitudes. If no solver is provided, the default solver will be used.
 
@@ -257,7 +257,7 @@ class Numerics:
                 Defaults to 100.
 
         Returns:
-            tuple: A tuple containing:
+            tuple (np.ndarray): A tuple containing:
                 - points (np.ndarray): The Cartesian points of the Fibonacci sphere.
                 - theta (np.ndarray): The polar angles of the points on the Fibonacci sphere.
                 - phi (np.ndarray): The azimuthal angles of the points on the Fibonacci sphere.

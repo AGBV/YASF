@@ -69,7 +69,7 @@ class Particles:
             urls (list): A list of URLs representing different materials.
 
         Returns:
-            list: A list of data. Each element in the list corresponds to a URL in the input list,
+            data (list): A list of data. Each element in the list corresponds to a URL in the input list,
                 and the data is obtained by calling the `material_handler` function on each URL.
 
         """

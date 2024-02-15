@@ -150,9 +150,6 @@ class Optics:
             c_and_b (Union[bool, tuple], optional): A boolean value or a tuple. If `True`, it indicates
                 that the `c` and `b` bounds should be computed. If `False`, the function will return
                 without computing the `c` and `b` bounds.
-
-        Returns:
-            None: The function does not explicitly return anything.
         """
         pilm, taulm = spherical_functions_trigon(
             self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
@@ -422,7 +419,7 @@ class Optics:
                 Henyey-Greenstein phase function. It should have a size of either 2 or 3.
 
         Returns:
-            np.ndarray: The result of the computation, which is a numpy array.
+            p (np.ndarray): Computed Henyey-Greenstein phase function.
         """
         cb = np.squeeze(cb)
         if cb.size < 2:

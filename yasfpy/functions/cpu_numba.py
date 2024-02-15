@@ -15,43 +15,25 @@ def particle_interaction(
     sph_h: np.ndarray,
     e_j_dm_phi,
 ):
-    """The function `particle_interaction` calculates the interaction between particles based on their
-    properties and returns the result.
+    """Calculates the interaction between particles based on their properties and returns the result.
 
-    Parameters
-    ----------
-    lmax : int
-        The parameter `lmax` represents the maximum value of the angular momentum quantum number `l`. It
-    determines the size of the arrays `plm` and `sph_h`.
-    particle_number : int
-        The `particle_number` parameter represents the number of particles in the system.
-    idx : np.ndarray
-        The `idx` parameter is a numpy array of shape `(jmax, 5)`, where `jmax` is the total number of
-    interactions between particles. Each row of `idx` represents an interaction and contains the
-    following information:
-    x : np.ndarray
-        The parameter `x` is a numpy array representing the positions of the particles. It has shape
-    `(particle_number,)` and contains the x-coordinates of the particles.
-    translation_table : np.ndarray
-        The `translation_table` parameter is a 3-dimensional numpy array that stores the translation
-    coefficients used in the calculation. It has shape `(n2, n1, p)` where `n2` and `n1` are the indices
-    of the translation coefficients, and `p` is the maximum
-    plm : np.ndarray
-        The parameter `plm` is a numpy array representing the associated Legendre polynomials. It has shape
-    `(pmax * (pmax + 1) // 2, s1max, s2max)`, where `pmax` is the maximum degree of the Legendre
-    polynomials
-    sph_h : np.ndarray
-        The `sph_h` parameter is a numpy array representing the spherical harmonics. It has shape `(jmax,
-    jmax, channels)`, where `jmax` is the maximum number of particles, `channels` is the number of
-    channels, and `jmax` is the maximum number
-    e_j_dm_phi
-        The parameter `e_j_dm_phi` is not defined in the code snippet you provided. Could you please
-    provide the definition or explanation of what `e_j_dm_phi` represents?
+    Args:
+        lmax (int): The maximum value of the angular momentum quantum number `l`. It determines the size of the arrays `plm` and `sph_h`.
+        particle_number (int): The number of particles in the system.
+        idx (np.ndarray): A numpy array of shape `(jmax, 5)`, where `jmax` is the total number of interactions between particles. Each row of `idx` represents an interaction and contains the following information:
+            - s1 (int): The index of the first particle.
+            - n1 (int): The index of the first particle's property.
+            - tau1 (int): The tau value of the first particle.
+            - l1 (int): The l value of the first particle.
+            - m1 (int): The m value of the first particle.
+        x (np.ndarray): A numpy array representing the positions of the particles. It has shape `(particle_number,)` and contains the x-coordinates of the particles.
+        translation_table (np.ndarray): A 3-dimensional numpy array that stores the translation coefficients used in the calculation. It has shape `(n2, n1, p)` where `n2` and `n1` are the indices of the translation coefficients, and `p` is the maximum.
+        plm (np.ndarray): A numpy array representing the associated Legendre polynomials. It has shape `(pmax * (pmax + 1) // 2, s1max, s2max)`, where `pmax` is the maximum degree of the Legendre polynomials.
+        sph_h (np.ndarray): A numpy array representing the spherical harmonics. It has shape `(jmax, jmax, channels)`, where `jmax` is the maximum number of particles, `channels` is the number of channels.
+        e_j_dm_phi (np.ndarray): The parameter `e_j_dm_phi` is not defined in the code snippet you provided. Could you please provide the definition or explanation of what `e_j_dm_phi` represents?
 
-    Returns
-    -------
-        the array `wx`, which represents the result of the particle interaction calculations.
-
+    Returns:
+        wx (np.ndarray): The array `wx`, which represents the result of the particle interaction calculations.
     """
     jmax = particle_number * 2 * lmax * (lmax + 2)
     channels = sph_h.shape[-1]
@@ -89,22 +71,16 @@ def particle_interaction(
 
 @jit(nopython=True, parallel=True, fastmath=True)
 def compute_idx_lookups(lmax: int, particle_number: int):
-    """The function `compute_idx_lookups` generates an index lookup table for a given `lmax` and
+    """
+    The function `compute_idx_lookups` generates an index lookup table for a given `lmax` and
     `particle_number` using parallel processing.
 
-    Parameters
-    ----------
-    lmax : int
-        The parameter `lmax` represents the maximum value of the angular momentum quantum number `l`. It
-    determines the range of values for `l` in the nested loop.
-    particle_number : int
-        The parameter `particle_number` represents the number of particles in the system.
+    Args:
+        lmax (int): The maximum value of the angular momentum quantum number `l`. It determines the range of values for `l` in the nested loop.
+        particle_number (int): The number of particles in the system.
 
-    Returns
-    -------
-        The function `compute_idx_lookups` returns a NumPy array `idx` which contains the computed index
-    lookups.
-
+    Returns:
+        idx (np.ndarray): A NumPy array `idx` which contains the computed index lookups.
     """
     nmax = 2 * lmax * (lmax + 2)
     idx = np.zeros(nmax * particle_number * 5, dtype=int64).reshape(
@@ -137,42 +113,25 @@ def compute_scattering_cross_section(
     sph_h: np.ndarray,
     e_j_dm_phi: np.ndarray,
 ):
-    """The function `compute_scattering_cross_section` calculates the scattering cross section for a given
-    set of input parameters.
+    """Calculates the scattering cross section for a given set of input parameters.
 
-    Parameters
-    ----------
-    lmax : int
-        The parameter `lmax` represents the maximum angular momentum quantum number. It determines the
-    maximum value of `l` in the calculations.
-    particle_number : int
-        The `particle_number` parameter represents the number of particles in the system.
-    idx : np.ndarray
-        `idx` is a numpy array of shape `(jmax, 5)`, where `jmax` is the total number of particle pairs.
-    Each row of `idx` represents a particle pair and contains the following information:
-    sfc : np.ndarray
-        The `sfc` parameter is a numpy array of shape `(s, n, channels)`, where:
-    translation_table : np.ndarray
-        The `translation_table` parameter is a 3-dimensional numpy array that stores the translation
-    coefficients used in the computation of the scattering cross section. It has shape `(n2, n1, p)`
-    where `n2` and `n1` are the number of radial functions for the second and
-    plm : np.ndarray
-        The parameter `plm` is a numpy array representing the associated Legendre polynomials. It has shape
-    `(pmax * (pmax + 1) // 2, 2, 2)`, where `pmax` is the maximum value of `p` in the loop.
-    sph_h : np.ndarray
-        The `sph_h` parameter is a numpy array of shape `(pmax, s1max, s2max, channels)`. It represents the
-    scattering matrix elements for each combination of `s1`, `s2`, and `p`, where `p` is the order of
-    the Legend
-    e_j_dm_phi : np.ndarray
-        The parameter `e_j_dm_phi` is a numpy array representing the scattering phase function. It has
-    shape `(2*lmax+1, channels, channels)` and contains complex values. The indices `(j, s1, s2)`
-    represent the angular momentum index `j`, and the spin indices
+    Args:
+        lmax (int): The maximum angular momentum quantum number. It determines the maximum value of `l` in the calculations.
+        particle_number (int): The number of particles in the system.
+        idx (np.ndarray): A numpy array of shape `(jmax, 5)`, where `jmax` is the total number of particle pairs. Each row of `idx` represents a particle pair and contains the following information:
+            - s (int): The index of the first particle.
+            - n (int): The index of the second particle.
+            - tau (int): The tau value.
+            - l (int): The l value.
+            - m (int): The m value.
+        sfc (np.ndarray): A numpy array of shape `(s, n, channels)`, where:
+        translation_table (np.ndarray): A 3-dimensional numpy array that stores the translation coefficients used in the computation of the scattering cross section. It has shape `(n2, n1, p)` where `n2` and `n1` are the number of radial functions for the second and first particles, respectively, and `p` is the order of the Legendre polynomial.
+        plm (np.ndarray): A numpy array representing the associated Legendre polynomials. It has shape `(pmax * (pmax + 1) // 2, 2, 2)`, where `pmax` is the maximum value of `p` in the loop.
+        sph_h (np.ndarray): A numpy array of shape `(pmax, s1max, s2max, channels)`. It represents the scattering matrix elements for each combination of `s1`, `s2`, and `p`, where `p` is the order of the Legendre polynomial.
+        e_j_dm_phi (np.ndarray): A numpy array representing the scattering phase function. It has shape `(2*lmax+1, channels, channels)` and contains complex values. The indices `(j, s1, s2)` represent the angular momentum index `j`, and the spin indices `s1` and `s2`.
 
-    Returns
-    -------
-        The function `compute_scattering_cross_section` returns the complex scattering cross section
-    `c_sca_complex`.
-
+    Returns:
+        c_sca_complex (np.ndarray): The complex scattering cross section `c_sca_complex`.
     """
     jmax = particle_number * 2 * lmax * (lmax + 2)
     channels = sph_h.shape[-1]
@@ -219,55 +178,23 @@ def compute_radial_independent_scattered_field_legacy(
     pilm: np.ndarray,
     taulm: np.ndarray,
 ):
-    """The function `compute_radial_independent_scattered_field_legacy` calculates the scattered field for
-    a given set of parameters and returns the result.
+    """Calculates the scattered field for a given set of parameters and returns the result.
 
-    Parameters
-    ----------
-    lmax : int
-        The parameter `lmax` represents the maximum value of the angular momentum quantum number `l`. It
-    determines the maximum order of the spherical harmonics used in the computation.
-    particles_position : np.ndarray
-        The `particles_position` parameter is a numpy array that represents the positions of particles. It
-    has shape `(num_particles, 3)`, where `num_particles` is the number of particles and each row
-    represents the x, y, and z coordinates of a particle.
-    idx : np.ndarray
-        The `idx` parameter is a numpy array that contains the indices of the particles. It has shape
-    `(jmax, 5)` where `jmax` is the total number of particles. Each row of `idx` represents a particle
-    and contains the following information:
-    sfc : np.ndarray
-        The parameter `sfc` is a 3-dimensional numpy array representing the scattering form factors. It has
-    dimensions `(s, n, w)`, where:
-    k_medium : np.ndarray
-        The parameter `k_medium` is a numpy array representing the wave number in the medium. It is used in
-    the calculation of the scattered field.
-    azimuthal_angles : np.ndarray
-        An array of azimuthal angles, representing the angles at which the scattered field is computed.
-    e_r : np.ndarray
-        e_r is a numpy array representing the radial component of the electric field. It has shape
-    (azimuthal_angles.size, 3), where azimuthal_angles.size is the number of azimuthal angles and 3
-    represents the three Cartesian components of the electric field.
-    e_phi : np.ndarray
-        `e_phi` is a numpy array representing the electric field component in the azimuthal direction. It
-    has a shape of `(azimuthal_angles.size, 3)`, where `azimuthal_angles.size` is the number of
-    azimuthal angles and `3` represents the three components of the
-    e_theta : np.ndarray
-        `e_theta` is a numpy array representing the electric field component in the theta direction. It has
-    a shape of `(azimuthal_angles.size, 3)`, where `azimuthal_angles.size` is the number of azimuthal
-    angles and `3` represents the three components of the electric
-    pilm : np.ndarray
-        The parameter `pilm` is a numpy array that represents the matrix of spherical harmonics
-    coefficients. It has a shape of `(lmax+1, lmax+1, azimuthal_angles.size)`. Each element `pilm[l, m,
-    a]` represents the coefficient of the spherical
-    taulm : np.ndarray
-        `taulm` is a numpy array that represents the scattering coefficients for each combination of `l`,
-    `m`, and azimuthal angle `a`. It has a shape of `(lmax+1, lmax+1, azimuthal_angles.size)`. The
-    values in `taulm
+    Args:
+        lmax (int): The maximum value of the angular momentum quantum number `l`. It determines the maximum order of the spherical harmonics used in the computation.
+        particles_position (np.ndarray): An array representing the positions of particles. It has shape `(num_particles, 3)`, where `num_particles` is the number of particles and each row represents the x, y, and z coordinates of a particle.
+        idx (np.ndarray): An array containing the indices of the particles. It has shape `(jmax, 5)` where `jmax` is the total number of particles. Each row of `idx` represents a particle and contains the following information:
+        sfc (np.ndarray): A 3-dimensional array representing the scattering form factors. It has dimensions `(s, n, w)`, where:
+        k_medium (np.ndarray): An array representing the wave number in the medium. It is used in the calculation of the scattered field.
+        azimuthal_angles (np.ndarray): An array of azimuthal angles, representing the angles at which the scattered field is computed.
+        e_r (np.ndarray): An array representing the radial component of the electric field. It has shape `(azimuthal_angles.size, 3)`, where `azimuthal_angles.size` is the number of azimuthal angles and 3 represents the three Cartesian components of the electric field.
+        e_phi (np.ndarray): An array representing the electric field component in the azimuthal direction. It has a shape of `(azimuthal_angles.size, 3)`, where `azimuthal_angles.size` is the number of azimuthal angles and `3` represents the three components of the electric field.
+        e_theta (np.ndarray): An array representing the electric field component in the theta direction. It has a shape of `(azimuthal_angles.size, 3)`, where `azimuthal_angles.size` is the number of azimuthal angles and `3` represents the three components of the electric field.
+        pilm (np.ndarray): An array representing the matrix of spherical harmonics coefficients. It has a shape of `(lmax+1, lmax+1, azimuthal_angles.size)`. Each element `pilm[l, m, a]` represents the coefficient of the spherical harmonics for a given `l`, `m`, and azimuthal angle `a`.
+        taulm (np.ndarray): An array representing the scattering coefficients for each combination of `l`, `m`, and azimuthal angle `a`. It has a shape of `(lmax+1, lmax+1, azimuthal_angles.size)`. The values in `taulm` represent the scattering coefficients.
 
-    Returns
-    -------
-        The function `compute_radial_independent_scattered_field_legacy` returns the variable `e_1_sca`,
-    which is a numpy array of complex numbers.
+    Returns:
+        e_1_sca (np.ndarray): An array of complex numbers representing the scattered field.
 
     """
     e_1_sca = np.zeros(
@@ -324,49 +251,22 @@ def compute_electric_field_angle_components(
     pilm: np.ndarray,
     taulm: np.ndarray,
 ):
-    """The function `compute_electric_field_angle_components` calculates the electric field components in
-    the theta and phi directions for given input parameters.
+    """Calculates the electric field components in the theta and phi directions for given input parameters.
 
-    Parameters
-    ----------
-    lmax : int
-        The parameter `lmax` represents the maximum value of the angular momentum quantum number `l`. It
-    determines the maximum value of `l` for which the calculations will be performed.
-    particles_position : np.ndarray
-        The `particles_position` parameter is a numpy array that represents the positions of particles. It
-    has shape `(num_particles, 3)`, where `num_particles` is the number of particles and each particle
-    has 3 coordinates (x, y, z).
-    idx : np.ndarray
-        The `idx` parameter is a numpy array of shape `(jmax, 5)`, where `jmax` is the total number of
-    particles multiplied by `2 * lmax * (lmax + 2)`. Each row of `idx` represents the indices `(s, n,
-    sfc : np.ndarray
-        The parameter `sfc` is a 3-dimensional numpy array representing the scattering form factors. It has
-    dimensions `(s, n, w)`, where:
-    k_medium : np.ndarray
-        The parameter `k_medium` represents the wave vector in the medium. It is a numpy array that
-    contains the wave vector values for different frequencies or wavelengths.
-    azimuthal_angles : np.ndarray
-        The parameter `azimuthal_angles` is an array that represents the azimuthal angles at which the
-    electric field components are computed. It specifies the angles at which the electric field is
-    measured in the azimuthal direction.
-    e_r : np.ndarray
-        The parameter `e_r` represents the unit vector pointing in the direction of the electric field. It
-    is a numpy array of shape `(azimuthal_angles.size, 3)`, where each row corresponds to a different
-    azimuthal angle and the three columns represent the x, y, and z components
-    pilm : np.ndarray
-        `pilm` is a 3-dimensional numpy array of shape `(lmax+1, lmax+1, azimuthal_angles.size)`. It
-    represents the matrix elements of the electric field expansion coefficients for the theta component.
-    The indices `(l, m, a)` correspond to the spherical harmon
-    taulm : np.ndarray
-        `taulm` is a numpy array that represents the angular momentum coupling coefficients. It has a shape
-    of `(lmax+1, lmax+1, azimuthal_angles.size)`. The first dimension represents the value of `l`, the
-    second dimension represents the value of `m`, and
+    Args:
+        lmax (int): The maximum value of the angular momentum quantum number `l`. It determines the maximum value of `l` for which the calculations will be performed.
+        particles_position (np.ndarray): The positions of particles. It has shape `(num_particles, 3)`, where `num_particles` is the number of particles and each particle has 3 coordinates (x, y, z).
+        idx (np.ndarray): A numpy array of shape `(jmax, 5)`, where `jmax` is the total number of particles multiplied by `2 * lmax * (lmax + 2)`. Each row of `idx` represents the indices `(s, n, tau, l, m)`.
+        sfc (np.ndarray): A 3-dimensional numpy array representing the scattering form factors. It has dimensions `(s, n, w)`.
+        k_medium (np.ndarray): The wave vector in the medium. It is a numpy array that contains the wave vector values for different frequencies or wavelengths.
+        azimuthal_angles (np.ndarray): An array representing the azimuthal angles at which the electric field components are computed. It specifies the angles at which the electric field is measured in the azimuthal direction.
+        e_r (np.ndarray): The unit vector pointing in the direction of the electric field. It is a numpy array of shape `(azimuthal_angles.size, 3)`, where each row corresponds to a different azimuthal angle and the three columns represent the x, y, and z components.
+        pilm (np.ndarray): A 3-dimensional numpy array of shape `(lmax+1, lmax+1, azimuthal_angles.size)`. It represents the matrix elements of the electric field expansion coefficients for the theta component. The indices `(l, m, a)` correspond to the spherical harmonics.
+        taulm (np.ndarray): A numpy array that represents the angular momentum coupling coefficients. It has a shape of `(lmax+1, lmax+1, azimuthal_angles.size)`. The first dimension represents the value of `l`, the second dimension represents the value of `m`, and the third dimension represents the azimuthal angle.
 
-    Returns
-    -------
-        The function `compute_electric_field_angle_components` returns two arrays: `e_field_theta` and
-    `e_field_phi`.
-
+    Returns:
+        e_field_theta (np.ndarray): The electric field component in the theta direction.
+        e_field_phi (np.ndarray): The electric field component in the phi direction.
     """
     e_field_theta = np.zeros(
         azimuthal_angles.size * k_medium.size, dtype=complex128
@@ -425,7 +325,7 @@ def compute_polarization_components(
         e_field_phi (np.ndarray): The electric field component in the phi direction.
 
     Returns:
-        tuple: A tuple containing the following polarization components:
+        degree_of_polarization_tuple (tuple): A tuple containing the following polarization components:
             - I (np.ndarray): The total intensity.
             - degree_of_polarization (np.ndarray): The degree of polarization.
             - degree_of_linear_polarization (np.ndarray): The degree of linear polarization.
@@ -499,7 +399,7 @@ def compute_radial_independent_scattered_field(
         e_field_phi (np.ndarray): The electric field phi component.
 
     Returns:
-        np.ndarray: The computed radial independent scattered field.
+        e_1_sca (np.ndarray): The computed radial independent scattered field.
     """
     e_1_sca = np.zeros(
         number_of_angles * 3 * number_of_wavelengths, dtype=complex128
@@ -530,11 +430,10 @@ def compute_lookup_tables(
         cosine_theta (np.ndarray): Array of cosine of polar angles.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple containing the computed lookup tables:
-            - spherical_bessel (np.ndarray): Array of spherical Bessel functions.
-            - spherical_hankel (np.ndarray): Array of spherical Hankel functions.
-            - e_j_dm_phi (np.ndarray): Array of exponential terms.
-            - p_lm (np.ndarray): Array of associated Legendre polynomials.
+        spherical_bessel (np.ndarray): Array of spherical Bessel functions.
+        spherical_hankel (np.ndarray): Array of spherical Hankel functions.
+        e_j_dm_phi (np.ndarray): Array of exponential terms.
+        p_lm (np.ndarray): Array of associated Legendre polynomials.
     """
     spherical_hankel = np.zeros(
         (2 * lmax + 1) * np.prod(size_parameter.shape), dtype=complex
@@ -592,24 +491,24 @@ def compute_field(
     Compute the field using the given parameters and coefficients.
 
     Parameters:
-    - lmax (int): The maximum degree of the spherical harmonics.
-    - idx (np.ndarray): The index array containing the values of s, n, tau, l, and m.
-    - size_parameter (np.ndarray): The size parameter array.
-    - sph_h (np.ndarray): The spherical harmonics array.
-    - derivative (np.ndarray): The derivative array.
-    - e_j_dm_phi (np.ndarray): The e_j_dm_phi array.
-    - p_lm (np.ndarray): The p_lm array.
-    - pi_lm (np.ndarray): The pi_lm array.
-    - tau_lm (np.ndarray): The tau_lm array.
-    - e_r (np.ndarray): The e_r array.
-    - e_theta (np.ndarray): The e_theta array.
-    - e_phi (np.ndarray): The e_phi array.
-    - scattered_field_coefficients (np.ndarray, optional): The scattered field coefficients array. Defaults to None.
-    - initial_field_coefficients (np.ndarray, optional): The initial field coefficients array. Defaults to None.
-    - scatter_to_internal (np.ndarray, optional): The scatter to internal array. Defaults to None.
+        lmax (int): The maximum degree of the spherical harmonics.
+        idx (np.ndarray): The index array containing the values of s, n, tau, l, and m.
+        size_parameter (np.ndarray): The size parameter array.
+        sph_h (np.ndarray): The spherical harmonics array.
+        derivative (np.ndarray): The derivative array.
+        e_j_dm_phi (np.ndarray): The e_j_dm_phi array.
+        p_lm (np.ndarray): The p_lm array.
+        pi_lm (np.ndarray): The pi_lm array.
+        tau_lm (np.ndarray): The tau_lm array.
+        e_r (np.ndarray): The e_r array.
+        e_theta (np.ndarray): The e_theta array.
+        e_phi (np.ndarray): The e_phi array.
+        scattered_field_coefficients (np.ndarray, optional): The scattered field coefficients array. Defaults to None.
+        initial_field_coefficients (np.ndarray, optional): The initial field coefficients array. Defaults to None.
+        scatter_to_internal (np.ndarray, optional): The scatter to internal array. Defaults to None.
 
     Returns:
-    - field (np.ndarray): The computed field array.
+        field (np.ndarray): The computed field array.
     """
     jmax = sph_h.shape[1] * 2 * lmax * (lmax + 2)
     channels = sph_h.shape[-1]

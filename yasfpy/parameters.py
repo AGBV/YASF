@@ -55,7 +55,7 @@ class Parameters:
         """Interpolates the refractive index values from a table for different wavelengths.
 
         Returns:
-            np.array: An array that contains the interpolated refractive index values for the particles
+            refractive_index_interpolated (np.array): An array that contains the interpolated refractive index values for the particles
                 at different wavelengths.
         """
         refractive_index_interpolated = np.zeros(
