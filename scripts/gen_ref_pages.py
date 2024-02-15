@@ -25,21 +25,27 @@ for path in sorted(src.rglob("*.py")):
         continue
 
     if len(parts) == 0:
-        parts = [SRC_DIR,]
+        parts = [
+            SRC_DIR,
+        ]
 
     with mkdocs_gen_files.open(full_doc_path, "w") as fd:
         ident = ".".join(parts)
-        fd.write(f"""---
+        fd.write(
+            f"""---
             comments: true
             ---
-            ::: {ident}""".replace("    ", ""))
+            ::: {ident}""".replace(
+                "    ", ""
+            )
+        )
 
     mkdocs_gen_files.set_edit_path(full_doc_path, path)
-    
+
     for i, part in enumerate(parts):
         parts[i] = part.replace("_", " ").title()
 
-    nav[parts] = doc_path.as_posix()  
+    nav[parts] = doc_path.as_posix()
 
 with mkdocs_gen_files.open("reference/index.md", "w") as nav_file:
     nav_file.writelines(nav.build_literate_nav())
