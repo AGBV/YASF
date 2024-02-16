@@ -183,8 +183,8 @@ class Simulation:
         An internal setup function called upon object creation.
         The following functions are called:
 
-        - [__compute_idx_lookups][yasfpy.simulation.Simulation.__compute_idx_lookup]
-        - [__compute_lookups][yasfpy.simulation.Simulation.__compute_lookups]
+        - [__compute_idx_lookups][simulation.Simulation.__compute_idx_lookup]
+        - [__compute_lookups][simulation.Simulation.__compute_lookups]
         """
         self.__compute_idx_lookup()
         self.__compute_lookups()
@@ -198,7 +198,7 @@ class Simulation:
             mie_coefficients (np.ndarray): Mie coefficients table
 
         See Also:
-            [t_entry][yasfpy.functions.t_entry.t_entry] : T-Matrix entry function
+            [t_entry][functions.t_entry.t_entry] : T-Matrix entry function
 
         Notes:
             Due to the four nested loops (particles, tau, l, and m),
@@ -256,8 +256,8 @@ class Simulation:
         Computes initial field coefficients $a_{\\tau ,l,m}$ and $b_{\\tau ,l,m}$.
         Depending on the `beam_width`, one of two functions is called:
 
-        - [__compute_initial_field_coefficients_wavebundle_normal_incidence][yasfpy.simulation.Simulation.__compute_initial_field_coefficients_wavebundle_normal_incidence], $\\text{beam width} \\in (0, \\infty)$
-        - [__compute_initial_field_coefficients_planewave][yasfpy.simulation.Simulation.__compute_initial_field_coefficients_planewave], $\\text{beam width} = 0$ or $\\text{beam width} = \\infty$
+        - [__compute_initial_field_coefficients_wavebundle_normal_incidence][simulation.Simulation.__compute_initial_field_coefficients_wavebundle_normal_incidence], $\\text{beam width} \\in (0, \\infty)$
+        - [__compute_initial_field_coefficients_planewave][simulation.Simulation.__compute_initial_field_coefficients_planewave], $\\text{beam width} = 0$ or $\\text{beam width} = \\infty$
 
         Attributes:
             initial_field_coefficients (np.ndarray): Initial field coefficients
