@@ -2,6 +2,7 @@ import numpy as np
 from numba import cuda
 from cmath import exp, sqrt
 
+
 # TODO: Implement data batching for GPUs with smaller memory
 @cuda.jit(fastmath=True)
 def particle_interaction_gpu(
