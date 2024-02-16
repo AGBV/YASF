@@ -457,7 +457,6 @@ class Optics:
 
         self.cb = np.empty((self.phase_function.shape[1], len(self.c_and_b_bounds)))
         for w in range(self.phase_function.shape[1]):
-
             # def dhg_optimization(bc):
             #     return (
             #         Optics.compute_double_henyey_greenstein(self.scattering_angles, bc)
