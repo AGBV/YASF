@@ -12,6 +12,7 @@ TODO_DEST = "docs/todo.md"
 
 def find_todo_comments(directory):
     todo_list = []
+    print(directory.parent)
     for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith(FILE_EXTENSION):
@@ -19,8 +20,9 @@ def find_todo_comments(directory):
                     lines = f.readlines()
                     for i, line in enumerate(lines):
                         if line.strip().startswith("# TODO"):
+                            file_url = f"https://github.com/AGBV/YASF/blob/main/{os.path.join(root.replace(directory.parent.as_posix(), '').strip('/'), file)}#L{i + 1}"
                             todo_list.append(
-                                f"- [{file}:{i + 1}](https://github.com/AGBV/YASF/blob/main/{os.path.join(root, file)}#L{i + 1}){line.strip().replace('# TODO', '')}"
+                                f"- [{file}:{i + 1}]({file_url}){{:target='blank'}}{line.strip().replace('# TODO', '')}"
                             )
     return todo_list
 
