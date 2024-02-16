@@ -23,7 +23,7 @@ class TestHandlers(unittest.TestCase):
 
     def test_refractiveindex_info_fe_querry(self):
         csv_file = "tests/data/fe_querry.csv"
-        csv_data = pd.read_csv(csv_file, sep="\s+", comment="#")
+        csv_data = pd.read_csv(csv_file, sep=r"\s+", comment="#")
 
         header = None
         with open(csv_file, "r") as fobj:
