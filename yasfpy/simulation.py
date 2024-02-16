@@ -524,10 +524,12 @@ class Simulation:
             guess = self.right_hand_side
         for w in range(self.parameters.wavelengths_number):
 
-            def mmm(x):
-                return self.master_matrix_multiply(x, w)
+            # def mmm(x):
+            #     return self.master_matrix_multiply(x, w)
 
-            A = LinearOperator(shape=(jmax, jmax), matvec=mmm)
+            # A = LinearOperator(shape=(jmax, jmax), matvec=mmm)
+
+            A = LinearOperator(shape=(jmax, jmax), matvec=lambda x: self.master_matrix_multiply(x, w))
             b = self.right_hand_side[:, :, w].ravel()
             x0 = guess[:, :, w].ravel()
             self.log.scatter(
