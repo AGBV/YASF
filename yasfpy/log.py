@@ -5,11 +5,27 @@ SCATTER = 25
 
 
 def _log_for_numerics(self, message, *args, **kwargs):
+    """
+    Log a message with the NUMERICS level if it is enabled.
+
+    Args:
+        message (str): The log message.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
     if self.isEnabledFor(NUMERICS):
         self._log(NUMERICS, message, args, **kwargs)
 
 
 def _log_for_scatter(self, message, *args, **kwargs):
+    """
+    Log a message for the SCATTER level.
+
+    Args:
+        message (str): The log message.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
     if self.isEnabledFor(SCATTER):
         self._log(SCATTER, message, args, **kwargs)
 
@@ -22,6 +38,16 @@ def _log_for_scatter(self, message, *args, **kwargs):
 # https://stackoverflow.com/questions/7621897/python-logging-module-globally
 # https://stackoverflow.com/questions/2183233/how-to-add-a-custom-loglevel-to-pythons-logging-facility
 def scattering_logger(name):
+    """
+    Create a logger with custom log levels for scattering-related logging.
+
+    Args:
+        name (str): The name of the logger.
+
+    Returns:
+        (logging.Logger): The logger object.
+
+    """
     levels = ["NUMERICS", "SCATTER"]
     methods = [_log_for_numerics, _log_for_scatter]
     for i, level in enumerate(levels):
