@@ -3,9 +3,6 @@ from pathlib import Path
 
 import mkdocs_gen_files
 
-nav = mkdocs_gen_files.Nav()
-
-
 # Change this to match the file extension of your code
 FILE_EXTENSION = ".py"
 SRC_DIR = "yasfpy"
@@ -34,7 +31,7 @@ def generate_todo_md(directory, output_file, source_file=None):
     with open(source_file, "r") as f:
         todo = f.readlines()
         todo = "".join(todo)
-    with open(output_file, "w") as f:
+    with mkdocs_gen_files.open(output_file, "w") as f:
         f.write(todo)
         f.write("\n\n## Source List\n")
         f.write("**This is an auto-generated list of TODOs in the codebase.**\n\n")
@@ -42,4 +39,4 @@ def generate_todo_md(directory, output_file, source_file=None):
 
 
 src = Path(__file__).parent.parent
-generate_todo_md(src / SRC_DIR, "docs/todo_gen.md", "docs/todo.md")
+generate_todo_md(src / SRC_DIR, "todo_gen.md", "docs/todo.md")
