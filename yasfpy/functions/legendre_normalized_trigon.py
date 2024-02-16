@@ -4,6 +4,36 @@ import numpy as np
 
 
 def legendre_normalized_trigon(lmax, x: np.ndarray, y: np.ndarray = None):
+    """
+    Compute the normalized Legendre polynomials of the first kind for trigonometric arguments.
+
+    Args:
+        lmax (int): The maximum degree of the Legendre polynomials.
+        x (np.ndarray): The input array of x-coordinates.
+        y (np.ndarray, optional): The input array of y-coordinates. Defaults to None.
+
+    Returns:
+        plm (np.ndarray): The array of computed Legendre polynomials.
+
+    Note:
+        Base on the celes implementation of [legendre_normalized_trigon.m](https://github.com/disordered-photonics/celes/blob/master/src/mathematics/legendre_normalized_trigon.m){:target="_blank"}
+
+    Examples:
+        >>> lmax = 2
+        >>> x = np.array([0, np.pi/4, np.pi/2])
+        >>> y = np.array([0, 1, 0])
+        >>> result = legendre_normalized_trigon(lmax, x, y)
+        >>> print(result)
+        array([[[ 0.70710678,  0.        ,  0.        ],
+                [ 0.        ,  0.        ,  0.        ],
+                [ 0.        ,  0.        ,  0.        ]],
+               [[ 0.        ,  0.        ,  0.        ],
+                [ 0.        ,  0.70710678,  0.        ],
+                [ 0.        ,  0.        ,  0.        ]],
+               [[ 0.        ,  0.        ,  0.        ],
+                [ 0.        ,  0.        ,  0.        ],
+                [ 0.        ,  0.        ,  0.70710678]]])
+    """
     #   if not(isinstance(x, np.ndarray) or np.isscalar(x) or isinstance(x, list)):
     #     return legendre_normalized_trigon_legacy(x, y, lmax)
 
@@ -60,7 +90,20 @@ def legendre_normalized_trigon(lmax, x: np.ndarray, y: np.ndarray = None):
 
 
 def legendre_normalized_trigon_legacy(x, y=None, lmax=4):
+    """
+    Calculate the normalized Legendre polynomials for trigonometric functions.
+
+    Args:
+        x (float or sympy.core.symbol.Symbol): The input variable x.
+        y (float or sympy.core.symbol.Symbol, optional): The input variable y. Defaults to None.
+        lmax (int, optional): The maximum degree of the Legendre polynomials. Defaults to 4.
+
+    Returns:
+        plm (numpy.ndarray): The matrix of Legendre polynomials.
+
+    """
     import sympy as sym
+    import numpy as np
 
     plm = sym.zeros(lmax + 1, lmax + 1)
     if y == None:

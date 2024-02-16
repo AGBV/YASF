@@ -10,6 +10,8 @@ nav = mkdocs_gen_files.Nav()
 # Change this to match the file extension of your code
 FILE_EXTENSION = ".py"
 SRC_DIR = "yasfpy"
+TODO_SRC = "docs/todo_temp.md"
+TODO_DEST = "docs/todo.md"
 
 def find_todo_comments(directory):
     todo_list = []
@@ -26,15 +28,17 @@ def find_todo_comments(directory):
     return todo_list
 
 
-def generate_todo_md(directory, output_file):
+def generate_todo_md(directory, output_file, source_file = None):
     todo_list = find_todo_comments(directory)
-    with open(output_file, "a") as f:
+    todo = ""
+    with open(source_file, "r") as f:
+        todo = f.readlines()
+        todo = "".join(todo)
+    with open(output_file, "w") as f:
+        f.write(todo)
         f.write("\n\n## Source List\n")
         f.write("**This is an auto-generated list of TODOs in the codebase.**\n\n")
         f.write("\n".join(todo_list))
 
-
-# if __name__ == "__main__":
 src = Path(__file__).parent.parent
-print("HEHEHE")
-generate_todo_md(src / SRC_DIR, "docs/todo.md")
+generate_todo_md(src / SRC_DIR, "docs/todo_gen.md", "docs/todo.md")

@@ -11,6 +11,16 @@ import numpy as np
 
 
 def material_handler(links):
+    """
+    Handles the processing of material data from various sources.
+
+    Args:
+        links (str or list): The link(s) to the material data source(s).
+
+    Returns:
+        (dict): A dictionary containing the processed material data and information.
+
+    """
     if not isinstance(links, list):
         links = [links]
 
@@ -27,19 +37,32 @@ def material_handler(links):
                 data["ref_idx"] = pd.concat([data["ref_idx"], df])
                 data["material"] = material
             else:
-                print("No mathing handler found for url")
+                print("No matching handler found for url")
         else:
             if ".csv" in link:
                 df, material = handle_csv(link)
                 data["ref_idx"] = pd.concat([data["ref_idx"], df])
                 data["material"] = material
             else:
-                print("No mathing handler found for file type")
+                print("No matching handler found for file type")
     # data['ref_idx'] = data['ref_idx'].sort_values(by=['wavelength'])
     return data
 
 
 def handle_refractiveindex_info(url):
+    """
+    Retrieves refractive index data from a given URL and processes it.
+
+    Args:
+        url (str): The URL to retrieve the refractive index data from.
+
+    Returns:
+        (tuple): A tuple containing the processed data as a pandas DataFrame and the material name.
+
+    Raises:
+        Exception: If the data retrieval fails.
+
+    """
     url_split = url.replace("=", "/").split("/")
     material = unquote(url_split[-2])
 
@@ -106,14 +129,21 @@ def handle_refractiveindex_info(url):
 
 
 def handle_eodg(url):
+    """
+    Handles the EODG material data retrieval from a given URL.
+
+    Args:
+        url (str): The URL of the EODG material data.
+
+    Returns:
+        (tuple): A tuple containing the retrieved material data and the material name.
+
+    Raises:
+        Exception: If the data retrieval from the URL fails.
+    """
     url_split = url.split("/")
-    # material = unquote(url_split[-1][:-3]).replace('_', ' ')
     material = unquote(url_split[6])
 
-    # req = urllib.request.Request(url)
-    # with urllib.request.urlopen(req) as resp:
-    # data = resp.read()
-    # data = data.decode("iso-8859-1")
     resp = req.get(url)
     if resp.status_code >= 400:
         raise Exception(f"Failed to retrieve data from {url}")
@@ -130,7 +160,6 @@ def handle_eodg(url):
         io.StringIO(data), delim_whitespace=True, header=None, names=header_yml
     )
     data = data.fillna(0)
-    # eodg uses wavenumbers in cm-1 instead of wavelengths in um, hence um = 1e4 / cm-1
     if "wavn" in data_format:
         data["wavelength"] = 1e4 / data["wavelength"]
         data = data.iloc[::-1]
@@ -139,6 +168,15 @@ def handle_eodg(url):
 
 
 def handle_csv(path):
+    """
+    Read a CSV file containing material data and extract the material name and data.
+
+    Args:
+        path (str): The path to the CSV file.
+
+    Returns:
+        (tuple): A tuple containing the material data as a pandas DataFrame and the material name.
+    """
     name = re.split(r"\._-", path)
     material = unquote(name[0])
     data = pd.read_csv(

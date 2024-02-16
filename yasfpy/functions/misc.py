@@ -7,10 +7,33 @@ from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trig
 
 
 def jmult_max(num_part, lmax):
+    """
+    Calculate the maximum value of jmult.
+
+    Parameters:
+    num_part (int): The number of particles.
+    lmax (int): The maximum value of l.
+
+    Returns:
+        (int): The maximum value of jmult.
+    """
     return 2 * num_part * lmax * (lmax + 2)
 
 
 def multi2single_index(j_s, tau, l, m, lmax):
+    """
+    Converts the multi-index (j_s, tau, l, m) to a single index.
+
+    Args:
+        j_s (int): The value of j_s.
+        tau (int): The value of tau.
+        l (int): The value of l.
+        m (int): The value of m.
+        lmax (int): The maximum value of l.
+
+    Returns:
+        (int): The single index corresponding to the multi-index (j_s, tau, l, m).
+    """
     return (
         j_s * 2 * lmax * (lmax + 2)
         + (tau - 1) * lmax * (lmax + 2)
@@ -21,6 +44,19 @@ def multi2single_index(j_s, tau, l, m, lmax):
 
 
 def single_index2multi(idx, lmax):
+    """
+    Convert a single index to multi-indices (j_s, tau, l, m) for spherical harmonics.
+
+    Args:
+        idx (int): The single index.
+        lmax (int): The maximum angular momentum quantum number.
+
+    Returns:
+        j_s (int): The spin index.
+        tau (int): The isospin index.
+        l (float): The orbital angular momentum quantum number.
+        m (int): The magnetic quantum number.
+    """
     j_s = idx // (2 * lmax * (lmax + 2))
     idx_new = idx % (2 * lmax * (lmax + 2))
     tau = idx_new // (lmax * (lmax + 2)) + 1
@@ -31,6 +67,22 @@ def single_index2multi(idx, lmax):
 
 
 def transformation_coefficients(pilm, taulm, tau, l, m, pol, dagger: bool = False):
+    """
+    Calculate the transformation coefficients for spherical harmonics.
+
+    Args:
+        pilm (ndarray): Array of spherical harmonics.
+        taulm (ndarray): Array of spherical harmonics.
+        tau (int): Polarization state.
+        l (int): Degree of the spherical harmonics.
+        m (int): Order of the spherical harmonics.
+        pol (int): Polarization state.
+        dagger (bool, optional): Whether to apply the dagger operation. Defaults to False.
+
+    Returns:
+        (float): The transformation coefficient.
+
+    """
     ifac = 1j
     if dagger:
         ifac *= -1
@@ -69,6 +121,30 @@ def mutual_lookup(
     derivatives: bool = False,
     parallel: bool = False,
 ):
+    """
+    Calculate mutual lookup tables for scattering calculations.
+
+    Args:
+        lmax (int): The maximum degree of the spherical harmonics expansion.
+        positions_1 (np.ndarray): The positions of the first set of particles.
+        positions_2 (np.ndarray): The positions of the second set of particles.
+        refractive_index (np.ndarray): The refractive indices of the particles.
+        derivatives (bool, optional): Whether to calculate the derivatives of the lookup tables. Defaults to False.
+        parallel (bool, optional): Whether to use parallel computation. Defaults to False.
+
+    Returns:
+        spherical_bessel (np.ndarray): The spherical Bessel functions.
+        spherical_hankel (np.ndarray): The spherical Hankel functions.
+        e_j_dm_phi (np.ndarray): The exponential term in the scattering calculation.
+        p_lm (np.ndarray): The normalized Legendre polynomials.
+        e_r (np.ndarray): The unit vectors in the radial direction.
+        e_theta (np.ndarray): The unit vectors in the polar direction.
+        e_phi (np.ndarray): The unit vectors in the azimuthal direction.
+        cosine_theta (np.ndarray): The cosine of the polar angle.
+        sine_theta (np.ndarray): The sine of the polar angle.
+        size_parameter (np.ndarray): The size parameter of the particles.
+        spherical_hankel_derivative (np.ndarray): The derivative of the spherical Hankel functions.
+    """
     differences = positions_1[:, np.newaxis, :] - positions_2[np.newaxis, :, :]
     distances = np.sqrt(np.sum(differences**2, axis=2))
     distances = distances[:, :, np.newaxis]

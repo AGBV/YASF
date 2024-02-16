@@ -3,6 +3,19 @@ import math
 
 
 def spherical_functions_trigon(lmax, theta, st=None):
+    """
+    Compute spherical functions using trigonometric functions.
+
+    Args:
+        lmax (int): The maximum degree of the spherical harmonics.
+        theta (numpy.ndarray or float): The polar angle(s) in radians.
+        st (numpy.ndarray or float, optional): The sine of the polar angle(s). If not provided, it will be computed from theta.
+
+    Returns:
+        pilm (numpy.ndarray): The associated Legendre functions.
+        taulm (numpy.ndarray): The derivative of the associated Legendre functions.
+
+    """
     size = np.array([1])
     if isinstance(theta, np.ndarray):
         size = theta.shape

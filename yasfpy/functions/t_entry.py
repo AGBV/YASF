@@ -10,10 +10,27 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
     """
     Computes an entry in the T Matrix for a given l, k, and tau
 
-    **Note**: scipy.special has also derivative function. Why is it not the same?
-    Example:
-      Now:    djx  = x *  spherical_jn(l-1, x)  - l * jx
-      Possible: djx  = spherical_jn(l, x, derivative=True)
+    Args:
+        tau (float): The value of tau.
+        l (int): The value of l.
+        k_medium (float): The value of k_medium.
+        k_sphere (float): The value of k_sphere.
+        radius (float): The value of radius.
+        field_type (str, optional): The type of field. Defaults to "scattered".
+
+    Returns:
+        (float): The computed entry in the T Matrix.
+
+    Note:
+        [scipy.special](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.spherical_jn.html#scipy.special.spherical_jn){:target="_blank"}
+        has also derivative function. Why is it not the same?
+
+        Now:      `djx  = x *  spherical_jn(l-1, x)  - l * jx`<br>
+        Possible: `djx  = spherical_jn(l, x, derivative=True)`
+
+    Raises:
+        ValueError: If an invalid field type is provided.
+
     """
     m = k_sphere / k_medium
     x = k_medium * radius
@@ -45,5 +62,5 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
         )  # d / -a
     else:
         logger = log.scattering_logger("t_entry")
-        logger.warning("Not a valid field type provided. Returning None!")
-        return None
+        logger.error("Not a valid field type provided. Returning None!")
+        raise ValueError("Not a valid field type provided. Returning None!")
