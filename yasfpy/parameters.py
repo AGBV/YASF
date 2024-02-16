@@ -82,7 +82,10 @@ class Parameters:
         return refractive_index_interpolated
 
     def __index_to_table(self):
-        # TODO: do all the idx to value conversion here
+        """
+        Todo:
+            do all the idx to value conversion here
+        """
         pass
 
     def __compute_ks(self):
