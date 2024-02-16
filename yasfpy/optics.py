@@ -458,13 +458,23 @@ class Optics:
         self.cb = np.empty((self.phase_function.shape[1], len(self.c_and_b_bounds)))
         for w in range(self.phase_function.shape[1]):
 
-            def dhg_optimization(bc):
-                return (
-                    Optics.compute_double_henyey_greenstein(self.scattering_angles, bc)
-                    - self.phase_function[:, w]
-                )
+            # def dhg_optimization(bc):
+            #     return (
+            #         Optics.compute_double_henyey_greenstein(self.scattering_angles, bc)
+            #         - self.phase_function[:, w]
+            #     )
+
+            # bc = least_squares(
+            #     dhg_optimization, bc0, jac="2-point", bounds=self.c_and_b_bounds
+            # )
 
             bc = least_squares(
-                dhg_optimization, bc0, jac="2-point", bounds=self.c_and_b_bounds
+                lambda bc: Optics.compute_double_henyey_greenstein(
+                    self.scattering_angles, bc
+                )
+                - self.phase_function[:, w],
+                bc0,
+                jac="2-point",
+                bounds=self.c_and_b_bounds,
             )
             self.cb[w, :] = bc.x
