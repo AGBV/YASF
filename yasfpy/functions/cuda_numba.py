@@ -2,6 +2,7 @@ import numpy as np
 from numba import cuda
 from cmath import exp, sqrt
 
+
 @cuda.jit(fastmath=True)
 def particle_interaction_gpu(
     lmax: int,
@@ -29,7 +30,7 @@ def particle_interaction_gpu(
         plm (np.ndarray): Array containing associated Legendre polynomials.
         sph_h (np.ndarray): Array containing spherical harmonics.
         e_j_dm_phi (np.ndarray): Additional parameter for the calculation.
-    
+
     Todo:
         Implement data batching for GPUs with smaller memory
     """

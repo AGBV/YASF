@@ -6,12 +6,12 @@ import mkdocs_gen_files
 nav = mkdocs_gen_files.Nav()
 
 
-
 # Change this to match the file extension of your code
 FILE_EXTENSION = ".py"
 SRC_DIR = "yasfpy"
 TODO_SRC = "docs/todo_temp.md"
 TODO_DEST = "docs/todo.md"
+
 
 def find_todo_comments(directory):
     todo_list = []
@@ -28,7 +28,7 @@ def find_todo_comments(directory):
     return todo_list
 
 
-def generate_todo_md(directory, output_file, source_file = None):
+def generate_todo_md(directory, output_file, source_file=None):
     todo_list = find_todo_comments(directory)
     todo = ""
     with open(source_file, "r") as f:
@@ -39,6 +39,7 @@ def generate_todo_md(directory, output_file, source_file = None):
         f.write("\n\n## Source List\n")
         f.write("**This is an auto-generated list of TODOs in the codebase.**\n\n")
         f.write("\n".join(todo_list))
+
 
 src = Path(__file__).parent.parent
 generate_todo_md(src / SRC_DIR, "docs/todo_gen.md", "docs/todo.md")
