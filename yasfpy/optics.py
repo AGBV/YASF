@@ -24,8 +24,8 @@ from yasfpy.functions.cuda_numba import (
 
 
 class Optics:
-    """The optics class handles the calculation of the optical scattering properties like
-    scattering and extinction cross-sections.
+    """The optics class handles the calculation of the optical scattering properties
+    like scattering and extinction cross-sections.
     """
 
     def __init__(self, simulation: Simulation):
