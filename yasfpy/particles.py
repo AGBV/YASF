@@ -136,8 +136,7 @@ class Particles:
             if len(self.position) == 1:
                 self.max_particle_distance = 0
             else:
-                assert (
-                len(self.position) == 1)
+                assert len(self.position) == 1
                 "SCIPY CONVEX HULL NEEDS 4 POINT MINIMUM; not currently accounted for"
 
         else:
