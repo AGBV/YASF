@@ -132,9 +132,18 @@ class Particles:
 
     def compute_maximal_particle_distance(self):
         """The function computes the maximum distance between particles using the ConvexHull algorithm."""
-        hull = ConvexHull(self.position)
-        vert = self.position[hull.vertices, :]
-        self.max_particle_distance = max(pdist(vert))
+        if len(self.position) < 4:
+            if len(self.position) == 1:
+                self.max_particle_distance = 0
+            else:
+                assert (
+                len(self.position) == 1)
+                "SCIPY CONVEX HULL NEEDS 4 POINT MINIMUM; not currently accounted for"
+
+        else:
+            hull = ConvexHull(self.position)
+            vert = self.position[hull.vertices, :]
+            self.max_particle_distance = max(pdist(vert))
 
     def compute_volume_equivalent_area(self):
         """The function computes the volume equivalent area by calculating the geometric projection."""
