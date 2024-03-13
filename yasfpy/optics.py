@@ -1,9 +1,10 @@
 import logging
 from typing import Union
 from math import ceil
-
+import pandas as pd
 import numpy as np
 from numba import cuda
+from yasfpy.functions.misc import single_index2multi
 from yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
 
 from yasfpy.simulation import Simulation
@@ -300,12 +301,14 @@ class Optics:
             )
 
         self.scattering_angles = self.simulation.numerics.polar_angles
-
+        k_medium = self.simulation.parameters.k_medium
+        if type(self.simulation.parameters.k_medium) == pd.core.series.Series:
+            k_medium = k_medium.to_numpy()
         self.phase_function_3d = (
             intensity
             * 4
             * np.pi
-            / np.power(np.abs(self.simulation.parameters.k_medium), 2)
+            / np.power(np.abs(k_medium), 2)
             / self.c_sca[np.newaxis, :]
         )
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
