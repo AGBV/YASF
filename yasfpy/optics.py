@@ -415,7 +415,7 @@ class Optics:
 
         self.__compute_c_and_b()
 
-    def __check_phase_function(self, precision=1e-4):
+    def __check_phase_function(self, precision=1e-4) -> bool:
         integral = 0
         delta_phi = (
             len(self.simulation.numerics.azimuthal_angles)
@@ -461,7 +461,7 @@ class Optics:
         g = sum / (4 * np.pi)
         self.g = g
 
-    def __compute_correction(self):
+    def __compute_correction(self) -> float64:
         """Naive implementation of a correction term to lessen the underestimation of a spheres surface
         via numerical integration. Does not adequately correct the result, but does improve it.
 
