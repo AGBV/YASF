@@ -139,6 +139,7 @@ class Optics:
         self,
         legendre_coefficients_number: int = 15,
         c_and_b: Union[bool, tuple] = False,
+        check_phase_function: bool = False,
     ):
         """The function `compute_phase_function` calculates various polarization components and phase
         function coefficients for a given simulation.
@@ -311,6 +312,10 @@ class Optics:
             / np.power(np.abs(k_medium), 2)
             / self.c_sca[np.newaxis, :]
         )
+        if check_phase_function:
+            res = self.__check_phase_function()
+            assert res == True, "The phase function does have the desired precision. Please increase the amount of angles used."
+
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
             np.cos(self.scattering_angles),
             self.phase_function_3d,
