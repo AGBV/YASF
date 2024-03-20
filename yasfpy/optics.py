@@ -436,8 +436,9 @@ class Optics:
         nopython=True,
     )
     def compute_asymmetry(self):
-        """Computes the asymmetry parameter by numerical integration over the phase function. Therefore depends on the
-        chosen sampling points. Accuracy depends on the number of sampling points. **ACCURACY CURRENTLY VERY MUCH IN QUESTION**
+        """Computes the asymmetry parameter by numerical integration over the phase function.
+        Therefore depends on the chosen sampling points. Accuracy depends on the number of
+        sampling points. **ACCURACY CURRENTLY VERY MUCH IN QUESTION**
         """
         sum = 0
         delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
@@ -478,9 +479,10 @@ class Optics:
         nopython=True,
     )
     def compute_asymmetry_corrected(self):
-        """Computes asymmetry parameter via numerical integration over the phase function. Makes use of a
-        correction term for the surface to compensate for underestimation of the spaces surface area. Therefore
-        depends on the chosen sampling points. Accuracy depends on the number of sampling points.
+        """Computes asymmetry parameter via numerical integration over the phase function.
+        Makes use of a correction term for the surface to compensate for underestimation
+        of the spaces surface area. Therefore depends on the chosen sampling points.
+        Accuracy depends on the number of sampling points.
         **ACCURACY CURRENTLY VERY MUCH IN QUESTION**
         """
         correction_term = self.__compute_correction()
@@ -504,9 +506,9 @@ class Optics:
         self.g_corr = g
 
     def compute_asymmetry_coeff(self):
-        """WIP: Tried using the scattered field coefficients p & q to calculate the asymmetry parameter. Does **not** work.
-        Might however be subject to further investigation, to achievce more reliable results.
-
+        """WIP: Tried using the scattered field coefficients p & q to calculate the asymmetry parameter.
+        Does **not** work. Might however be subject to further investigation,
+        to achievce more reliable results.
         """
         A = self.simulation.scattered_field_coefficients
         a_i = []
