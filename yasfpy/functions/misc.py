@@ -168,7 +168,7 @@ def mutual_lookup(
     )
     e_phi = np.stack([-np.sin(phi), np.cos(phi), np.zeros_like(phi)], axis=-1)
 
-    size_parameter = distances * refractive_index[np.newaxis, np.newaxis, :]
+    size_parameter = distances * np.array(refractive_index)[np.newaxis, np.newaxis, :]
 
     if parallel:
         from yasfpy.functions.cpu_numba import compute_lookup_tables

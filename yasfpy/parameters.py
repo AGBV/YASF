@@ -99,7 +99,7 @@ class Parameters:
             table = self.__interpolate_refractive_index_from_table()
             self.k_particle = (
                 np.take(table, self.particles.refractive_index, axis=0)
-                * self.omega[np.newaxis, :]
+                * np.array(self.omega)[np.newaxis, :]
             )
 
             unique_radius_index_pairs = np.zeros(
