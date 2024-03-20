@@ -1,0 +1,144 @@
+name: Unit tests
+
+on:
+  schedule:
+    - cron: "0 5 * * 0"
+  ## This is a bit overkill... ideally we only merge into master after a PR is approved
+  # push:
+  #   branches:
+  #     - master
+  #   paths:
+  #     - "src/**"
+  #     - "tests/**"
+  #     - ".github/workflows/testing.yml"
+  pull_request:
+    types:
+      - review_requested
+  workflow_dispatch:
+
+jobs:
+  requirements:
+    runs-on: ubuntu-latest
+    name: Poetry dependencies to requirements.txt
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Install poetry
+        uses: abatilo/actions-poetry@v2
+
+      - name: View poetry --help
+        run: poetry --help
+
+      - name: Export dependencies
+        run: |
+          poetry export --with tests -f requirements.txt -o requirements.txt --without-hashes
+          cat requirements.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: requirements-file
+          path: requirements.txt
+          retention-days: 1
+
+  unittest:
+    name: Unit tests
+    runs-on:
+      - self-hosted
+      - gpu
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    needs: requirements
+
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Download requirements file
+        uses: actions/download-artifact@v3
+        with:
+          name: requirements-file
+
+      - name: Cache conda
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('**/poetry.lock') }}
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: "latest"
+          activate-environment: yasf-env
+          environment-file: yasf-env-test.yml
+          use-only-tar-bz2: true
+          auto-activate-base: false
+
+      - name: List installed packages with their versions
+        run: conda list
+
+      - name: Running pytest
+        run: |
+          pytest -v --cov=yasfpy --cov-report=xml --cov-report=html
+          coverage xml -i
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 7
+
+  codacy-coverage-reporter:
+    runs-on: ubuntu-latest
+    name: Codacy coverage reporter
+    needs: unittest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-report
+      - name: Run codacy-coverage-reporter
+        uses: codacy/codacy-coverage-reporter-action@v1
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: ./coverage.xml
+
+  deepsource-coverage-reporter:
+    runs-on: ubuntu-latest
+    name: DeepSource coverage reporter
+    needs: unittest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-report
+      - name: Report test coverage to DeepSource
+        uses: deepsourcelabs/test-coverage-action@master
+        with:
+          key: python
+          coverage-file: coverage.xml
+          dsn: ${{ secrets.DEEPSOURCE_DSN }}

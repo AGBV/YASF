@@ -1,6 +1,7 @@
-name: Publish docs via GitHub Pages
+name: Publish docs
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -10,8 +11,8 @@ on:
       - ".github/workflows/mkdocs.yml"
       - "!yasfpy/**"
       - "!tests/**"
-      - "!.github/workflows/test-self-hosted-conda.yml"
-      - "!sonar-project.properties"
+      #- "!.github/workflows/test-self-hosted-conda.yml"
+      #- "!sonar-project.properties"
   # workflow_run:
   #   workflows:
   #     - Unit tests on self-hosted with Conda
@@ -27,16 +28,21 @@ jobs:
       packages: write
     steps:
       - name: Checkout master
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           lfs: false
 
       - name: Download artifact
         uses: dawidd6/action-download-artifact@v2
-        if: ${{ github.event_name == 'workflow_run' }}
         with:
-          workflow: ${{ github.event.workflow_run.workflow_id }}
-          workflow_conclusion: success
+          workflow: testing.yml
+          name: coverage-report
+
+      - name: Install poetry
+        uses: abatilo/actions-poetry@v2
+
+      - name: Export dependencies
+        run: poetry export --only docs -f requirements.txt -o requirements.txt --without-hashes
 
       - name: Deploy docs
         uses: mhausenblas/mkdocs-deploy-gh-pages@master
@@ -44,4 +50,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CONFIG_FILE: mkdocs.yml
           # EXTRA_PACKAGES: build-base
-          REQUIREMENTS: docs/requirements.txt
+          REQUIREMENTS: ./requirements.txt
