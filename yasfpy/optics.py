@@ -3,7 +3,7 @@ from typing import Union
 from math import ceil
 import pandas as pd
 import numpy as np
-from numba import cuda, jit
+from numba import cuda
 from yasfpy.functions.misc import single_index2multi
 from yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
 
@@ -437,9 +437,6 @@ class Optics:
         else:
             return True
 
-    @jit(
-        nopython=True,
-    )
     def compute_asymmetry(self):
         """Computes the asymmetry parameter by numerical integration over the phase function.
         Therefore depends on the chosen sampling points. Accuracy depends on the number of
