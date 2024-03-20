@@ -410,32 +410,49 @@ class Optics:
 
         self.__compute_c_and_b()
 
-
     def __check_phase_function(self, precision=1e-4):
         integral = 0
-        delta_phi = len(self.simulation.numerics.azimuthal_angles)/self.simulation.numerics.sampling_points_number[0]
-        delta_theta = len(self.simulation.numerics.polar_angles)/self.simulation.numerics.sampling_points_number[1]
+        delta_phi = (
+            len(self.simulation.numerics.azimuthal_angles)
+            / self.simulation.numerics.sampling_points_number[0]
+        )
+        delta_theta = (
+            len(self.simulation.numerics.polar_angles)
+            / self.simulation.numerics.sampling_points_number[1]
+        )
         for idx in self.simulation.numerics.azimuthal_angles:
-            integral += self.phase_function_3d[idx,:]*delta_phi*np.sin(self.simulation.numerics.azimuthal_angles[idx])*delta_theta
-        if 1-integral/(4*np.pi) > precision:
+            integral += (
+                self.phase_function_3d[idx, :]
+                * delta_phi
+                * np.sin(self.simulation.numerics.azimuthal_angles[idx])
+                * delta_theta
+            )
+        if 1 - integral / (4 * np.pi) > precision:
             return False
         else:
             return True
 
-
-
-    @jit(nopython=True,)
+    @jit(
+        nopython=True,
+    )
     def compute_asymmetry(self):
         """Computes the asymmetry parameter by numerical integration over the phase function. Therefore depends on the
-        chosen sampling points. Accuracy depends on the number of sampling points. **ACCURACY CURRENTLY VERY MUCH IN QUESTION**"""
+        chosen sampling points. Accuracy depends on the number of sampling points. **ACCURACY CURRENTLY VERY MUCH IN QUESTION**
+        """
         sum = 0
-        delta_phi = (2*np.pi)/self.simulation.numerics.sampling_points_number[0]
-        delta_theta = np.pi/self.simulation.numerics.sampling_points_number[1]
+        delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
+        delta_theta = np.pi / self.simulation.numerics.sampling_points_number[1]
         for idx in range(len(self.simulation.numerics.azimuthal_angles)):
             rn = np.cos(self.simulation.numerics.polar_angles[idx])
-            a = self.phase_function_3d[idx,:]*rn*delta_phi*np.sin(self.simulation.numerics.polar_angles[idx])*delta_theta
+            a = (
+                self.phase_function_3d[idx, :]
+                * rn
+                * delta_phi
+                * np.sin(self.simulation.numerics.polar_angles[idx])
+                * delta_theta
+            )
             sum += a
-        g = sum/(4*np.pi)
+        g = sum / (4 * np.pi)
         self.g = g
 
     def __compute_correction(self):
@@ -446,14 +463,20 @@ class Optics:
             correction_term (float64): Computed error term
         """
         integral = 0
-        delta_phi = (2*np.pi)/self.simulation.numerics.sampling_points_number[0]
-        delta_theta = np.pi/self.simulation.numerics.sampling_points_number[1]
+        delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
+        delta_theta = np.pi / self.simulation.numerics.sampling_points_number[1]
         for idx in range(len(self.simulation.numerics.azimuthal_angles)):
-            integral += np.sin(self.simulation.numerics.polar_angles[idx])*delta_theta*delta_phi
-        error = 1 - integral/(4*np.pi)
-        return 12*error/len(self.simulation.numerics.azimuthal_angles)**2
+            integral += (
+                np.sin(self.simulation.numerics.polar_angles[idx])
+                * delta_theta
+                * delta_phi
+            )
+        error = 1 - integral / (4 * np.pi)
+        return 12 * error / len(self.simulation.numerics.azimuthal_angles) ** 2
 
-    @jit(nopython=True,)
+    @jit(
+        nopython=True,
+    )
     def compute_asymmetry_corrected(self):
         """Computes asymmetry parameter via numerical integration over the phase function. Makes use of a
         correction term for the surface to compensate for underestimation of the spaces surface area. Therefore
@@ -463,15 +486,21 @@ class Optics:
         correction_term = self.__compute_correction()
         print(correction_term)
         sum = 0
-        delta_phi = (2*np.pi)/self.simulation.numerics.sampling_points_number[0]
-        delta_theta = np.pi/self.simulation.numerics.sampling_points_number[1]
+        delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
+        delta_theta = np.pi / self.simulation.numerics.sampling_points_number[1]
         for idx in range(len(self.simulation.numerics.azimuthal_angles)):
             rn = np.cos(self.simulation.numerics.polar_angles[idx])
-            a = self.phase_function_3d[idx,:]*rn*delta_phi*np.sin(self.simulation.numerics.polar_angles[idx])*delta_theta
-            correction = self.phase_function_3d[idx,:]*rn*correction_term
+            a = (
+                self.phase_function_3d[idx, :]
+                * rn
+                * delta_phi
+                * np.sin(self.simulation.numerics.polar_angles[idx])
+                * delta_theta
+            )
+            correction = self.phase_function_3d[idx, :] * rn * correction_term
             sum += a
             sum += correction
-        g = sum/(4*np.pi)
+        g = sum / (4 * np.pi)
         self.g_corr = g
 
     def compute_asymmetry_coeff(self):
@@ -485,27 +514,34 @@ class Optics:
         for n in range(A.shape[1]):
             _, tau, _, _ = single_index2multi(n, self.simulation.numerics.lmax)
             if tau == 1:
-                a_i.append(A[:,n,:])
+                a_i.append(A[:, n, :])
             else:
-                b_i.append(A[:,n,:])
+                b_i.append(A[:, n, :])
 
         g = []
         for wv in range(self.simulation.parameters.wavelength.shape[0]):
             sum_term = 0
-            for i_n in range(len(a_i)-1):
+            for i_n in range(len(a_i) - 1):
                 n = i_n + 1
-                a_n = np.squeeze(a_i[i_n][:,wv])
-                b_n = np.squeeze(b_i[i_n][:,wv])
-                a_n2 = np.squeeze(a_i[i_n+1][:,wv])
-                b_n2 = np.squeeze(b_i[i_n+1][:,wv])
-                p1 = (np.dot(a_n,np.conj(a_n2))+np.dot(b_n, np.conj(b_n2))).real # *((n*(n+2))/(n+1))
-                p2 = (np.dot(a_n,np.conj(b_n))).real # *((2*n+1)/(n*(n+1)))
+                a_n = np.squeeze(a_i[i_n][:, wv])
+                b_n = np.squeeze(b_i[i_n][:, wv])
+                a_n2 = np.squeeze(a_i[i_n + 1][:, wv])
+                b_n2 = np.squeeze(b_i[i_n + 1][:, wv])
+                p1 = (
+                    np.dot(a_n, np.conj(a_n2)) + np.dot(b_n, np.conj(b_n2))
+                ).real  # *((n*(n+2))/(n+1))
+                p2 = (np.dot(a_n, np.conj(b_n))).real  # *((2*n+1)/(n*(n+1)))
                 sum_term += p1 + p2
-            g_wv = ((4*np.pi)/(np.power(np.abs(self.simulation.parameters.k_particle[:,wv]),2)*self.c_sca[wv]))*sum_term
+            g_wv = (
+                (4 * np.pi)
+                / (
+                    np.power(np.abs(self.simulation.parameters.k_particle[:, wv]), 2)
+                    * self.c_sca[wv]
+                )
+            ) * sum_term
             g.append(g_wv)
         self.g = g
         return g
-
 
     @staticmethod
     def compute_double_henyey_greenstein(theta: np.ndarray, cb: np.ndarray):
