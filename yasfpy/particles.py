@@ -49,10 +49,10 @@ class Particles:
                 self.refractive_index = (
                     self.refractive_index[:, 0] + 1j * self.refractive_index[:, 1]
                 )
-        elif self.refractive_index.shape[1] > 2:
-            self.log.error(
-                "Refractive index should be either complex or a two column matrix!"
-            )
+            elif self.refractive_index.shape[1] > 2:
+                self.log.error(
+                    "Refractive index should be either complex or a two column matrix!"
+                )
         else:
             self.refractive_index = refractive_index.astype(int)
             self.refractive_index_table = refractive_index_table
