@@ -767,7 +767,7 @@ class Optics:
             dolu = dolu_device.copy_to_host()
             docp = docp_device.copy_to_host()
 
-    def compute_data_split(self, data: list[np.ndarray], idx: int):
+    def __compute_data_split(self, data: list[np.ndarray], idx: int):
 
         buffer = 10000 # buffer to accomodate for varying GPU mem usage
         device = cuda.select_device(0)
@@ -778,22 +778,26 @@ class Optics:
         idx_per_array = []
         for array in data:
             print(array.shape)
-            totaly_data_bytes += array.size*array.itemsize
-            idx_per_array.append(np.where(np.array(array.shape) == idx)[0])
+            total_data_bytes += array.size*array.itemsize
+            idx_per_array.append(np.where(np.array(array.shape) == idx)[0][0])
 
         print(idx_per_array)
         num = idx
         while total_data_bytes > free_bytes:
             new_data_bytes = 0
-            num -= 10
+            num -= 10000
             for i in range(len(data)):
+                print(i)
                 data[i] = data[i].take(indices=range(0,num), axis=idx_per_array[i])
                 new_data_bytes += data[i].size*data[i].itemsize
             total_data_bytes = new_data_bytes
+            print(total_data_bytes)
 
         print("FOUND IDX TO SPLIT")
         print(f"{num = }")
 
+        print(f"{total_data_bytes = }")
+        print(f"{free_bytes = }")
         return data
 
     def test_data_split(self):
@@ -840,14 +844,12 @@ class Optics:
             e_field_phi_imag,
         ]
 
-        data_for_gpu = self.compute_data_split(to_split, idx=pilm.shape[-1])
-        azimuthal_angles_device = cuda.to_device(
-            self.simulation.numerics.azimuthal_angles
-        )
-        e_r_device = cuda.to_device(self.simulation.numerics.e_r)
-        pilm_device = cuda.to_device(pilm)
-        taulm_device = cuda.to_device(taulm)
-        e_field_theta_real_device = cuda.to_device(e_field_theta_real)
-        e_field_theta_imag_device = cuda.to_device(e_field_theta_imag)
-        e_field_phi_real_device = cuda.to_device(e_field_phi_real)
-        e_field_phi_imag_device = cuda.to_device(e_field_phi_imag)
+        data_for_gpu = self.__compute_data_split(to_split, idx=pilm.shape[-1])
+        azimuthal_angles_device = cuda.to_device(data_for_gpu[0])
+        e_r_device = cuda.to_device(data_for_gpu[1])
+        pilm_device = cuda.to_device(data_for_gpu[2])
+        taulm_device = cuda.to_device(data_for_gpu[3])
+        e_field_theta_real_device = cuda.to_device(data_for_gpu[4])
+        e_field_theta_imag_device = cuda.to_device(data_for_gpu[5])
+        e_field_phi_real_device = cuda.to_device(data_for_gpu[6])
+        e_field_phi_imag_device = cuda.to_device(data_for_gpu[7])
