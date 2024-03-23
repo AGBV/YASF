@@ -766,3 +766,88 @@ class Optics:
             dolq = dolq_device.copy_to_host()
             dolu = dolu_device.copy_to_host()
             docp = docp_device.copy_to_host()
+
+    def compute_data_split(self, data: list[np.ndarray], idx: int):
+
+        buffer = 10000 # buffer to accomodate for varying GPU mem usage
+        device = cuda.select_device(0)
+        handle = cuda.cudadrv.devices.get_context()
+        mem_info = cuda.cudadrv.driver.Context(device,handle).get_memory_info()
+        free_bytes = mem_info.free
+        total_data_bytes = 0
+        idx_per_array = []
+        for array in data:
+            print(array.shape)
+            totaly_data_bytes += array.size*array.itemsize
+            idx_per_array.append(np.where(np.array(array.shape) == idx)[0])
+
+        print(idx_per_array)
+        num = idx
+        while total_data_bytes > free_bytes:
+            new_data_bytes = 0
+            num -= 10
+            for i in range(len(data)):
+                data[i] = data[i].take(indices=range(0,num), axis=idx_per_array[i])
+                new_data_bytes += data[i].size*data[i].itemsize
+            total_data_bytes = new_data_bytes
+
+        print("FOUND IDX TO SPLIT")
+        print(f"{num = }")
+
+        return data
+
+    def test_data_split(self):
+
+        pilm, taulm = spherical_functions_trigon(
+            self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
+        )
+
+        jmax = (
+            self.simulation.parameters.particles.number
+            * self.simulation.numerics.nmax
+        )
+        angles = self.simulation.numerics.azimuthal_angles.size
+        wavelengths = self.simulation.parameters.k_medium.size
+        e_field_theta_real = np.zeros(
+            (
+                self.simulation.numerics.azimuthal_angles.size,
+                self.simulation.parameters.k_medium.size,
+            ),
+            dtype=float,
+        )
+        e_field_theta_imag = np.zeros_like(e_field_theta_real)
+        e_field_phi_real = np.zeros_like(e_field_theta_real)
+        e_field_phi_imag = np.zeros_like(e_field_theta_real)
+
+        # TODO: first allocate all the necessary data to GPU mem
+        # so that remaining memory can be used completely
+
+        particles_position_device = cuda.to_device(
+            self.simulation.parameters.particles.position
+        )
+        idx_device = cuda.to_device(self.simulation.idx_lookup)
+        sfc_device = cuda.to_device(self.simulation.scattered_field_coefficients)
+        k_medium_device = cuda.to_device(self.simulation.parameters.k_medium)
+
+        to_split = [
+            self.simulation.numerics.azimuthal_angles,
+            self.simulation.numerics.e_r,
+            pilm,
+            taulm,
+            e_field_theta_real,
+            e_field_theta_imag,
+            e_field_phi_real,
+            e_field_phi_imag,
+        ]
+
+        data_for_gpu = self.compute_data_split(to_split, idx=pilm.shape[-1])
+        azimuthal_angles_device = cuda.to_device(
+            self.simulation.numerics.azimuthal_angles
+        )
+        e_r_device = cuda.to_device(self.simulation.numerics.e_r)
+        pilm_device = cuda.to_device(pilm)
+        taulm_device = cuda.to_device(taulm)
+        e_field_theta_real_device = cuda.to_device(e_field_theta_real)
+        e_field_theta_imag_device = cuda.to_device(e_field_theta_imag)
+        e_field_phi_real_device = cuda.to_device(e_field_phi_real)
+        e_field_phi_imag_device = cuda.to_device(e_field_phi_imag)
