@@ -3,7 +3,7 @@ from typing import Union
 from math import ceil
 import pandas as pd
 import numpy as np
-from numba import cuda, jit
+from numba import cuda
 from yasfpy.functions.misc import single_index2multi
 from yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
 
@@ -437,9 +437,6 @@ class Optics:
         else:
             return True
 
-    @jit(
-        nopython=True,
-    )
     def compute_asymmetry(self):
         """Computes the asymmetry parameter by numerical integration over the phase function.
         Therefore depends on the chosen sampling points. Accuracy depends on the number of
@@ -461,12 +458,12 @@ class Optics:
         g = sum / (4 * np.pi)
         self.g = g
 
-    def __compute_correction(self) -> float64:
+    def __compute_correction(self) -> float:
         """Naive implementation of a correction term to lessen the underestimation of a spheres surface
         via numerical integration. Does not adequately correct the result, but does improve it.
 
         Returns:
-            correction_term (float64): Computed error term
+            correction_term (float): Computed error term
         """
         integral = 0
         delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
@@ -480,9 +477,6 @@ class Optics:
         error = 1 - integral / (4 * np.pi)
         return 12 * error / len(self.simulation.numerics.azimuthal_angles) ** 2
 
-    @jit(
-        nopython=True,
-    )
     def compute_asymmetry_corrected(self):
         """Computes asymmetry parameter via numerical integration over the phase function.
         Makes use of a correction term for the surface to compensate for underestimation
