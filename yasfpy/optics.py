@@ -4,17 +4,21 @@ from math import ceil
 import pandas as pd
 import numpy as np
 from numba import cuda
-from yasfpy.functions.misc import single_index2multi
-from yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
+import os,sys
 
-from yasfpy.simulation import Simulation
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+from YASF.yasfpy.functions.misc import single_index2multi
+from YASF.yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
 
-from yasfpy.functions.cpu_numba import (
+from YASF.yasfpy.simulation import Simulation
+
+from YASF.yasfpy.functions.cpu_numba import (
     compute_scattering_cross_section,
     compute_electric_field_angle_components,
     compute_polarization_components,
 )
-from yasfpy.functions.cuda_numba import (
+from YASF.yasfpy.functions.cuda_numba import (
     compute_scattering_cross_section_gpu,
     compute_electric_field_angle_components_gpu,
     compute_polarization_components_gpu,
@@ -614,3 +618,151 @@ class Optics:
                 bounds=self.c_and_b_bounds,
             )
             self.cb[w, :] = bc.x
+
+
+
+    def compute_phase_function_batched(
+        self,
+        legendre_coefficients_number: int = 15,
+        c_and_b: Union[bool, tuple] = False,
+        check_phase_function: bool = False,
+    ):
+        """WIP WIP WIP WIP WIP WIP WIP WIP WIP
+
+        Args:
+            legendre_coefficients_number (int, optional): The number of Legendre coefficients to compute
+                for the phase function. These coefficients are used to approximate the phase function
+                using Legendre polynomials. The higher the number of coefficients, the more accurate
+                the approximation will be.
+            c_and_b (Union[bool, tuple], optional): A boolean value or a tuple. If `True`, it indicates
+                that the `c` and `b` bounds should be computed. If `False`, the function will return
+                without computing the `c` and `b` bounds.
+        """
+        pilm, taulm = spherical_functions_trigon(
+            self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
+        )
+
+        if self.simulation.numerics.gpu:
+            jmax = (
+                self.simulation.parameters.particles.number
+                * self.simulation.numerics.nmax
+            )
+            angles = self.simulation.numerics.azimuthal_angles.size
+            wavelengths = self.simulation.parameters.k_medium.size
+            e_field_theta_real = np.zeros(
+                (
+                    self.simulation.numerics.azimuthal_angles.size,
+                    self.simulation.parameters.k_medium.size,
+                ),
+                dtype=float,
+            )
+            e_field_theta_imag = np.zeros_like(e_field_theta_real)
+            e_field_phi_real = np.zeros_like(e_field_theta_real)
+            e_field_phi_imag = np.zeros_like(e_field_theta_real)
+
+            particles_position_device = cuda.to_device(
+                self.simulation.parameters.particles.position
+            )
+            idx_device = cuda.to_device(self.simulation.idx_lookup)
+            sfc_device = cuda.to_device(self.simulation.scattered_field_coefficients)
+            k_medium_device = cuda.to_device(self.simulation.parameters.k_medium)
+            azimuthal_angles_device = cuda.to_device(
+                self.simulation.numerics.azimuthal_angles
+            )
+            e_r_device = cuda.to_device(self.simulation.numerics.e_r)
+            pilm_device = cuda.to_device(pilm)
+            taulm_device = cuda.to_device(taulm)
+            e_field_theta_real_device = cuda.to_device(e_field_theta_real)
+            e_field_theta_imag_device = cuda.to_device(e_field_theta_imag)
+            e_field_phi_real_device = cuda.to_device(e_field_phi_real)
+            e_field_phi_imag_device = cuda.to_device(e_field_phi_imag)
+
+            sizes = (jmax, angles, wavelengths)
+            threads_per_block = (16, 16, 2)
+            # blocks_per_grid = tuple(
+            #     [
+            #         ceil(sizes[k] / threads_per_block[k])
+            #         for k in range(len(threads_per_block))
+            #     ]
+            # )
+            blocks_per_grid = tuple(
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
+            )
+            # blocks_per_grid = (
+            #   ceil(jmax / threads_per_block[0]),
+            #   ceil(angles / threads_per_block[1]),
+            #   ceil(wavelengths / threads_per_block[2]))
+            current_idx = 0
+            compute_electric_field_angle_components_gpu_batched[
+                blocks_per_grid, threads_per_block
+            ](
+                self.simulation.numerics.lmax,
+                particles_position_device,
+                idx_device,
+                sfc_device,
+                k_medium_device,
+                azimuthal_angles_device,
+                e_r_device,
+                pilm_device,
+                taulm_device,
+                e_field_theta_real_device,
+                e_field_theta_imag_device,
+                e_field_phi_real_device,
+                e_field_phi_imag_device,
+            )
+
+            e_field_theta_real = e_field_theta_real_device.copy_to_host()
+            e_field_theta_imag = e_field_theta_imag_device.copy_to_host()
+            e_field_phi_real = e_field_phi_real_device.copy_to_host()
+            e_field_phi_imag = e_field_phi_imag_device.copy_to_host()
+            e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
+            e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
+
+            intensity = np.zeros_like(e_field_theta_real)
+            dop = np.zeros_like(e_field_theta_real)
+            dolp = np.zeros_like(e_field_theta_real)
+            dolq = np.zeros_like(e_field_theta_real)
+            dolu = np.zeros_like(e_field_theta_real)
+            docp = np.zeros_like(e_field_theta_real)
+
+            intensity_device = cuda.to_device(intensity)
+            dop_device = cuda.to_device(dop)
+            dolp_device = cuda.to_device(dolp)
+            dolq_device = cuda.to_device(dolq)
+            dolu_device = cuda.to_device(dolu)
+            docp_device = cuda.to_device(docp)
+
+            sizes = (angles, wavelengths)
+            threads_per_block = (32, 32)
+            # blocks_per_grid = tuple(
+            #     [
+            #         ceil(sizes[k] / threads_per_block[k])
+            #         for k in range(len(threads_per_block))
+            #     ]
+            # )
+            blocks_per_grid = tuple(
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
+            )
+            compute_polarization_components_gpu[blocks_per_grid, threads_per_block](
+                self.simulation.parameters.k_medium.size,
+                self.simulation.numerics.azimuthal_angles.size,
+                e_field_theta_real_device,
+                e_field_theta_imag_device,
+                e_field_phi_real_device,
+                e_field_phi_imag_device,
+                intensity_device,
+                dop_device,
+                dolp_device,
+                dolq_device,
+                dolu_device,
+                docp_device,
+            )
+
+            intensity = intensity_device.copy_to_host()
+            dop = dop_device.copy_to_host()
+            dolp = dolp_device.copy_to_host()
+            dolq = dolq_device.copy_to_host()
+            dolu = dolu_device.copy_to_host()
+            docp = docp_device.copy_to_host()

@@ -1,9 +1,14 @@
+import os,sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 import numpy as np
 
 from scipy.special import spherical_jn
 from scipy.special import hankel1, lpmv
 
-from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
+from YASF.yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
 
 def jmult_max(num_part, lmax):

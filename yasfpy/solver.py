@@ -1,4 +1,9 @@
-import yasfpy.log as log
+import os,sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+import YASF.yasfpy.log as log
 
 import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres, lgmres, bicgstab

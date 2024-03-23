@@ -1,4 +1,9 @@
-import yasfpy.log as log
+import os,sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+import YASF.yasfpy.log as log
 from time import time
 
 import numpy as np
@@ -12,18 +17,18 @@ from scipy.special import spherical_jn, spherical_yn
 # from scipy.special import hankel1
 # from scipy.special import lpmv
 
-from yasfpy.parameters import Parameters
-from yasfpy.numerics import Numerics
-from yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
-from yasfpy.functions.t_entry import t_entry
+from YASF.yasfpy.parameters import Parameters
+from YASF.yasfpy.numerics import Numerics
+from YASF.yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
+from YASF.yasfpy.functions.t_entry import t_entry
 
-from yasfpy.functions.misc import transformation_coefficients
-from yasfpy.functions.misc import multi2single_index
-from yasfpy.functions.misc import mutual_lookup
+from YASF.yasfpy.functions.misc import transformation_coefficients
+from YASF.yasfpy.functions.misc import multi2single_index
+from YASF.yasfpy.functions.misc import mutual_lookup
 
-from yasfpy.functions.cpu_numba import compute_idx_lookups
-from yasfpy.functions.cpu_numba import particle_interaction, compute_field
-from yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_gpu
+from YASF.yasfpy.functions.cpu_numba import compute_idx_lookups
+from YASF.yasfpy.functions.cpu_numba import particle_interaction, compute_field
+from YASF.yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_gpu
 
 
 class Simulation:

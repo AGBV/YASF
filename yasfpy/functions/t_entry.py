@@ -1,7 +1,11 @@
 import sys, os
 
-sys.path.append(os.getcwd())
-import yasfpy.log as log
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+# TODO: if anything breaks here, uncommenting this is probably the fix
+# sys.path.append(os.getcwd())
+import YASF.yasfpy.log as log
 
 from scipy.special import spherical_jn, spherical_yn
 

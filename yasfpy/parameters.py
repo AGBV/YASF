@@ -1,7 +1,10 @@
-import numpy as np
+import os,sys
 
-from yasfpy.particles import Particles
-from yasfpy.initial_field import InitialField
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+from YASF.yasfpy.particles import Particles
+from YASF.yasfpy.initial_field import InitialField
 
 
 import numpy as np

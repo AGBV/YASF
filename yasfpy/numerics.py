@@ -1,12 +1,17 @@
-import yasfpy.log as log
+import os,sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+import YASF.yasfpy.log as log
 
 from typing import Union, Callable
 import numpy as np
 import pywigxjpf as wig
 
-from yasfpy.functions.misc import jmult_max
-from yasfpy.functions.misc import multi2single_index
-from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
+from YASF.yasfpy.functions.misc import jmult_max
+from YASF.yasfpy.functions.misc import multi2single_index
+from YASF.yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
 
 class Numerics:
