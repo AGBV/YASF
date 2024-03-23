@@ -781,24 +781,35 @@ class Optics:
             total_data_bytes += array.size*array.itemsize
             idx_per_array.append(np.where(np.array(array.shape) == idx)[0][0])
 
+        print(f"{total_data_bytes = }")
         print(idx_per_array)
         num = idx
         while total_data_bytes > free_bytes:
             new_data_bytes = 0
-            num -= 10000
+            num -= 1000
             for i in range(len(data)):
                 print(i)
-                data[i] = data[i].take(indices=range(0,num), axis=idx_per_array[i])
-                new_data_bytes += data[i].size*data[i].itemsize
+                temp_shape = data[i].shape
+                temp_size = 1
+                for s in temp_shape:
+                    if s == idx:
+                        temp_size *= num
+                    else:
+                        temp_size *= s
+                new_data_bytes += temp_size*data[i].itemsize
             total_data_bytes = new_data_bytes
-            print(total_data_bytes)
 
         print("FOUND IDX TO SPLIT")
         print(f"{num = }")
+        print(f"{total_data_bytes = }")
 
+        for i in range(len(data)):
+            print(i)
+            data[i] = data[i].take(indices=range(0,num), axis=idx_per_array[i])
         print(f"{total_data_bytes = }")
         print(f"{free_bytes = }")
         return data
+
 
     def test_data_split(self):
 
