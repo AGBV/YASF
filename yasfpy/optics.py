@@ -213,6 +213,8 @@ class Optics:
             #   ceil(angles / threads_per_block[1]),
             #   ceil(wavelengths / threads_per_block[2]))
 
+            print(f"{blocks_per_grid = }")
+
             compute_electric_field_angle_components_gpu[
                 blocks_per_grid, threads_per_block
             ](
@@ -700,6 +702,7 @@ class Optics:
             # split data along axis, send maximum amount to GPU, wait for it to be done
             # store results, repeat
             idx_to_split = self.simulation.numerics.azimuthal_angles.shape[0]
+            print(f"{idx_to_split = }")
 
             idx_per_array = []
             for array in to_split:
@@ -712,19 +715,31 @@ class Optics:
 
                 if split_idx != 0:
                     print(f"Splitting data from {start_idx} to end")
-                    for i in range(len(to_split)):
-                        to_split[i] = to_split[i].take()
-                        to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
-                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array)
+                    to_split[0] = to_split[0][start_idx:]
+                    to_split[1] = to_split[1][start_idx:,:]
+                    to_split[2] = to_split[2][:,:,start_idx:]
+                    to_split[3] = to_split[3][:,:,start_idx:]
+                    to_split[4] = to_split[4][start_idx:,:]
+                    to_split[5] = to_split[5][start_idx:,:]
+                    to_split[6] = to_split[6][start_idx:,:]
+                    to_split[7] = to_split[7][start_idx:,:]
 
-                azimuthal_split =np.ascontiguousarray(self.simulation.numerics.azimuthal_angles[start_idx:split_idx])
-                e_r_split = np.ascontiguousarray(self.simulation.numerics.e_r[start_idx:split_idx,:])
-                pilm_split = np.ascontiguousarray(pilm[:,:,start_idx:split_idx])
-                taulm_split = np.ascontiguousarray(taulm[:,:,start_idx:split_idx])
-                e_theta_imag_split = np.ascontiguousarray(e_field_theta_imag[start_idx:split_idx,:])
-                e_theta_real_split = np.ascontiguousarray(e_field_theta_real[start_idx:split_idx,:])
-                e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:split_idx,:])
-                e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:split_idx,:])
+                    # for i in range(len(to_split)):
+                    #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
+                print("to_split shapes:")
+                print([i.shape for i in to_split])
+                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array)
+                if split_idx < 1:
+                    break
+
+                azimuthal_split =np.ascontiguousarray(self.simulation.numerics.azimuthal_angles[start_idx:start_idx+split_idx])
+                e_r_split = np.ascontiguousarray(self.simulation.numerics.e_r[start_idx:start_idx+split_idx,:])
+                pilm_split = np.ascontiguousarray(pilm[:,:,start_idx:start_idx+split_idx])
+                taulm_split = np.ascontiguousarray(taulm[:,:,start_idx:start_idx+split_idx])
+                e_theta_imag_split = np.ascontiguousarray(e_field_theta_imag[start_idx:start_idx+split_idx,:])
+                e_theta_real_split = np.ascontiguousarray(e_field_theta_real[start_idx:start_idx+split_idx,:])
+                e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:start_idx+split_idx,:])
+                e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:start_idx+split_idx,:])
 
                 azimuthal_angles_device = cuda.to_device(azimuthal_split)
                 e_r_device = cuda.to_device(e_r_split)
@@ -736,7 +751,8 @@ class Optics:
                 e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
 
 
-                sizes = (jmax, azimuthal_split.shape[0], wavelengths)
+                print(azimuthal_split.shape)
+                sizes = (jmax, azimuthal_split.size, wavelengths)
                 print(f"{sizes = }")
                 threads_per_block = (16, 16, 2)
                 print(f"{threads_per_block = }")
@@ -746,10 +762,17 @@ class Optics:
                 #         for k in range(len(threads_per_block))
                 #     ]
                 # )
+                blocks_per_grid = (
+                    ceil(jmax / threads_per_block[0]),
+                    ceil(angles / threads_per_block[1]),
+                    ceil(wavelengths / threads_per_block[2])
+                )
+
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
                     for k in range(len(threads_per_block)))
                 print(f"{blocks_per_grid = }")
+
 
                 compute_electric_field_angle_components_gpu[
                     blocks_per_grid, threads_per_block
@@ -769,19 +792,23 @@ class Optics:
                     e_field_phi_imag_device,
                 )
 
-                print(f"Filling in results: {start_idx}:{split_idx}!")
-                e_field_theta_real[start_idx:split_idx,:] = e_field_theta_real_device.copy_to_host()
-                e_field_theta_imag[start_idx:split_idx,:] = e_field_theta_imag_device.copy_to_host()
-                e_field_phi_real[start_idx:split_idx,:] = e_field_phi_real_device.copy_to_host()
-                e_field_phi_imag[start_idx:split_idx,:] = e_field_phi_imag_device.copy_to_host()
+                print(f"Filling in results: {start_idx}:{start_idx+split_idx}!")
+                e_field_theta_real[start_idx:start_idx+split_idx,:] = e_field_theta_real_device.copy_to_host()
+                e_field_theta_imag[start_idx:start_idx+split_idx,:] = e_field_theta_imag_device.copy_to_host()
+                e_field_phi_real[start_idx:start_idx+split_idx,:] = e_field_phi_real_device.copy_to_host()
+                e_field_phi_imag[start_idx:start_idx+split_idx,:] = e_field_phi_imag_device.copy_to_host()
 
                 # update start_idx
                 start_idx += split_idx+1
+                print(f"{start_idx = }")
+                print(f"{start_idx >= idx_to_split = }")
                 if start_idx >= idx_to_split:
                     done = True
 
             e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
             e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
+            print(f"{e_field_theta = }")
+            print(f"{e_field_phi = }")
 
 
             # continue with next calculation
@@ -868,5 +895,12 @@ class Optics:
         print(f"{total_data_bytes = }")
         print(f"{free_bytes = }")
         print(f"Memory ∆: {free_bytes-total_data_bytes}")
+
+        print(f"{num//16} > {2**16-1}?")
+        if num//16 > 2**16-1:
+            num = (2**16-1)*16
+            print("need to limit number of blocks")
+
+        print(f"Returning {num}!")
         return num
 
