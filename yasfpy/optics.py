@@ -717,14 +717,14 @@ class Optics:
                         to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
                 split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array)
 
-                azimuthal_split = self.simulation.numerics.azimuthal_angles[start_idx:split_idx]
-                e_r_split = self.simulation.numerics.e_r[start_idx:split_idx,:]
-                pilm_split = pilm[:,:,start_idx:split_idx]
-                taulm_split = taulm[:,:,start_idx:split_idx]
-                e_theta_imag_split = e_field_theta_imag[start_idx:split_idx,:]
-                e_theta_real_split = e_field_theta_real[start_idx:split_idx,:]
-                e_phi_imag_split = e_field_phi_imag[start_idx:split_idx,:]
-                e_phi_real_split = e_field_phi_real[start_idx:split_idx,:]
+                azimuthal_split =np.ascontiguousarray(self.simulation.numerics.azimuthal_angles[start_idx:split_idx])
+                e_r_split = np.ascontiguousarray(self.simulation.numerics.e_r[start_idx:split_idx,:])
+                pilm_split = np.ascontiguousarray(pilm[:,:,start_idx:split_idx])
+                taulm_split = np.ascontiguousarray(taulm[:,:,start_idx:split_idx])
+                e_theta_imag_split = np.ascontiguousarray(e_field_theta_imag[start_idx:split_idx,:])
+                e_theta_real_split = np.ascontiguousarray(e_field_theta_real[start_idx:split_idx,:])
+                e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:split_idx,:])
+                e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:split_idx,:])
 
                 azimuthal_angles_device = cuda.to_device(azimuthal_split)
                 e_r_device = cuda.to_device(e_r_split)
@@ -735,6 +735,21 @@ class Optics:
                 e_field_phi_real_device = cuda.to_device(e_phi_real_split)
                 e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
 
+
+                sizes = (jmax, azimuthal_split.shape[0], wavelengths)
+                print(f"{sizes = }")
+                threads_per_block = (16, 16, 2)
+                print(f"{threads_per_block = }")
+                # blocks_per_grid = tuple(
+                #     [
+                #         ceil(sizes[k] / threads_per_block[k])
+                #         for k in range(len(threads_per_block))
+                #     ]
+                # )
+                blocks_per_grid = tuple(
+                    ceil(sizes[k] / threads_per_block[k])
+                    for k in range(len(threads_per_block)))
+                print(f"{blocks_per_grid = }")
 
                 compute_electric_field_angle_components_gpu[
                     blocks_per_grid, threads_per_block
