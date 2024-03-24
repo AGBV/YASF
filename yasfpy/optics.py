@@ -708,6 +708,9 @@ class Optics:
             for array in to_split:
                 idx_per_array.append(np.where(np.array(array.shape) == idx_to_split)[0][0])
 
+
+            threads_per_block = (16, 16, 2)
+
             start_idx = 0
             split_idx = 0
             done = False
@@ -726,13 +729,12 @@ class Optics:
 
                     # for i in range(len(to_split)):
                     #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
-                print("to_split shapes:")
-                print([i.shape for i in to_split])
-                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array)
+
+                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=16)
                 if split_idx < 1:
                     break
 
-                azimuthal_split =np.ascontiguousarray(self.simulation.numerics.azimuthal_angles[start_idx:start_idx+split_idx])
+                azimuthal_split = np.ascontiguousarray(self.simulation.numerics.azimuthal_angles[start_idx:start_idx+split_idx])
                 e_r_split = np.ascontiguousarray(self.simulation.numerics.e_r[start_idx:start_idx+split_idx,:])
                 pilm_split = np.ascontiguousarray(pilm[:,:,start_idx:start_idx+split_idx])
                 taulm_split = np.ascontiguousarray(taulm[:,:,start_idx:start_idx+split_idx])
@@ -750,23 +752,7 @@ class Optics:
                 e_field_phi_real_device = cuda.to_device(e_phi_real_split)
                 e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
 
-
-                print(azimuthal_split.shape)
                 sizes = (jmax, azimuthal_split.size, wavelengths)
-                print(f"{sizes = }")
-                threads_per_block = (16, 16, 2)
-                print(f"{threads_per_block = }")
-                # blocks_per_grid = tuple(
-                #     [
-                #         ceil(sizes[k] / threads_per_block[k])
-                #         for k in range(len(threads_per_block))
-                #     ]
-                # )
-                blocks_per_grid = (
-                    ceil(jmax / threads_per_block[0]),
-                    ceil(angles / threads_per_block[1]),
-                    ceil(wavelengths / threads_per_block[2])
-                )
 
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
@@ -792,7 +778,6 @@ class Optics:
                     e_field_phi_imag_device,
                 )
 
-                print(f"Filling in results: {start_idx}:{start_idx+split_idx}!")
                 e_field_theta_real[start_idx:start_idx+split_idx,:] = e_field_theta_real_device.copy_to_host()
                 e_field_theta_imag[start_idx:start_idx+split_idx,:] = e_field_theta_imag_device.copy_to_host()
                 e_field_phi_real[start_idx:start_idx+split_idx,:] = e_field_phi_real_device.copy_to_host()
@@ -800,8 +785,6 @@ class Optics:
 
                 # update start_idx
                 start_idx += split_idx+1
-                print(f"{start_idx = }")
-                print(f"{start_idx >= idx_to_split = }")
                 if start_idx >= idx_to_split:
                     done = True
 
@@ -860,7 +843,7 @@ class Optics:
             dolu = dolu_device.copy_to_host()
             docp = docp_device.copy_to_host()
 
-    def __compute_data_split(self, data: list[np.ndarray], idx_list: list) -> int:
+    def __compute_data_split(self, data: list[np.ndarray], idx_list: list, threads_per_block: int) -> int:
 
         buffer = 10000 # buffer to accomodate for varying GPU mem usage
         device = cuda.select_device(0)
@@ -894,9 +877,9 @@ class Optics:
         print(f"{free_bytes = }")
         print(f"Memory ∆: {free_bytes-total_data_bytes}")
 
-        print(f"{num//16} > {2**16-1}?")
-        if num//16 > 2**16-1:
-            num = (2**16-1)*16
+        print(f"{num//threads_per_block} > {2**16-1}?")
+        if num//threads_per_block > 2**16-1:
+            num = (2**16-1)*threads_per_block
             print("need to limit number of blocks")
 
         print(f"Returning {num}!")
