@@ -715,14 +715,14 @@ class Optics:
 
                 if split_idx != 0:
                     print(f"Splitting data from {start_idx} to end")
-                    to_split[0] = to_split[0][start_idx:]
-                    to_split[1] = to_split[1][start_idx:,:]
-                    to_split[2] = to_split[2][:,:,start_idx:]
-                    to_split[3] = to_split[3][:,:,start_idx:]
-                    to_split[4] = to_split[4][start_idx:,:]
-                    to_split[5] = to_split[5][start_idx:,:]
-                    to_split[6] = to_split[6][start_idx:,:]
-                    to_split[7] = to_split[7][start_idx:,:]
+                    to_split[0] = to_split[0][split_idx+1:]
+                    to_split[1] = to_split[1][split_idx+1:,:]
+                    to_split[2] = to_split[2][:,:,split_idx+1:]
+                    to_split[3] = to_split[3][:,:,split_idx+1:]
+                    to_split[4] = to_split[4][split_idx+1:,:]
+                    to_split[5] = to_split[5][split_idx+1:,:]
+                    to_split[6] = to_split[6][split_idx+1:,:]
+                    to_split[7] = to_split[7][split_idx+1:,:]
 
                     # for i in range(len(to_split)):
                     #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
