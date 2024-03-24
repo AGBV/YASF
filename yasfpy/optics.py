@@ -868,12 +868,10 @@ class Optics:
         mem_info = cuda.cudadrv.driver.Context(device,handle).get_memory_info()
         free_bytes = mem_info.free
         total_data_bytes = 0
-        idx_per_array = []
         for array in data:
             total_data_bytes += array.size*array.itemsize
 
         print(f"{total_data_bytes = }")
-        print(idx_per_array)
         idx = data[0].shape[idx_list[0]]
         num = idx
         while total_data_bytes > free_bytes:
@@ -903,4 +901,3 @@ class Optics:
 
         print(f"Returning {num}!")
         return num
-
