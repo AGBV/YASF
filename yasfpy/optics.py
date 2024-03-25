@@ -662,6 +662,7 @@ class Optics:
             e_field_phi_real = np.zeros_like(e_field_theta_real)
             e_field_phi_imag = np.zeros_like(e_field_theta_real)
 
+            # stuff we need in full for every iteration
             particles_position_device = cuda.to_device(
                 self.simulation.parameters.particles.position
             )
@@ -790,11 +791,10 @@ class Optics:
 
             e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
             e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
-            print(f"{e_field_theta = }")
-            print(f"{e_field_phi = }")
 
 
             # continue with next calculation
+
             intensity = np.zeros_like(e_field_theta_real)
             dop = np.zeros_like(e_field_theta_real)
             dolp = np.zeros_like(e_field_theta_real)
@@ -802,46 +802,216 @@ class Optics:
             dolu = np.zeros_like(e_field_theta_real)
             docp = np.zeros_like(e_field_theta_real)
 
-            intensity_device = cuda.to_device(intensity)
-            dop_device = cuda.to_device(dop)
-            dolp_device = cuda.to_device(dolp)
-            dolq_device = cuda.to_device(dolq)
-            dolu_device = cuda.to_device(dolu)
-            docp_device = cuda.to_device(docp)
+            to_split = [
+                    e_field_theta_real,
+                    e_field_theta_imag,
+                    e_field_phi_real,
+                    e_field_phi_imag,
+                    intensity,
+                    dop,
+                    dolp,
+                    dolq,
+                    dolu,
+                    docp,
 
+            ]
             sizes = (angles, wavelengths)
-            threads_per_block = (32, 32)
+            threads_per_block = (1024, 1) # this allows ~65000 wavelengths, limits required batching
             # blocks_per_grid = tuple(
             #     [
             #         ceil(sizes[k] / threads_per_block[k])
             #         for k in range(len(threads_per_block))
             #     ]
             # )
-            blocks_per_grid = tuple(
-                ceil(sizes[k] / threads_per_block[k])
-                for k in range(len(threads_per_block))
-            )
-            compute_polarization_components_gpu[blocks_per_grid, threads_per_block](
-                self.simulation.parameters.k_medium.size,
-                self.simulation.numerics.azimuthal_angles.size,
-                e_field_theta_real_device,
-                e_field_theta_imag_device,
-                e_field_phi_real_device,
-                e_field_phi_imag_device,
-                intensity_device,
-                dop_device,
-                dolp_device,
-                dolq_device,
-                dolu_device,
-                docp_device,
+
+            start_idx = 0
+            split_idx = 0
+            idx_per_array = [0]*len(to_split)
+            done = False
+            while not done:
+
+                if split_idx != 0:
+                    print(f"Splitting data from {start_idx} to end")
+                    for i in range(len(to_split)):
+                        to_split[i] = to_split[i][split_idx+1:,:]
+
+
+                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=1024)
+                if split_idx < 1:
+                    break
+
+                intensity_split = np.ascontiguousarray(intensity[start_idx:start_idx+split_idx,:])
+                dop_split = np.ascontiguousarray(dop[start_idx:start_idx+split_idx,:])
+                dolp_split = np.ascontiguousarray(dolp[start_idx:start_idx+split_idx,:])
+                dolq_split = np.ascontiguousarray(dolq[start_idx:start_idx+split_idx,:])
+                dolu_split = np.ascontiguousarray(dolu[start_idx:start_idx+split_idx,:])
+                docp_split = np.ascontiguousarray(docp[start_idx:start_idx+split_idx,:])
+
+                e_theta_imag_split = np.ascontiguousarray(e_field_theta_imag[start_idx:start_idx+split_idx,:])
+                e_theta_real_split = np.ascontiguousarray(e_field_theta_real[start_idx:start_idx+split_idx,:])
+                e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:start_idx+split_idx,:])
+                e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:start_idx+split_idx,:])
+
+                blocks_per_grid = tuple(
+                    ceil(sizes[k] / threads_per_block[k])
+                    for k in range(len(threads_per_block))
+                )
+                print(f"{blocks_per_grid = }")
+
+                intensity_device = cuda.to_device(intensity_split)
+                dop_device = cuda.to_device(dop_split)
+                dolp_device = cuda.to_device(dolp_split)
+                dolq_device = cuda.to_device(dolq_split)
+                dolu_device = cuda.to_device(dolu_split)
+                docp_device = cuda.to_device(docp_split)
+
+                e_field_theta_real_device = cuda.to_device(e_theta_real_split)
+                e_field_theta_imag_device = cuda.to_device(e_theta_imag_split)
+                e_field_phi_real_device = cuda.to_device(e_phi_real_split)
+                e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
+
+
+                compute_polarization_components_gpu[blocks_per_grid, threads_per_block](
+                    self.simulation.parameters.k_medium.size,
+                    self.simulation.numerics.azimuthal_angles.size,
+                    e_field_theta_real_device,
+                    e_field_theta_imag_device,
+                    e_field_phi_real_device,
+                    e_field_phi_imag_device,
+                    intensity_device,
+                    dop_device,
+                    dolp_device,
+                    dolq_device,
+                    dolu_device,
+                    docp_device,
+                )
+
+                intensity[start_idx:start_idx+split_idx,:] = intensity_device.copy_to_host()
+                dop[start_idx:start_idx+split_idx,:] = dop_device.copy_to_host()
+                dolq[start_idx:start_idx+split_idx,:] = dolp_device.copy_to_host()
+                dolq[start_idx:start_idx+split_idx,:] = dolq_device.copy_to_host()
+                dolu[start_idx:start_idx+split_idx,:] = dolu_device.copy_to_host()
+                docp[start_idx:start_idx+split_idx,:] = docp_device.copy_to_host()
+
+                # update start_idx
+                start_idx += split_idx+1
+                if start_idx >= idx_to_split:
+                    done = True
+
+        self.scattering_angles = self.simulation.numerics.polar_angles
+        k_medium = self.simulation.parameters.k_medium
+        if type(self.simulation.parameters.k_medium) == pd.core.series.Series:
+            k_medium = k_medium.to_numpy()
+        self.phase_function_3d = (
+            intensity
+            * 4
+            * np.pi
+            / np.power(np.abs(k_medium), 2)
+            / self.c_sca[np.newaxis, :]
+        )
+        if check_phase_function:
+            res = self.__check_phase_function()
+            assert res == True, "The phase function does have the desired precision. Please increase the amount of angles used."
+
+        self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
+            np.cos(self.scattering_angles),
+            self.phase_function_3d,
+            legendre_coefficients_number,
+        )
+
+        self.degree_of_polarization_3d = dop
+        self.degree_of_linear_polarization_3d = dolp
+        self.degree_of_linear_polarization_q_3d = dolq
+        self.degree_of_linear_polarization_u_3d = dolu
+        self.degree_of_circular_polarization_3d = docp
+
+        if (self.simulation.numerics.sampling_points_number is not None) and (
+            self.simulation.numerics.sampling_points_number.size == 2
+        ):
+            self.phase_function = np.mean(
+                np.reshape(
+                    self.phase_function_3d,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
             )
 
-            intensity = intensity_device.copy_to_host()
-            dop = dop_device.copy_to_host()
-            dolp = dolp_device.copy_to_host()
-            dolq = dolq_device.copy_to_host()
-            dolu = dolu_device.copy_to_host()
-            docp = docp_device.copy_to_host()
+            self.degree_of_polarization = np.mean(
+                np.reshape(
+                    dop,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization = np.mean(
+                np.reshape(
+                    dolp,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization_q = np.mean(
+                np.reshape(
+                    dolq,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization_u = np.mean(
+                np.reshape(
+                    dolu,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_circular_polarization = np.mean(
+                np.reshape(
+                    docp,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+
+            self.scattering_angles = np.reshape(
+                self.scattering_angles, self.simulation.numerics.sampling_points_number
+            )
+            self.scattering_angles = self.scattering_angles[0, :]
+        else:
+            self.phase_function = self.phase_function_3d
+
+            self.degree_of_polarization = dop
+            self.degree_of_linear_polarization = dolp
+            self.degree_of_linear_polarization_q = dolq
+            self.degree_of_linear_polarization_u = dolu
+            self.degree_of_circular_polarization = docp
+
+        self.c_and_b_bounds = c_and_b
+        if isinstance(c_and_b, bool):
+            if c_and_b:
+                self.c_and_b_bounds = ([-1, 0], [1, 1])
+            else:
+                return
+
+        self.__compute_c_and_b()
+
 
     def __compute_data_split(self, data: list[np.ndarray], idx_list: list, threads_per_block: int) -> int:
 
