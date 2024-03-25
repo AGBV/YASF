@@ -815,7 +815,6 @@ class Optics:
                     docp,
 
             ]
-            sizes = (angles, wavelengths)
             threads_per_block = (32, 32) # this allows ~65000 wavelengths, limits required batching
             # blocks_per_grid = tuple(
             #     [
@@ -852,6 +851,7 @@ class Optics:
                 e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:start_idx+split_idx,:])
                 e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:start_idx+split_idx,:])
 
+                sizes = (jmax, split_idx, wavelengths)
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
                     for k in range(len(threads_per_block))
