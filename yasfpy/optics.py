@@ -731,7 +731,7 @@ class Optics:
                     # for i in range(len(to_split)):
                     #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
 
-                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=16*16)
+                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[1])
                 if split_idx < 1:
                     break
 
@@ -792,7 +792,7 @@ class Optics:
             e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
             e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
 
-
+            print("Done with e field calculations...")
             # continue with next calculation
 
             intensity = np.zeros_like(e_field_theta_real)
@@ -816,7 +816,7 @@ class Optics:
 
             ]
             sizes = (angles, wavelengths)
-            threads_per_block = (1024, 1) # this allows ~65000 wavelengths, limits required batching
+            threads_per_block = (32, 32) # this allows ~65000 wavelengths, limits required batching
             # blocks_per_grid = tuple(
             #     [
             #         ceil(sizes[k] / threads_per_block[k])
@@ -836,7 +836,7 @@ class Optics:
                         to_split[i] = to_split[i][split_idx+1:,:]
 
 
-                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=1024)
+                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[0])
                 if split_idx < 1:
                     break
 
