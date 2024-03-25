@@ -709,7 +709,7 @@ class Optics:
                 idx_per_array.append(np.where(np.array(array.shape) == idx_to_split)[0][0])
 
 
-            threads_per_block = (16, 16, 2)
+            threads_per_block = (1, 16*16, 2)
 
             start_idx = 0
             split_idx = 0
@@ -730,7 +730,7 @@ class Optics:
                     # for i in range(len(to_split)):
                     #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
 
-                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=16)
+                split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=16*16)
                 if split_idx < 1:
                     break
 
