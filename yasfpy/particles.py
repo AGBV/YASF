@@ -66,7 +66,7 @@ class Particles:
         self.__setup_impl()
 
     @staticmethod
-    def generate_refractive_index_table(urls: list):
+    def generate_refractive_index_table(urls: list) -> list:
         """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
         URL using the `material_handler` function, and returns a list of the retrieved data.
 
