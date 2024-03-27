@@ -778,6 +778,7 @@ class Optics:
                     e_field_phi_real_device,
                     e_field_phi_imag_device,
                 )
+                cuda.synchronize()
 
                 e_field_theta_real[start_idx:start_idx+split_idx,:] = e_field_theta_real_device.copy_to_host()
                 e_field_theta_imag[start_idx:start_idx+split_idx,:] = e_field_theta_imag_device.copy_to_host()
@@ -1015,7 +1016,7 @@ class Optics:
 
     def __compute_data_split(self, data: list[np.ndarray], idx_list: list, threads_per_block: int) -> int:
 
-        buffer = 10000 # buffer to accomodate for varying GPU mem usage
+        # buffer = 10000 # buffer to accomodate for varying GPU mem usage
         device = cuda.select_device(0)
         handle = cuda.cudadrv.devices.get_context()
         mem_info = cuda.cudadrv.driver.Context(device,handle).get_memory_info()
@@ -1024,7 +1025,7 @@ class Optics:
         for array in data:
             total_data_bytes += array.size*array.itemsize
 
-        print(f"{total_data_bytes = }")
+        print(f"{total_data_bytes*1e-9} GB of data remaining")
         idx = data[0].shape[idx_list[0]]
         num = idx
         while total_data_bytes > free_bytes:
@@ -1041,9 +1042,7 @@ class Optics:
                 new_data_bytes += temp_size*data[i].itemsize
             total_data_bytes = new_data_bytes
 
-        print("FOUND IDX TO SPLIT")
-        print(f"{num = }")
-        print(f"{total_data_bytes*1e-9} GB of data required")
+        print(f"{total_data_bytes*1e-9} GB of data will move to GPU")
         print(f"{free_bytes*1e-9} GB of data available on GPU")
         print(f"Memory ∆: {(free_bytes-total_data_bytes)*1e-6} MB")
 
@@ -1052,5 +1051,4 @@ class Optics:
             num = (2**16-1)*threads_per_block
             print("need to limit number of blocks")
 
-        print(f"Returning {num}!")
         return num
