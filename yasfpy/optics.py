@@ -127,7 +127,6 @@ class Optics:
                 associated_legendre_lookup,
                 spherical_bessel_lookup,
                 e_j_dm_phi_loopup,
-                progress,
             )
 
         self.c_sca = (

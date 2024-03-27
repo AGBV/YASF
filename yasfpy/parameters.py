@@ -37,7 +37,7 @@ class Parameters:
             initial_field (InitialField): An object of the `InitialField` class. It represents the
                 initial field configuration for the simulation.
         """
-        self.wavelength = wavelength
+        self.wavelength = np.array(wavelength)
         self.medium_refractive_index = medium_refractive_index
         self.wavelengths_number = wavelength.size
         self.particles = particles
@@ -68,14 +68,14 @@ class Parameters:
         for idx, data in enumerate(self.particles.refractive_index_table):
             table = data["ref_idx"].to_numpy().astype(float)
             n = np.interp(
-                self.wavelength / 1e3,
+                self.wavelength,
                 table[:, 0],
                 table[:, 1],
                 left=table[0, 1],
                 right=table[-1, 1],
             )
             k = np.interp(
-                self.wavelength / 1e3,
+                self.wavelength,
                 table[:, 0],
                 table[:, 2],
                 left=table[0, 2],
@@ -96,12 +96,13 @@ class Parameters:
         medium and particles.
         """
         self.k_medium = self.omega * self.medium_refractive_index
+        self.ref_idx_table = None
         if self.particles.refractive_index_table is None:
             self.k_particle = np.outer(self.particles.refractive_index, self.omega)
         else:
-            table = self.__interpolate_refractive_index_from_table()
+            self.ref_idx_table = self.__interpolate_refractive_index_from_table()
             self.k_particle = (
-                np.take(table, self.particles.refractive_index, axis=0)
+                np.take(self.ref_idx_table, self.particles.refractive_index, axis=0)
                 * np.array(self.omega)[np.newaxis, :]
             )
 
@@ -116,7 +117,7 @@ class Parameters:
                 :, 0
             ]
             unique_radius_index_pairs[:, 1:] = np.take(
-                table,
+                self.ref_idx_table,
                 self.particles.unique_radius_index_pairs[:, 1].astype(int),
                 axis=0,
             )
