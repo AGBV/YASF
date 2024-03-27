@@ -1043,9 +1043,9 @@ class Optics:
 
         print("FOUND IDX TO SPLIT")
         print(f"{num = }")
-        print(f"{total_data_bytes = }")
-        print(f"{free_bytes = }")
-        print(f"Memory ∆: {free_bytes-total_data_bytes}")
+        print(f"{total_data_bytes*1e-9} GB of data required")
+        print(f"{free_bytes*1e-9} GB of data available on GPU")
+        print(f"Memory ∆: {(free_bytes-total_data_bytes)*1e-6} MB")
 
         print(f"{num//threads_per_block} > {2**16-1}?")
         if num//threads_per_block > 2**16-1:
