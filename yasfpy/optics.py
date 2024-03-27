@@ -213,7 +213,7 @@ class Optics:
             #   ceil(angles / threads_per_block[1]),
             #   ceil(wavelengths / threads_per_block[2]))
 
-            print(f"{blocks_per_grid = }")
+            # print(f"{blocks_per_grid = }")
 
             compute_electric_field_angle_components_gpu[
                 blocks_per_grid, threads_per_block
@@ -703,7 +703,6 @@ class Optics:
             # split data along axis, send maximum amount to GPU, wait for it to be done
             # store results, repeat
             idx_to_split = self.simulation.numerics.azimuthal_angles.shape[0]
-            print(f"{idx_to_split = }")
 
             idx_per_array = []
             for array in to_split:
@@ -718,7 +717,6 @@ class Optics:
             while not done:
 
                 if split_idx != 0:
-                    print(f"Splitting data from {start_idx} to end")
                     to_split[0] = to_split[0][split_idx+1:]
                     to_split[1] = to_split[1][split_idx+1:,:]
                     to_split[2] = to_split[2][:,:,split_idx+1:]
@@ -758,7 +756,6 @@ class Optics:
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
                     for k in range(len(threads_per_block)))
-                print(f"{blocks_per_grid = }")
 
 
                 compute_electric_field_angle_components_gpu[
@@ -778,7 +775,6 @@ class Optics:
                     e_field_phi_real_device,
                     e_field_phi_imag_device,
                 )
-                cuda.synchronize()
 
                 e_field_theta_real[start_idx:start_idx+split_idx,:] = e_field_theta_real_device.copy_to_host()
                 e_field_theta_imag[start_idx:start_idx+split_idx,:] = e_field_theta_imag_device.copy_to_host()
@@ -831,7 +827,6 @@ class Optics:
             while not done:
 
                 if split_idx != 0:
-                    print(f"Splitting data from {start_idx} to end")
                     for i in range(len(to_split)):
                         to_split[i] = to_split[i][split_idx+1:,:]
 
@@ -857,7 +852,6 @@ class Optics:
                     ceil(sizes[k] / threads_per_block[k])
                     for k in range(len(threads_per_block))
                 )
-                print(f"{blocks_per_grid = }")
 
                 intensity_device = cuda.to_device(intensity_split)
                 dop_device = cuda.to_device(dop_split)
@@ -1025,6 +1019,7 @@ class Optics:
         for array in data:
             total_data_bytes += array.size*array.itemsize
 
+        print("---------------------------------------------------")
         print(f"{total_data_bytes*1e-9} GB of data remaining")
         idx = data[0].shape[idx_list[0]]
         num = idx
@@ -1042,13 +1037,13 @@ class Optics:
                 new_data_bytes += temp_size*data[i].itemsize
             total_data_bytes = new_data_bytes
 
-        print(f"{total_data_bytes*1e-9} GB of data will move to GPU")
         print(f"{free_bytes*1e-9} GB of data available on GPU")
-        print(f"Memory ∆: {(free_bytes-total_data_bytes)*1e-6} MB")
+        print(f"Unused GPU memory: {(free_bytes-total_data_bytes)*1e-6} MB")
 
         print(f"{num//threads_per_block} > {2**16-1}?")
         if num//threads_per_block > 2**16-1:
             num = (2**16-1)*threads_per_block
             print("need to limit number of blocks")
 
+        print("---------------------------------------------------")
         return num
