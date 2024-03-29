@@ -253,7 +253,9 @@ def mutual_lookup(
     )
 
 
-def interpolate_refractive_index_from_table(wavelengths: np.ndarray, materials: list, species_idx: np.ndarray) -> np.ndarray:
+def interpolate_refractive_index_from_table(
+    wavelengths: np.ndarray, materials: list, species_idx: np.ndarray
+) -> np.ndarray:
     """Interpolates the refractive index values from a table for different wavelengths.
 
     Returns:
@@ -265,7 +267,6 @@ def interpolate_refractive_index_from_table(wavelengths: np.ndarray, materials: 
 
     unique_refractive_indices, _ = np.unique(species_idx, return_inverse=True, axis=0)
     num_unique_refractive_indices = unique_refractive_indices.shape[0]
-
 
     refractive_index_interpolated = np.zeros(
         (num_unique_refractive_indices, wavelengths.size),
