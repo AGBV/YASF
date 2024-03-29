@@ -63,14 +63,14 @@ class Parameters:
         for idx, data in enumerate(self.particles.refractive_index_table):
             table = data["ref_idx"].to_numpy().astype(float)
             n = np.interp(
-                self.wavelength / 1e3,
+                self.wavelength,
                 table[:, 0],
                 table[:, 1],
                 left=table[0, 1],
                 right=table[-1, 1],
             )
             k = np.interp(
-                self.wavelength / 1e3,
+                self.wavelength,
                 table[:, 0],
                 table[:, 2],
                 left=table[0, 2],
