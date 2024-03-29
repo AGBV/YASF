@@ -3,12 +3,12 @@ import os,sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-import numpy as np
+from YASF.yasfpy.particles import Particles
+from YASF.yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
+import numpy as np
 from scipy.special import spherical_jn
 from scipy.special import hankel1, lpmv
-
-from YASF.yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
 
 def jmult_max(num_part, lmax):
@@ -256,3 +256,41 @@ def mutual_lookup(
         size_parameter,
         spherical_hankel_derivative,
     )
+
+
+def interpolate_refractive_index_from_table(wavelengths: np.ndarray, materials: list, species_idx: np.ndarray) -> np.ndarray:
+    """Interpolates the refractive index values from a table for different wavelengths.
+
+    Returns:
+        refractive_index_interpolated (np.array): An array that contains the interpolated refractive index values for the particles
+            at different wavelengths.
+    """
+
+    refractive_index_table = Particles.generate_refractive_index_table(materials)
+
+    unique_refractive_indices, _ = np.unique(species_idx, return_inverse=True, axis=0)
+    num_unique_refractive_indices = unique_refractive_indices.shape[0]
+
+
+    refractive_index_interpolated = np.zeros(
+        (num_unique_refractive_indices, wavelengths.size),
+        dtype=complex,
+    )
+    for idx, data in enumerate(refractive_index_table):
+        table = data["ref_idx"].to_numpy().astype(float)
+        n = np.interp(
+            wavelengths,
+            table[:, 0],
+            table[:, 1],
+            left=table[0, 1],
+            right=table[-1, 1],
+        )
+        k = np.interp(
+            wavelengths,
+            table[:, 0],
+            table[:, 2],
+            left=table[0, 2],
+            right=table[-1, 2],
+        )
+        refractive_index_interpolated[idx, :] = n + 1j * k
+    return refractive_index_interpolated

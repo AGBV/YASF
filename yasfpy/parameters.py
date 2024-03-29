@@ -96,8 +96,8 @@ class Parameters:
         medium and particles.
         """
         self.k_medium = self.omega * self.medium_refractive_index
-        self.ref_idx_table = None
         if self.particles.refractive_index_table is None:
+            self.ref_idx_table = None
             self.k_particle = np.outer(self.particles.refractive_index, self.omega)
         else:
             self.ref_idx_table = self.__interpolate_refractive_index_from_table()
