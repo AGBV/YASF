@@ -617,3 +617,486 @@ class Optics:
                 bounds=self.c_and_b_bounds,
             )
             self.cb[w, :] = bc.x
+
+    def compute_phase_function_batched(
+        self,
+        legendre_coefficients_number: int = 15,
+        c_and_b: Union[bool, tuple] = False,
+        check_phase_function: bool = False,
+    ):
+        """WIP WIP WIP WIP WIP WIP WIP WIP WIP
+
+        Args:
+            legendre_coefficients_number (int, optional): The number of Legendre coefficients to compute
+                for the phase function. These coefficients are used to approximate the phase function
+                using Legendre polynomials. The higher the number of coefficients, the more accurate
+                the approximation will be.
+            c_and_b (Union[bool, tuple], optional): A boolean value or a tuple. If `True`, it indicates
+                that the `c` and `b` bounds should be computed. If `False`, the function will return
+                without computing the `c` and `b` bounds.
+        """
+        pilm, taulm = spherical_functions_trigon(
+            self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
+        )
+
+        if self.simulation.numerics.gpu:
+            jmax = (
+                self.simulation.parameters.particles.number
+                * self.simulation.numerics.nmax
+            )
+            angles = self.simulation.numerics.azimuthal_angles.size
+            wavelengths = self.simulation.parameters.k_medium.size
+            e_field_theta_real = np.zeros(
+                (
+                    self.simulation.numerics.azimuthal_angles.size,
+                    self.simulation.parameters.k_medium.size,
+                ),
+                dtype=float,
+            )
+            e_field_theta_imag = np.zeros_like(e_field_theta_real)
+            e_field_phi_real = np.zeros_like(e_field_theta_real)
+            e_field_phi_imag = np.zeros_like(e_field_theta_real)
+
+            # stuff we need in full for every iteration
+            particles_position_device = cuda.to_device(
+                self.simulation.parameters.particles.position
+            )
+            idx_device = cuda.to_device(self.simulation.idx_lookup)
+            sfc_device = cuda.to_device(self.simulation.scattered_field_coefficients)
+            k_medium_device = cuda.to_device(self.simulation.parameters.k_medium)
+
+            sizes = (jmax, angles, wavelengths)
+            threads_per_block = (16, 16, 2)
+            # blocks_per_grid = tuple(
+            #     [
+            #         ceil(sizes[k] / threads_per_block[k])
+            #         for k in range(len(threads_per_block))
+            #     ]
+            # )
+            blocks_per_grid = tuple(
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
+            )
+            # blocks_per_grid = (
+            #   ceil(jmax / threads_per_block[0]),
+            #   ceil(angles / threads_per_block[1]),
+            #   ceil(wavelengths / threads_per_block[2]))
+
+            to_split = [
+                self.simulation.numerics.azimuthal_angles,
+                self.simulation.numerics.e_r,
+                pilm,
+                taulm,
+                e_field_theta_real,
+                e_field_theta_imag,
+                e_field_phi_real,
+                e_field_phi_imag,
+            ]
+
+            # split data along axis, send maximum amount to GPU, wait for it to be done
+            # store results, repeat
+            idx_to_split = self.simulation.numerics.azimuthal_angles.shape[0]
+
+            idx_per_array = []
+            for array in to_split:
+                idx_per_array.append(
+                    np.where(np.array(array.shape) == idx_to_split)[0][0]
+                )
+
+            threads_per_block = (1, 16 * 16, 2)
+
+            start_idx = 0
+            split_idx = 0
+            done = False
+            while not done:
+
+                if split_idx != 0:
+                    to_split[0] = to_split[0][split_idx + 1 :]
+                    to_split[1] = to_split[1][split_idx + 1 :, :]
+                    to_split[2] = to_split[2][:, :, split_idx + 1 :]
+                    to_split[3] = to_split[3][:, :, split_idx + 1 :]
+                    to_split[4] = to_split[4][split_idx + 1 :, :]
+                    to_split[5] = to_split[5][split_idx + 1 :, :]
+                    to_split[6] = to_split[6][split_idx + 1 :, :]
+                    to_split[7] = to_split[7][split_idx + 1 :, :]
+
+                    # for i in range(len(to_split)):
+                    #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
+
+                split_idx = self.__compute_data_split(
+                    to_split,
+                    idx_list=idx_per_array,
+                    threads_per_block=threads_per_block[1],
+                )
+                if split_idx < 1:
+                    break
+
+                azimuthal_split = np.ascontiguousarray(
+                    self.simulation.numerics.azimuthal_angles[
+                        start_idx : start_idx + split_idx
+                    ]
+                )
+                e_r_split = np.ascontiguousarray(
+                    self.simulation.numerics.e_r[start_idx : start_idx + split_idx, :]
+                )
+                pilm_split = np.ascontiguousarray(
+                    pilm[:, :, start_idx : start_idx + split_idx]
+                )
+                taulm_split = np.ascontiguousarray(
+                    taulm[:, :, start_idx : start_idx + split_idx]
+                )
+                e_theta_imag_split = np.ascontiguousarray(
+                    e_field_theta_imag[start_idx : start_idx + split_idx, :]
+                )
+                e_theta_real_split = np.ascontiguousarray(
+                    e_field_theta_real[start_idx : start_idx + split_idx, :]
+                )
+                e_phi_imag_split = np.ascontiguousarray(
+                    e_field_phi_imag[start_idx : start_idx + split_idx, :]
+                )
+                e_phi_real_split = np.ascontiguousarray(
+                    e_field_phi_real[start_idx : start_idx + split_idx, :]
+                )
+
+                azimuthal_angles_device = cuda.to_device(azimuthal_split)
+                e_r_device = cuda.to_device(e_r_split)
+                pilm_device = cuda.to_device(pilm_split)
+                taulm_device = cuda.to_device(taulm_split)
+                e_field_theta_real_device = cuda.to_device(e_theta_real_split)
+                e_field_theta_imag_device = cuda.to_device(e_theta_imag_split)
+                e_field_phi_real_device = cuda.to_device(e_phi_real_split)
+                e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
+
+                sizes = (jmax, azimuthal_split.size, wavelengths)
+
+                blocks_per_grid = tuple(
+                    ceil(sizes[k] / threads_per_block[k])
+                    for k in range(len(threads_per_block))
+                )
+
+                compute_electric_field_angle_components_gpu[
+                    blocks_per_grid, threads_per_block
+                ](
+                    self.simulation.numerics.lmax,
+                    particles_position_device,
+                    idx_device,
+                    sfc_device,
+                    k_medium_device,
+                    azimuthal_angles_device,
+                    e_r_device,
+                    pilm_device,
+                    taulm_device,
+                    e_field_theta_real_device,
+                    e_field_theta_imag_device,
+                    e_field_phi_real_device,
+                    e_field_phi_imag_device,
+                )
+
+                e_field_theta_real[start_idx : start_idx + split_idx, :] = (
+                    e_field_theta_real_device.copy_to_host()
+                )
+                e_field_theta_imag[start_idx : start_idx + split_idx, :] = (
+                    e_field_theta_imag_device.copy_to_host()
+                )
+                e_field_phi_real[start_idx : start_idx + split_idx, :] = (
+                    e_field_phi_real_device.copy_to_host()
+                )
+                e_field_phi_imag[start_idx : start_idx + split_idx, :] = (
+                    e_field_phi_imag_device.copy_to_host()
+                )
+
+                # update start_idx
+                start_idx += split_idx + 1
+                if start_idx >= idx_to_split:
+                    done = True
+
+            e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
+            e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
+
+            print("Done with e field calculations...")
+            # continue with next calculation
+
+            intensity = np.zeros_like(e_field_theta_real)
+            dop = np.zeros_like(e_field_theta_real)
+            dolp = np.zeros_like(e_field_theta_real)
+            dolq = np.zeros_like(e_field_theta_real)
+            dolu = np.zeros_like(e_field_theta_real)
+            docp = np.zeros_like(e_field_theta_real)
+
+            to_split = [
+                e_field_theta_real,
+                e_field_theta_imag,
+                e_field_phi_real,
+                e_field_phi_imag,
+                intensity,
+                dop,
+                dolp,
+                dolq,
+                dolu,
+                docp,
+            ]
+            threads_per_block = (
+                1024,
+                1,
+            )  # this allows ~65000 wavelengths, limits required batching
+            # blocks_per_grid = tuple(
+            #     [
+            #         ceil(sizes[k] / threads_per_block[k])
+            #         for k in range(len(threads_per_block))
+            #     ]
+            # )
+
+            start_idx = 0
+            split_idx = 0
+            idx_per_array = [0] * len(to_split)
+            done = False
+            while not done:
+
+                if split_idx != 0:
+                    for i in range(len(to_split)):
+                        to_split[i] = to_split[i][split_idx + 1 :, :]
+
+                split_idx = self.__compute_data_split(
+                    to_split,
+                    idx_list=idx_per_array,
+                    threads_per_block=threads_per_block[0],
+                )
+                if split_idx < 1:
+                    break
+
+                intensity_split = np.ascontiguousarray(
+                    intensity[start_idx : start_idx + split_idx, :]
+                )
+                dop_split = np.ascontiguousarray(
+                    dop[start_idx : start_idx + split_idx, :]
+                )
+                dolp_split = np.ascontiguousarray(
+                    dolp[start_idx : start_idx + split_idx, :]
+                )
+                dolq_split = np.ascontiguousarray(
+                    dolq[start_idx : start_idx + split_idx, :]
+                )
+                dolu_split = np.ascontiguousarray(
+                    dolu[start_idx : start_idx + split_idx, :]
+                )
+                docp_split = np.ascontiguousarray(
+                    docp[start_idx : start_idx + split_idx, :]
+                )
+
+                e_theta_imag_split = np.ascontiguousarray(
+                    e_field_theta_imag[start_idx : start_idx + split_idx, :]
+                )
+                e_theta_real_split = np.ascontiguousarray(
+                    e_field_theta_real[start_idx : start_idx + split_idx, :]
+                )
+                e_phi_imag_split = np.ascontiguousarray(
+                    e_field_phi_imag[start_idx : start_idx + split_idx, :]
+                )
+                e_phi_real_split = np.ascontiguousarray(
+                    e_field_phi_real[start_idx : start_idx + split_idx, :]
+                )
+
+                sizes = (split_idx, wavelengths)
+                blocks_per_grid = tuple(
+                    ceil(sizes[k] / threads_per_block[k])
+                    for k in range(len(threads_per_block))
+                )
+
+                intensity_device = cuda.to_device(intensity_split)
+                dop_device = cuda.to_device(dop_split)
+                dolp_device = cuda.to_device(dolp_split)
+                dolq_device = cuda.to_device(dolq_split)
+                dolu_device = cuda.to_device(dolu_split)
+                docp_device = cuda.to_device(docp_split)
+
+                e_field_theta_real_device = cuda.to_device(e_theta_real_split)
+                e_field_theta_imag_device = cuda.to_device(e_theta_imag_split)
+                e_field_phi_real_device = cuda.to_device(e_phi_real_split)
+                e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
+
+                compute_polarization_components_gpu[blocks_per_grid, threads_per_block](
+                    self.simulation.parameters.k_medium.size,
+                    self.simulation.numerics.azimuthal_angles.size,
+                    e_field_theta_real_device,
+                    e_field_theta_imag_device,
+                    e_field_phi_real_device,
+                    e_field_phi_imag_device,
+                    intensity_device,
+                    dop_device,
+                    dolp_device,
+                    dolq_device,
+                    dolu_device,
+                    docp_device,
+                )
+
+                intensity[start_idx : start_idx + split_idx, :] = (
+                    intensity_device.copy_to_host()
+                )
+                dop[start_idx : start_idx + split_idx, :] = dop_device.copy_to_host()
+                dolq[start_idx : start_idx + split_idx, :] = dolp_device.copy_to_host()
+                dolq[start_idx : start_idx + split_idx, :] = dolq_device.copy_to_host()
+                dolu[start_idx : start_idx + split_idx, :] = dolu_device.copy_to_host()
+                docp[start_idx : start_idx + split_idx, :] = docp_device.copy_to_host()
+
+                # update start_idx
+                start_idx += split_idx + 1
+                if start_idx >= idx_to_split:
+                    done = True
+
+        self.scattering_angles = self.simulation.numerics.polar_angles
+        k_medium = self.simulation.parameters.k_medium
+        if type(self.simulation.parameters.k_medium) == pd.core.series.Series:
+            k_medium = k_medium.to_numpy()
+        self.phase_function_3d = (
+            intensity
+            * 4
+            * np.pi
+            / np.power(np.abs(k_medium), 2)
+            / self.c_sca[np.newaxis, :]
+        )
+        if check_phase_function:
+            res = self.__check_phase_function()
+            assert (
+                res == True
+            ), "The phase function does have the desired precision. Please increase the amount of angles used."
+
+        self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
+            np.cos(self.scattering_angles),
+            self.phase_function_3d,
+            legendre_coefficients_number,
+        )
+
+        self.degree_of_polarization_3d = dop
+        self.degree_of_linear_polarization_3d = dolp
+        self.degree_of_linear_polarization_q_3d = dolq
+        self.degree_of_linear_polarization_u_3d = dolu
+        self.degree_of_circular_polarization_3d = docp
+
+        if (self.simulation.numerics.sampling_points_number is not None) and (
+            self.simulation.numerics.sampling_points_number.size == 2
+        ):
+            self.phase_function = np.mean(
+                np.reshape(
+                    self.phase_function_3d,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+
+            self.degree_of_polarization = np.mean(
+                np.reshape(
+                    dop,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization = np.mean(
+                np.reshape(
+                    dolp,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization_q = np.mean(
+                np.reshape(
+                    dolq,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization_u = np.mean(
+                np.reshape(
+                    dolu,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_circular_polarization = np.mean(
+                np.reshape(
+                    docp,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+
+            self.scattering_angles = np.reshape(
+                self.scattering_angles, self.simulation.numerics.sampling_points_number
+            )
+            self.scattering_angles = self.scattering_angles[0, :]
+        else:
+            self.phase_function = self.phase_function_3d
+
+            self.degree_of_polarization = dop
+            self.degree_of_linear_polarization = dolp
+            self.degree_of_linear_polarization_q = dolq
+            self.degree_of_linear_polarization_u = dolu
+            self.degree_of_circular_polarization = docp
+
+        self.c_and_b_bounds = c_and_b
+        if isinstance(c_and_b, bool):
+            if c_and_b:
+                self.c_and_b_bounds = ([-1, 0], [1, 1])
+            else:
+                return
+
+        self.__compute_c_and_b()
+
+    def __compute_data_split(
+        self, data: list[np.ndarray], idx_list: list, threads_per_block: int
+    ) -> int:
+
+        # buffer = 10000 # buffer to accomodate for varying GPU mem usage
+        device = cuda.select_device(0)
+        handle = cuda.cudadrv.devices.get_context()
+        mem_info = cuda.cudadrv.driver.Context(device, handle).get_memory_info()
+        free_bytes = mem_info.free
+        total_data_bytes = 0
+        for array in data:
+            total_data_bytes += array.size * array.itemsize
+
+        print("---------------------------------------------------")
+        print(f"{total_data_bytes*1e-9} GB of data remaining")
+        idx = data[0].shape[idx_list[0]]
+        num = idx
+        while total_data_bytes > free_bytes:
+            new_data_bytes = 0
+            num -= 1000
+            for i in range(len(data)):
+                temp_shape = data[i].shape
+                temp_size = 1
+                for s in temp_shape:
+                    if s == idx:
+                        temp_size *= num
+                    else:
+                        temp_size *= s
+                new_data_bytes += temp_size * data[i].itemsize
+            total_data_bytes = new_data_bytes
+
+        print(f"{free_bytes*1e-9} GB of data available on GPU")
+        print(f"Unused GPU memory: {(free_bytes-total_data_bytes)*1e-6} MB")
+
+        print(f"{num//threads_per_block} > {2**16-1}?")
+        if num // threads_per_block > 2**16 - 1:
+            num = (2**16 - 1) * threads_per_block
+            print("need to limit number of blocks")
+
+        print("---------------------------------------------------")
+        return num
