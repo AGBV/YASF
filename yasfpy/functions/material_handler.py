@@ -45,7 +45,7 @@ def material_handler(links):
                 data["material"] = material
             else:
                 print("No matching handler found for file type")
-    # data['ref_idx'] = data['ref_idx'].sort_values(by=['wavelength'])
+    data['ref_idx'] = data['ref_idx'].sort_values(by=['wavelength'])
     return data
 
 
