@@ -445,11 +445,12 @@ class Optics:
     def compute_asymmetry(self):
         """Computes the asymmetry parameter by numerical integration over the phase function.
         Therefore depends on the chosen sampling points. Accuracy depends on the number of
-        sampling points. **ACCURACY CURRENTLY VERY MUCH IN QUESTION**
+        sampling points.
         """
         sum = 0
         delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
         delta_theta = np.pi / self.simulation.numerics.sampling_points_number[1]
+        g_test = np.sum(self.phase_function*np.cos(self.simulation.numerics.polar_angles)*np.sin(self.simulation.numerics.polar_angles)*delta_phi*delta_theta) / (4 * np.pi)
         for idx in range(len(self.simulation.numerics.azimuthal_angles)):
             rn = np.cos(self.simulation.numerics.polar_angles[idx])
             a = (
@@ -461,6 +462,8 @@ class Optics:
             )
             sum += a
         g = sum / (4 * np.pi)
+        print(f"{g = }")
+        print(f"{g_test = }")
         self.g = g
 
     def __compute_correction(self) -> float:
