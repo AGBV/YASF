@@ -2,10 +2,6 @@ import yasfpy.log as log
 
 import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres, lgmres, bicgstab
-
-
-import numpy as np
-from scipy.sparse.linalg import LinearOperator, bicgstab, gmres, lgmres
 from . import log
 
 
@@ -21,8 +17,8 @@ class Solver:
         self,
         solver_type: str = "gmres",
         tolerance: float = 1e-4,
-        max_iter: int = 1e4,
-        restart: int = 1e2,
+        max_iter: float = 1e4,
+        restart: float = 1e2,
     ):
         """Initializes a solver object with specified parameters and creates a logger object.
 

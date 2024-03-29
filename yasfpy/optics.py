@@ -123,7 +123,6 @@ class Optics:
                 associated_legendre_lookup,
                 spherical_bessel_lookup,
                 e_j_dm_phi_loopup,
-                progress,
             )
 
         self.c_sca = (
@@ -208,6 +207,8 @@ class Optics:
             #   ceil(jmax / threads_per_block[0]),
             #   ceil(angles / threads_per_block[1]),
             #   ceil(wavelengths / threads_per_block[2]))
+
+            # print(f"{blocks_per_grid = }")
 
             compute_electric_field_angle_components_gpu[
                 blocks_per_grid, threads_per_block
@@ -460,12 +461,12 @@ class Optics:
         g = sum / (4 * np.pi)
         self.g = g
 
-    def __compute_correction(self) -> float64:
+    def __compute_correction(self) -> float:
         """Naive implementation of a correction term to lessen the underestimation of a spheres surface
         via numerical integration. Does not adequately correct the result, but does improve it.
 
         Returns:
-            correction_term (float64): Computed error term
+            correction_term (float): Computed error term
         """
         integral = 0
         delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
@@ -479,9 +480,6 @@ class Optics:
         error = 1 - integral / (4 * np.pi)
         return 12 * error / len(self.simulation.numerics.azimuthal_angles) ** 2
 
-    @jit(
-        nopython=True,
-    )
     def compute_asymmetry_corrected(self):
         """Computes asymmetry parameter via numerical integration over the phase function.
         Makes use of a correction term for the surface to compensate for underestimation

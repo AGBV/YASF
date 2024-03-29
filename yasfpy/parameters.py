@@ -1,5 +1,3 @@
-import numpy as np
-
 from yasfpy.particles import Particles
 from yasfpy.initial_field import InitialField
 
@@ -16,8 +14,8 @@ class Parameters:
 
     def __init__(
         self,
-        wavelength: np.array,
-        medium_refractive_index: np.array,
+        wavelength: np.ndarray,
+        medium_refractive_index: np.ndarray,
         particles: Particles,
         initial_field: InitialField,
     ):
@@ -34,7 +32,7 @@ class Parameters:
             initial_field (InitialField): An object of the `InitialField` class. It represents the
                 initial field configuration for the simulation.
         """
-        self.wavelength = wavelength
+        self.wavelength = np.array(wavelength)
         self.medium_refractive_index = medium_refractive_index
         self.wavelengths_number = wavelength.size
         self.particles = particles
@@ -94,12 +92,13 @@ class Parameters:
         """
         self.k_medium = self.omega * self.medium_refractive_index
         if self.particles.refractive_index_table is None:
+            self.ref_idx_table = None
             self.k_particle = np.outer(self.particles.refractive_index, self.omega)
         else:
-            table = self.__interpolate_refractive_index_from_table()
+            self.ref_idx_table = self.__interpolate_refractive_index_from_table()
             self.k_particle = (
-                np.take(table, self.particles.refractive_index, axis=0)
-                * self.omega[np.newaxis, :]
+                np.take(self.ref_idx_table, self.particles.refractive_index, axis=0)
+                * np.array(self.omega)[np.newaxis, :]
             )
 
             unique_radius_index_pairs = np.zeros(
@@ -113,7 +112,7 @@ class Parameters:
                 :, 0
             ]
             unique_radius_index_pairs[:, 1:] = np.take(
-                table,
+                self.ref_idx_table,
                 self.particles.unique_radius_index_pairs[:, 1].astype(int),
                 axis=0,
             )

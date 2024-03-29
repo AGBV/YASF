@@ -15,9 +15,9 @@ class Particles:
 
     def __init__(
         self,
-        position: np.array,
-        r: np.array,
-        refractive_index: np.array,
+        position: np.ndarray,
+        r: np.ndarray,
+        refractive_index: np.ndarray,
         refractive_index_table: list = None,
         shape_type: str = "sphere",
     ):
@@ -49,10 +49,10 @@ class Particles:
                 self.refractive_index = (
                     self.refractive_index[:, 0] + 1j * self.refractive_index[:, 1]
                 )
-        elif self.refractive_index.shape[1] > 2:
-            self.log.error(
-                "Refractive index should be either complex or a two column matrix!"
-            )
+            elif self.refractive_index.shape[1] > 2:
+                self.log.error(
+                    "Refractive index should be either complex or a two column matrix!"
+                )
         else:
             self.refractive_index = refractive_index.astype(int)
             self.refractive_index_table = refractive_index_table
@@ -61,7 +61,7 @@ class Particles:
         self.__setup_impl()
 
     @staticmethod
-    def generate_refractive_index_table(urls: list):
+    def generate_refractive_index_table(urls: list) -> list:
         """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
         URL using the `material_handler` function, and returns a list of the retrieved data.
 
