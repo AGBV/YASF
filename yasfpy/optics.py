@@ -447,23 +447,10 @@ class Optics:
         Therefore depends on the chosen sampling points. Accuracy depends on the number of
         sampling points.
         """
-        sum = 0
         delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
         delta_theta = np.pi / self.simulation.numerics.sampling_points_number[1]
-        g_test = np.sum(self.phase_function*np.cos(self.simulation.numerics.polar_angles)*np.sin(self.simulation.numerics.polar_angles)*delta_phi*delta_theta) / (4 * np.pi)
-        for idx in range(len(self.simulation.numerics.azimuthal_angles)):
-            rn = np.cos(self.simulation.numerics.polar_angles[idx])
-            a = (
-                self.phase_function_3d[idx, :]
-                * rn
-                * delta_phi
-                * np.sin(self.simulation.numerics.polar_angles[idx])
-                * delta_theta
-            )
-            sum += a
-        g = sum / (4 * np.pi)
+        g = np.sum(self.phase_function_3d*np.cos(self.simulation.numerics.polar_angles)[:,np.newaxis]*np.sin(self.simulation.numerics.polar_angles)[:,np.newaxis]*delta_phi*delta_theta,axis=0) / (4 * np.pi)
         print(f"{g = }")
-        print(f"{g_test = }")
         self.g = g
 
     def __compute_correction(self) -> float:
@@ -493,23 +480,13 @@ class Optics:
         **ACCURACY CURRENTLY VERY MUCH IN QUESTION**
         """
         correction_term = self.__compute_correction()
-        print(correction_term)
-        sum = 0
         delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
         delta_theta = np.pi / self.simulation.numerics.sampling_points_number[1]
-        for idx in range(len(self.simulation.numerics.azimuthal_angles)):
-            rn = np.cos(self.simulation.numerics.polar_angles[idx])
-            a = (
-                self.phase_function_3d[idx, :]
-                * rn
-                * delta_phi
-                * np.sin(self.simulation.numerics.polar_angles[idx])
-                * delta_theta
-            )
-            correction = self.phase_function_3d[idx, :] * rn * correction_term
-            sum += a
-            sum += correction
-        g = sum / (4 * np.pi)
+
+        g_n = np.sum(self.phase_function_3d*np.cos(self.simulation.numerics.polar_angles)[:,np.newaxis]*np.sin(self.simulation.numerics.polar_angles)[:,np.newaxis]*delta_phi*delta_theta,axis=0)
+        correction = np.sum(self.phase_function_3d*np.cos(self.simulation.numerics.polar_angles)[:,np.newaxis]*np.sin(self.simulation.numerics.azimuthal_angles)[:,np.newaxis]*delta_phi*delta_theta,axis=0)
+        g = (g_n+correction) / (4 * np.pi)
+        print(f"corrected g: {g}")
         self.g_corr = g
 
     def compute_asymmetry_coeff(self):
