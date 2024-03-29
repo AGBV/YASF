@@ -1,9 +1,9 @@
-import numpy as np
+from yasfpy.particles import Particles
+from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
+import numpy as np
 from scipy.special import spherical_jn
 from scipy.special import hankel1, lpmv
-
-from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
 
 def jmult_max(num_part, lmax):
@@ -168,7 +168,7 @@ def mutual_lookup(
     )
     e_phi = np.stack([-np.sin(phi), np.cos(phi), np.zeros_like(phi)], axis=-1)
 
-    size_parameter = distances * refractive_index[np.newaxis, np.newaxis, :]
+    size_parameter = distances * np.array(refractive_index)[np.newaxis, np.newaxis, :]
 
     if parallel:
         from yasfpy.functions.cpu_numba import compute_lookup_tables
@@ -251,3 +251,41 @@ def mutual_lookup(
         size_parameter,
         spherical_hankel_derivative,
     )
+
+
+def interpolate_refractive_index_from_table(wavelengths: np.ndarray, materials: list, species_idx: np.ndarray) -> np.ndarray:
+    """Interpolates the refractive index values from a table for different wavelengths.
+
+    Returns:
+        refractive_index_interpolated (np.array): An array that contains the interpolated refractive index values for the particles
+            at different wavelengths.
+    """
+
+    refractive_index_table = Particles.generate_refractive_index_table(materials)
+
+    unique_refractive_indices, _ = np.unique(species_idx, return_inverse=True, axis=0)
+    num_unique_refractive_indices = unique_refractive_indices.shape[0]
+
+
+    refractive_index_interpolated = np.zeros(
+        (num_unique_refractive_indices, wavelengths.size),
+        dtype=complex,
+    )
+    for idx, data in enumerate(refractive_index_table):
+        table = data["ref_idx"].to_numpy().astype(float)
+        n = np.interp(
+            wavelengths,
+            table[:, 0],
+            table[:, 1],
+            left=table[0, 1],
+            right=table[-1, 1],
+        )
+        k = np.interp(
+            wavelengths,
+            table[:, 0],
+            table[:, 2],
+            left=table[0, 2],
+            right=table[-1, 2],
+        )
+        refractive_index_interpolated[idx, :] = n + 1j * k
+    return refractive_index_interpolated
