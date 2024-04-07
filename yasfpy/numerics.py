@@ -162,14 +162,19 @@ class Numerics:
             dshape = tuple([int(f_data[0][0]), int(f_data[0][1]), int(f_data[1][0])])
             f1 = [complex(float(i[0]),float(i[1])) for i in f_data[2:]]
             self.translation_ab5 = np.array(f1).reshape(dshape)
+            print("Found translation table and loaded it!")
         elif os.path.isfile(directory / f"lmax{self.lmax}.pickle"):
             with open(directory / f"lmax{self.lmax}", "wb") as f:
                 self.translation_ab5 = pickle.load(f)
+            print("Found translation table and loaded it!")
         else:
+            print(f"Didnt find translation table in specified directory: {directory}")
+            print("Starting calculation")
             self.compute_translation_table()
             res = {"wig": self.translation_ab5}
             with open(f"lmax{self.lmax}", "wb") as f:
                 pickle.dump(res,f)
+            print("Calculated translation table!")
 
     def compute_translation_table(self):
         """
