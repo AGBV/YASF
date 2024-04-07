@@ -8,7 +8,8 @@ import YASF.yasfpy.log as log
 from typing import Union, Callable
 import numpy as np
 import pywigxjpf as wig
-
+from pathlib import Path
+import pickle
 from YASF.yasfpy.functions.misc import jmult_max
 from YASF.yasfpy.functions.misc import multi2single_index
 from YASF.yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
@@ -154,6 +155,21 @@ class Numerics:
         The function computes the coefficients for the associated Legendre polynomials.
         """
         self.__plm_coefficients()
+
+    def check_for_translation_table(self, directory: Path):
+        if os.path.isfile(directory / f"lmax{self.lmax}.dat"):
+            f_data = [i.strip().strip("i").replace("E","e").split() for i in open(f"lmax{self.lmax}.dat").readlines()]
+            dshape = tuple([int(f_data[0][0]), int(f_data[0][1]), int(f_data[1][0])])
+            f1 = [complex(float(i[0]),float(i[1])) for i in f_data[2:]]
+            f1 = np.array(f1).reshape(dshape)
+        elif os.path.isfile(directory / f"lmax{self.lmax}.pickle"):
+            with open(f"lmax{self.lmax}", "wb") as f:
+                self.translation_ab5 = pickle.load(f)
+        else:
+            self.compute_translation_table()
+            res = {"wig": self.translation_ab5}
+            with open(f"lmax{self.lmax}", "wb") as f:
+                pickle.dump(res,f)
 
     def compute_translation_table(self):
         """
