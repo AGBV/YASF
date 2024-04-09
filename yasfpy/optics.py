@@ -668,14 +668,14 @@ class Optics:
             #   ceil(wavelengths / threads_per_block[2]))
 
             to_split = [
-                self.simulation.numerics.azimuthal_angles,
-                self.simulation.numerics.e_r,
-                pilm,
-                taulm,
-                e_field_theta_real,
-                e_field_theta_imag,
-                e_field_phi_real,
-                e_field_phi_imag,
+                np.ascontiguousarray(self.simulation.numerics.azimuthal_angles),
+                np.ascontiguousarray(self.simulation.numerics.e_r),
+                np.ascontiguousarray(pilm),
+                np.ascontiguousarray(taulm),
+                np.ascontiguousarray(e_field_theta_real),
+                np.ascontiguousarray(e_field_theta_imag),
+                np.ascontiguousarray(e_field_phi_real),
+                np.ascontiguousarray(e_field_phi_imag),
             ]
 
 
@@ -712,25 +712,11 @@ class Optics:
                 if split_idx < 1:
                     break
 
-                azimuthal_split = np.ascontiguousarray(self.simulation.numerics.azimuthal_angles[start_idx:start_idx+split_idx])
-                e_r_split = np.ascontiguousarray(self.simulation.numerics.e_r[start_idx:start_idx+split_idx,:])
-                pilm_split = np.ascontiguousarray(pilm[:,:,start_idx:start_idx+split_idx])
-                taulm_split = np.ascontiguousarray(taulm[:,:,start_idx:start_idx+split_idx])
-                e_theta_imag_split = np.ascontiguousarray(e_field_theta_imag[start_idx:start_idx+split_idx,:])
-                e_theta_real_split = np.ascontiguousarray(e_field_theta_real[start_idx:start_idx+split_idx,:])
-                e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:start_idx+split_idx,:])
-                e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:start_idx+split_idx,:])
+                split_device_data = []
+                for i in range(len(to_split)):
+                    split_device_data.append(cuda.to_device(np.take(to_split[i], (start_idx, start_idx+split_idx+1), axis=idx_per_array[i])))
 
-                azimuthal_angles_device = cuda.to_device(azimuthal_split)
-                e_r_device = cuda.to_device(e_r_split)
-                pilm_device = cuda.to_device(pilm_split)
-                taulm_device = cuda.to_device(taulm_split)
-                e_field_theta_real_device = cuda.to_device(e_theta_real_split)
-                e_field_theta_imag_device = cuda.to_device(e_theta_imag_split)
-                e_field_phi_real_device = cuda.to_device(e_phi_real_split)
-                e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
-
-                sizes = (jmax, azimuthal_split.size, wavelengths)
+                sizes = (jmax, len(range(start_idx,(start_idx+split_idx+1))), wavelengths)
 
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
@@ -745,20 +731,24 @@ class Optics:
                     idx_device,
                     sfc_device,
                     k_medium_device,
-                    azimuthal_angles_device,
-                    e_r_device,
-                    pilm_device,
-                    taulm_device,
-                    e_field_theta_real_device,
-                    e_field_theta_imag_device,
-                    e_field_phi_real_device,
-                    e_field_phi_imag_device,
+                    split_device_data[0],
+                    split_device_data[1],
+                    split_device_data[2],
+                    split_device_data[3],
+                    split_device_data[4],
+                    split_device_data[5],
+                    split_device_data[6],
+                    split_device_data[7],
                 )
 
-                e_field_theta_real[start_idx:start_idx+split_idx,:] = e_field_theta_real_device.copy_to_host()
-                e_field_theta_imag[start_idx:start_idx+split_idx,:] = e_field_theta_imag_device.copy_to_host()
-                e_field_phi_real[start_idx:start_idx+split_idx,:] = e_field_phi_real_device.copy_to_host()
-                e_field_phi_imag[start_idx:start_idx+split_idx,:] = e_field_phi_imag_device.copy_to_host()
+                e_field_theta_real[start_idx:start_idx+split_idx,:] = split_device_data[4].copy_to_host()
+                e_field_theta_imag[start_idx:start_idx+split_idx,:] = split_device_data[5].copy_to_host()
+                e_field_phi_real[start_idx:start_idx+split_idx,:] = split_device_data[6].copy_to_host()
+                e_field_phi_imag[start_idx:start_idx+split_idx,:] = split_device_data[7].copy_to_host()
+                _ = split_device_data[0].copy_to_host()
+                _ = split_device_data[1].copy_to_host()
+                _ = split_device_data[2].copy_to_host()
+                _ = split_device_data[3].copy_to_host()
 
                 # update start_idx
                 start_idx += split_idx+1
@@ -1028,15 +1018,22 @@ class Optics:
         return num
 
 
-    def __data_batching(self, to_split, sizes, idx_to_split, cuda_kernel, threads_per_block, blocks_per_grid):
+    def __data_batching(self, data, to_split, sizes, idx_to_split, cuda_kernel, threads_per_block, blocks_per_grid):
+
+        # stuff thats needed in full for every batch
+        device_data = []
+        for i in range(len(data)):
+            device_data.append(cuda.to_device(data[i]))
 
         start_idx = 0
         split_idx = 0
         idx_per_array = [0]*len(to_split)
         done = False
 
+        res = []
         for i in range(len(to_split)):
             to_split[i] = np.ascontiguousarray(to_split[i])
+            res.append(np.zeros(to_split[i].shape))
 
         while not done:
 
@@ -1053,64 +1050,61 @@ class Optics:
             for i in range(len(to_split)):
                 split_data.append(np.take(to_split[i],(start_idx,start_idx+split_idx+1), axis=idx_to_split[i]))
 
-            # intensity_split = np.ascontiguousarray(intensity[start_idx:start_idx+split_idx,:])
-            # dop_split = np.ascontiguousarray(dop[start_idx:start_idx+split_idx,:])
-            # dolp_split = np.ascontiguousarray(dolp[start_idx:start_idx+split_idx,:])
-            # dolq_split = np.ascontiguousarray(dolq[start_idx:start_idx+split_idx,:])
-            # dolu_split = np.ascontiguousarray(dolu[start_idx:start_idx+split_idx,:])
-            # docp_split = np.ascontiguousarray(docp[start_idx:start_idx+split_idx,:])
-
-            # e_theta_imag_split = np.ascontiguousarray(e_field_theta_imag[start_idx:start_idx+split_idx,:])
-            # e_theta_real_split = np.ascontiguousarray(e_field_theta_real[start_idx:start_idx+split_idx,:])
-            # e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:start_idx+split_idx,:])
-            # e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:start_idx+split_idx,:])
-
             blocks_per_grid = tuple(
                 ceil(sizes[k] / threads_per_block[k])
                 for k in range(len(threads_per_block))
             )
-            counter = 0
 
-            for key in data.keys():
-                device_data[key] = cuda.to_device
-            d = cuda.to_device(intensity_split)
-            d2 = cuda.to_device(dop_split)
-            dolp_device = cuda.to_device(dolp_split)
-            dolq_device = cuda.to_device(dolq_split)
-            dolu_device = cuda.to_device(dolu_split)
-            docp_device = cuda.to_device(docp_split)
-
-            e_field_theta_real_device = cuda.to_device(e_theta_real_split)
-            e_field_theta_imag_device = cuda.to_device(e_theta_imag_split)
-            e_field_phi_real_device = cuda.to_device(e_phi_real_split)
-            e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
+            batched_device_data = []
+            for i in range(len(to_split)):
+                batched_device_data.append(cuda.to_device(to_split[i]))
 
 
             cuda_kernel[blocks_per_grid, threads_per_block](
-                self.simulation.parameters.k_medium.size,
-                self.simulation.numerics.azimuthal_angles.size,
-                e_field_theta_real_device,
-                e_field_theta_imag_device,
-                e_field_phi_real_device,
-                e_field_phi_imag_device,
-                intensity_device,
-                dop_device,
-                dolp_device,
-                dolq_device,
-                dolu_device,
-                docp_device,
+                device_data,
+                batched_device_data,
+                threads_per_block,
+                blocks_per_grid,
             )
-
-            intensity[start_idx:start_idx+split_idx,:] = intensity_device.copy_to_host()
-            dop[start_idx:start_idx+split_idx,:] = dop_device.copy_to_host()
-            dolq[start_idx:start_idx+split_idx,:] = dolp_device.copy_to_host()
-            dolq[start_idx:start_idx+split_idx,:] = dolq_device.copy_to_host()
-            dolu[start_idx:start_idx+split_idx,:] = dolu_device.copy_to_host()
-            docp[start_idx:start_idx+split_idx,:] = docp_device.copy_to_host()
+            # receive batched data results
+            for i in range(len(batched_device_data)):
+                res[i][start_idx:start_idx+split_idx] = batched_device_data[i].copy_to_host()
 
             # update start_idx
             start_idx += split_idx+1
             if start_idx >= idx_to_split:
                 done = True
 
-    def __test_wrapper_e_field_angular(self, device_data: list, batched_device_data: list, threads_per_block, blocks_per_grid):
+        return res
+
+    def __test_wrapper_e_field_angular(self, device_data: list[np.ndarray], batched_device_data: list[np.ndarray], threads_per_block, blocks_per_grid):
+
+        particles_position_device = device_data[0]
+        idx_device = device_data[1]
+        sfc_device = device_data[2]
+        k_medium_device = device_data[3]
+
+        azimuthal_angles_device = batched_device_data[0]
+        e_r_device = batched_device_data[1]
+        pilm_device = batched_device_data[2]
+        taulm_device = batched_device_data[3]
+        e_field_theta_real_device = batched_device_data[4]
+        e_field_theta_imag_device = batched_device_data[5]
+        e_field_phi_real_device = batched_device_data[6]
+        e_field_phi_imag_device = batched_device_data[7]
+
+        compute_electric_field_angle_components_gpu[blocks_per_grid, threads_per_block](
+            self.simulation.numerics.lmax,
+            particles_position_device,
+            idx_device,
+            sfc_device,
+            k_medium_device,
+            azimuthal_angles_device,
+            e_r_device,
+            pilm_device,
+            taulm_device,
+            e_field_theta_real_device,
+            e_field_theta_imag_device,
+            e_field_phi_real_device,
+            e_field_phi_imag_device,
+        )
