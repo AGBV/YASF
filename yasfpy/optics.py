@@ -703,10 +703,10 @@ class Optics:
 
                 split_data = []
                 for i in range(len(to_split)):
-                    split_data.append(cuda.to_device(np.take(to_split[i], range(start_idx,start_idx+split_idx), axis=idx_per_array[i])))
+                    split_data.append(cuda.to_device(np.take(to_split[i], range(start_idx,start_idx+split_idx-1), axis=idx_per_array[i])))
 
 
-                sizes = (jmax, len(range(start_idx,(start_idx+split_idx))), wavelengths)
+                sizes = (jmax, len(range(start_idx,(start_idx+split_idx-1))), wavelengths)
 
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
@@ -1003,17 +1003,11 @@ class Optics:
             e_field_phi_imag = np.zeros_like(e_field_theta_real)
 
             # stuff we need in full for every iteration
-            particles_position_device = cuda.to_device(
-                self.simulation.parameters.particles.position
-            )
-            idx_device = cuda.to_device(self.simulation.idx_lookup)
-            sfc_device = cuda.to_device(self.simulation.scattered_field_coefficients)
-            k_medium_device = cuda.to_device(self.simulation.parameters.k_medium)
             device_data = [
-                particles_position_device,
-                idx_device,
-                sfc_device,
-                k_medium
+                self.simulation.parameters.particles.position,
+                self.simulation.idx_lookup,
+                self.simulation.scattered_field_coefficients,
+                self.simulation.parameters.k_medium,
             ]
 
             sizes = (jmax, angles, wavelengths)
@@ -1040,11 +1034,10 @@ class Optics:
             for array in to_split:
                 idx_per_array.append(np.where(np.array(array.shape) == idx_to_split)[0][0])
 
-
             threads_per_block = (1, 16*16, 2)
-
+            external_args = [self.simulation.numerics.lmax]
             sizes_idx_split = 1
-            res = self.__data_batching(device_data,to_split, sizes, sizes_idx_split, idx_to_split, idx_per_array, compute_electric_field_angle_components_gpu, threads_per_block)
+            res = self.__data_batching(external_args,device_data,to_split, sizes, sizes_idx_split, idx_to_split, idx_per_array, compute_electric_field_angle_components_gpu, threads_per_block)
             e_field_theta_real = res[4]
             e_field_theta_imag = res[5]
             e_field_phi_real = res[6]
@@ -1088,7 +1081,12 @@ class Optics:
                 for k in range(len(threads_per_block))
             )
             size_idx_split = 0
-            res = self.__data_batching(device_data,to_split,sizes,size_idx_split, idx_to_split, idx_per_array, compute_polarization_components_gpu, blocks_per_grid)
+
+            external_args = [
+                self.simulation.parameters.k_medium.size,
+                self.simulation.numerics.azimuthal_angles.size,
+            ]
+            res = self.__data_batching(external_args, device_data,to_split,sizes,size_idx_split, idx_to_split, idx_per_array, compute_polarization_components_gpu, blocks_per_grid)
 
             intensity = res[4]
             dop = res[5]
@@ -1212,50 +1210,64 @@ class Optics:
 
         self.__compute_c_and_b()
 
-    def __data_batching(self, external_args: list, device_data: list[np.ndarray], to_split: list[np.ndarray], sizes: tuple, size_split_idx: int, idx_to_split: int, idx_per_array: list[int], cuda_kernel: cuda.compiler.AutoJitCUDAKernel, threads_per_block: tuple):
+    def __data_batching(self, external_args: list, device_data: list[np.ndarray], to_split: list[np.ndarray], sizes: tuple, size_split_idx: int, idx_to_split: int, idx_per_array: list[int], cuda_kernel: Callable, threads_per_block: tuple):
+
+        total_bytes = 0
+        for array in to_split:
+            total_bytes += array.size*array.itemsize
+        # put device data onto array
+        device_data2 = []
+        for arr in device_data:
+            device_data2.append(cuda.to_device(arr))
 
         start_idx = 0
         split_idx = 0
-        idx_per_array = [0]*len(to_split)
         done = False
 
         res = []
         for i in range(len(to_split)):
-            to_split[i] = np.ascontiguousarray(to_split[i])
-            res.append(np.zeros(to_split[i].shape))
+            res.append(np.empty(to_split[i].shape,float))
 
         while not done:
 
-            if split_idx != 0:
-                for i in range(len(to_split)):
-                    to_split[i] = to_split[i][split_idx+1:,:]
-
-            split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[0])
+            split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[size_split_idx])
             if split_idx < 1:
                 break
 
             split_data = []
             for i in range(len(to_split)):
-                split_data.append(np.take(to_split[i],range(start_idx,start_idx+split_idx), axis=idx_per_array[i]))
+                split_data.append(np.take(to_split[i],range(start_idx,start_idx+split_idx-1), axis=idx_per_array[i]))
+
+            # check total size of data to be put on GPU
+            used_bytes = 0
+            for array in split_data:
+                used_bytes += array.size*array.itemsize
+            total_bytes -= used_bytes
+            print(f"{total_bytes*1e-9} GB of data remaining")
 
             sizes2 = list(sizes)
-            sizes2[size_split_idx] = len(range(start_idx,(start_idx+split_idx)))
+            sizes2[size_split_idx] = len(range(start_idx,(start_idx+split_idx-1)))
             sizes = tuple(sizes2)
             blocks_per_grid = tuple(
                 ceil(sizes[k] / threads_per_block[k])
                 for k in range(len(threads_per_block))
             )
 
+            # send data to device
             batched_device_data = []
             for i in range(len(to_split)):
-                batched_device_data.append(cuda.to_device(to_split[i]))
+                batched_device_data.append(cuda.to_device(split_data[i]))
 
-
-            arg_list = external_args + device_data + batched_device_data
+            # call kernel
+            arg_list = external_args + device_data2 + batched_device_data
             cuda_kernel[blocks_per_grid, threads_per_block](*arg_list)
+
             # receive batched data results
             for i in range(len(batched_device_data)):
-                res[i][start_idx:start_idx+split_idx] = batched_device_data[i].copy_to_host()
+                res[i] = np.append(res[i],np.array(batched_device_data[i].copy_to_host()),axis=idx_per_array[i])
+
+            # deallocate objects that use data on gpu so that cuda will deallocate memory
+            del batched_device_data, split_data, arg_list
 
             # update start_idx
             start_idx += split_idx+1
@@ -1266,17 +1278,17 @@ class Optics:
 
     def __compute_data_split(self, data: list[np.ndarray], idx_list: list, threads_per_block: int) -> int:
 
-            buffer = 2_000_000_000 # buffer to accomodate for varying GPU mem usage
             device = cuda.select_device(0)
             handle = cuda.cudadrv.devices.get_context()
             mem_info = cuda.cudadrv.driver.Context(device,handle).get_memory_info()
+            buffer = 0.05*mem_info.total  # buffer to accomodate for varying GPU mem usage
+            print(f"{buffer = }")
             free_bytes = mem_info.free-buffer
             total_data_bytes = 0
             for array in data:
                 total_data_bytes += array.size*array.itemsize
 
             print("---------------------------------------------------")
-            print(f"{total_data_bytes*1e-9} GB of data remaining")
             idx = data[0].shape[idx_list[0]]
             num = idx
             while total_data_bytes > free_bytes:
@@ -1299,7 +1311,7 @@ class Optics:
             print(f"{num//threads_per_block} > {2**16-1}?")
             if num//threads_per_block > 2**16-1:
                 num = (2**16-1)*threads_per_block
-                print("need to limit number of blocks")
+                print("Need to limit number of blocks due to limited number of blocks per grid!")
 
             print("---------------------------------------------------")
             return num
