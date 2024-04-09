@@ -1026,3 +1026,91 @@ class Optics:
 
         print("---------------------------------------------------")
         return num
+
+
+    def __data_batching(self, to_split, sizes, idx_to_split, cuda_kernel, threads_per_block, blocks_per_grid):
+
+        start_idx = 0
+        split_idx = 0
+        idx_per_array = [0]*len(to_split)
+        done = False
+
+        for i in range(len(to_split)):
+            to_split[i] = np.ascontiguousarray(to_split[i])
+
+        while not done:
+
+            if split_idx != 0:
+                for i in range(len(to_split)):
+                    to_split[i] = to_split[i][split_idx+1:,:]
+
+
+            split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[0])
+            if split_idx < 1:
+                break
+
+            split_data = []
+            for i in range(len(to_split)):
+                split_data.append(np.take(to_split[i],(start_idx,start_idx+split_idx+1), axis=idx_to_split[i]))
+
+            # intensity_split = np.ascontiguousarray(intensity[start_idx:start_idx+split_idx,:])
+            # dop_split = np.ascontiguousarray(dop[start_idx:start_idx+split_idx,:])
+            # dolp_split = np.ascontiguousarray(dolp[start_idx:start_idx+split_idx,:])
+            # dolq_split = np.ascontiguousarray(dolq[start_idx:start_idx+split_idx,:])
+            # dolu_split = np.ascontiguousarray(dolu[start_idx:start_idx+split_idx,:])
+            # docp_split = np.ascontiguousarray(docp[start_idx:start_idx+split_idx,:])
+
+            # e_theta_imag_split = np.ascontiguousarray(e_field_theta_imag[start_idx:start_idx+split_idx,:])
+            # e_theta_real_split = np.ascontiguousarray(e_field_theta_real[start_idx:start_idx+split_idx,:])
+            # e_phi_imag_split = np.ascontiguousarray(e_field_phi_imag[start_idx:start_idx+split_idx,:])
+            # e_phi_real_split = np.ascontiguousarray(e_field_phi_real[start_idx:start_idx+split_idx,:])
+
+            blocks_per_grid = tuple(
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
+            )
+            counter = 0
+
+            for key in data.keys():
+                device_data[key] = cuda.to_device
+            d = cuda.to_device(intensity_split)
+            d2 = cuda.to_device(dop_split)
+            dolp_device = cuda.to_device(dolp_split)
+            dolq_device = cuda.to_device(dolq_split)
+            dolu_device = cuda.to_device(dolu_split)
+            docp_device = cuda.to_device(docp_split)
+
+            e_field_theta_real_device = cuda.to_device(e_theta_real_split)
+            e_field_theta_imag_device = cuda.to_device(e_theta_imag_split)
+            e_field_phi_real_device = cuda.to_device(e_phi_real_split)
+            e_field_phi_imag_device = cuda.to_device(e_phi_imag_split)
+
+
+            cuda_kernel[blocks_per_grid, threads_per_block](
+                self.simulation.parameters.k_medium.size,
+                self.simulation.numerics.azimuthal_angles.size,
+                e_field_theta_real_device,
+                e_field_theta_imag_device,
+                e_field_phi_real_device,
+                e_field_phi_imag_device,
+                intensity_device,
+                dop_device,
+                dolp_device,
+                dolq_device,
+                dolu_device,
+                docp_device,
+            )
+
+            intensity[start_idx:start_idx+split_idx,:] = intensity_device.copy_to_host()
+            dop[start_idx:start_idx+split_idx,:] = dop_device.copy_to_host()
+            dolq[start_idx:start_idx+split_idx,:] = dolp_device.copy_to_host()
+            dolq[start_idx:start_idx+split_idx,:] = dolq_device.copy_to_host()
+            dolu[start_idx:start_idx+split_idx,:] = dolu_device.copy_to_host()
+            docp[start_idx:start_idx+split_idx,:] = docp_device.copy_to_host()
+
+            # update start_idx
+            start_idx += split_idx+1
+            if start_idx >= idx_to_split:
+                done = True
+
+    def __test_wrapper_e_field_angular(self, device_data: list, batched_device_data: list, threads_per_block, blocks_per_grid):
