@@ -696,14 +696,8 @@ class Optics:
             while not done:
 
                 if split_idx != 0:
-                    to_split[0] = to_split[0][split_idx+1:]
-                    to_split[1] = to_split[1][split_idx+1:,:]
-                    to_split[2] = to_split[2][:,:,split_idx+1:]
-                    to_split[3] = to_split[3][:,:,split_idx+1:]
-                    to_split[4] = to_split[4][split_idx+1:,:]
-                    to_split[5] = to_split[5][split_idx+1:,:]
-                    to_split[6] = to_split[6][split_idx+1:,:]
-                    to_split[7] = to_split[7][split_idx+1:,:]
+                    for i in range(len(to_split)):
+                        to_split[i] = np.take(to_split[i], range(start_idx,start_idx+split_idx), axis=idx_per_array[i])
 
                     # for i in range(len(to_split)):
                     #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
@@ -714,10 +708,8 @@ class Optics:
                     break
 
                 split_device_data = []
-                for i in range(len(to_split)):
-                    split_device_data.append(cuda.to_device(np.take(to_split[i], range(start_idx,start_idx+split_idx), axis=idx_per_array[i])))
-                    print(f"{to_split[i].shape = }")
-                    print(f"{np.take(to_split[i], range(start_idx, start_idx+split_idx), axis=idx_per_array[i]).shape}")
+                for data in to_split:
+                    split_device_data.append(cuda.to_device(data))
 
                 sizes = (jmax, len(range(start_idx,(start_idx+split_idx))), wavelengths)
 
