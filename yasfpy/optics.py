@@ -1,10 +1,11 @@
 import logging
-from typing import Union
+from typing import Union, Callable
 from math import ceil
 import pandas as pd
 import numpy as np
 from numba import cuda
 import os,sys,time,copy
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -967,14 +968,251 @@ class Optics:
 
         self.__compute_c_and_b()
 
+    def compute_phase_function(self, legendre_coefficients_number: int = 15, c_and_b: Union[bool, tuple] = False, check_phase_function: bool = False,):
+        """Generalized batching for phase function computation
+
+        Args:
+            legendre_coefficients_number (int, optional): The number of Legendre coefficients to compute
+                for the phase function. These coefficients are used to approximate the phase function
+                using Legendre polynomials. The higher the number of coefficients, the more accurate
+                the approximation will be.
+            c_and_b (Union[bool, tuple], optional): A boolean value or a tuple. If `True`, it indicates
+                that the `c` and `b` bounds should be computed. If `False`, the function will return
+                without computing the `c` and `b` bounds.
+        """
+        pilm, taulm = spherical_functions_trigon(
+            self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
+        )
+
+        if self.simulation.numerics.gpu:
+            jmax = (
+                self.simulation.parameters.particles.number
+                * self.simulation.numerics.nmax
+            )
+            angles = self.simulation.numerics.azimuthal_angles.size
+            wavelengths = self.simulation.parameters.k_medium.size
+            e_field_theta_real = np.zeros(
+                (
+                    self.simulation.numerics.azimuthal_angles.size,
+                    self.simulation.parameters.k_medium.size,
+                ),
+                dtype=float,
+            )
+            e_field_theta_imag = np.zeros_like(e_field_theta_real)
+            e_field_phi_real = np.zeros_like(e_field_theta_real)
+            e_field_phi_imag = np.zeros_like(e_field_theta_real)
+
+            # stuff we need in full for every iteration
+            particles_position_device = cuda.to_device(
+                self.simulation.parameters.particles.position
+            )
+            idx_device = cuda.to_device(self.simulation.idx_lookup)
+            sfc_device = cuda.to_device(self.simulation.scattered_field_coefficients)
+            k_medium_device = cuda.to_device(self.simulation.parameters.k_medium)
+            device_data = [
+                particles_position_device,
+                idx_device,
+                sfc_device,
+                k_medium
+            ]
+
+            sizes = (jmax, angles, wavelengths)
+            threads_per_block = (16, 16, 2)
+
+            blocks_per_grid = tuple(
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
+            )
+            to_split = [
+                np.ascontiguousarray(self.simulation.numerics.azimuthal_angles),
+                np.ascontiguousarray(self.simulation.numerics.e_r),
+                np.ascontiguousarray(pilm),
+                np.ascontiguousarray(taulm),
+                np.ascontiguousarray(e_field_theta_real),
+                np.ascontiguousarray(e_field_theta_imag),
+                np.ascontiguousarray(e_field_phi_real),
+                np.ascontiguousarray(e_field_phi_imag),
+            ]
+
+            idx_to_split = self.simulation.numerics.azimuthal_angles.shape[0]
+
+            idx_per_array = []
+            for array in to_split:
+                idx_per_array.append(np.where(np.array(array.shape) == idx_to_split)[0][0])
 
 
-    def __data_batching(self, data, to_split, sizes, idx_to_split, cuda_kernel, threads_per_block, blocks_per_grid):
+            threads_per_block = (1, 16*16, 2)
 
-        # stuff thats needed in full for every batch
-        device_data = []
-        for i in range(len(data)):
-            device_data.append(cuda.to_device(data[i]))
+            sizes_idx_split = 1
+            res = self.__data_batching(device_data,to_split, sizes, sizes_idx_split, idx_to_split, idx_per_array, compute_electric_field_angle_components_gpu, threads_per_block)
+            e_field_theta_real = res[4]
+            e_field_theta_imag = res[5]
+            e_field_phi_real = res[6]
+            e_field_phi_imag = res[7]
+
+            e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
+            e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
+
+            print("Done with e field calculations...")
+            # continue with next calculation
+
+            intensity = np.zeros_like(e_field_theta_real)
+            dop = np.zeros_like(e_field_theta_real)
+            dolp = np.zeros_like(e_field_theta_real)
+            dolq = np.zeros_like(e_field_theta_real)
+            dolu = np.zeros_like(e_field_theta_real)
+            docp = np.zeros_like(e_field_theta_real)
+
+            to_split = [
+                    np.ascontiguousarray(e_field_theta_real),
+                    np.ascontiguousarray(e_field_theta_imag),
+                    np.ascontiguousarray(e_field_phi_real),
+                    np.ascontiguousarray(e_field_phi_imag),
+                    np.ascontiguousarray(intensity),
+                    np.ascontiguousarray(dop),
+                    np.ascontiguousarray(dolp),
+                    np.ascontiguousarray(dolq),
+                    np.ascontiguousarray(dolu),
+                    np.ascontiguousarray(docp),
+
+            ]
+            threads_per_block = (1024, 1) # this allows ~65000 wavelengths, limits required batching
+
+            start_idx = 0
+            split_idx = 0
+            idx_per_array = [0]*len(to_split)
+
+            sizes = (split_idx, wavelengths)
+            blocks_per_grid = tuple(
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
+            )
+            size_idx_split = 0
+            res = self.__data_batching(device_data,to_split,sizes,size_idx_split, idx_to_split, idx_per_array, compute_polarization_components_gpu, blocks_per_grid)
+
+            intensity = res[4]
+            dop = res[5]
+            dolp = res[6]
+            dolq = res[7]
+            dolu = res[8]
+            docp = res[9]
+
+
+        self.scattering_angles = self.simulation.numerics.polar_angles
+        k_medium = self.simulation.parameters.k_medium
+        if type(self.simulation.parameters.k_medium) == pd.core.series.Series:
+            k_medium = k_medium.to_numpy()
+        self.phase_function_3d = (
+            intensity
+            * 4
+            * np.pi
+            / np.power(np.abs(k_medium), 2)
+            / self.c_sca[np.newaxis, :]
+        )
+        if check_phase_function:
+            res = self.__check_phase_function()
+            assert res == True, "The phase function does have the desired precision. Please increase the amount of angles used."
+
+        self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
+            np.cos(self.scattering_angles),
+            self.phase_function_3d,
+            legendre_coefficients_number,
+        )
+
+        self.degree_of_polarization_3d = dop
+        self.degree_of_linear_polarization_3d = dolp
+        self.degree_of_linear_polarization_q_3d = dolq
+        self.degree_of_linear_polarization_u_3d = dolu
+        self.degree_of_circular_polarization_3d = docp
+
+        if (self.simulation.numerics.sampling_points_number is not None) and (
+            self.simulation.numerics.sampling_points_number.size == 2
+        ):
+            self.phase_function = np.mean(
+                np.reshape(
+                    self.phase_function_3d,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+
+            self.degree_of_polarization = np.mean(
+                np.reshape(
+                    dop,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization = np.mean(
+                np.reshape(
+                    dolp,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization_q = np.mean(
+                np.reshape(
+                    dolq,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_linear_polarization_u = np.mean(
+                np.reshape(
+                    dolu,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+            self.degree_of_circular_polarization = np.mean(
+                np.reshape(
+                    docp,
+                    np.append(
+                        self.simulation.numerics.sampling_points_number,
+                        self.simulation.parameters.k_medium.size,
+                    ),
+                ),
+                axis=0,
+            )
+
+            self.scattering_angles = np.reshape(
+                self.scattering_angles, self.simulation.numerics.sampling_points_number
+            )
+            self.scattering_angles = self.scattering_angles[0, :]
+        else:
+            self.phase_function = self.phase_function_3d
+
+            self.degree_of_polarization = dop
+            self.degree_of_linear_polarization = dolp
+            self.degree_of_linear_polarization_q = dolq
+            self.degree_of_linear_polarization_u = dolu
+            self.degree_of_circular_polarization = docp
+
+        self.c_and_b_bounds = c_and_b
+        if isinstance(c_and_b, bool):
+            if c_and_b:
+                self.c_and_b_bounds = ([-1, 0], [1, 1])
+            else:
+                return
+
+        self.__compute_c_and_b()
+
+    def __data_batching(self, external_args: list, device_data: list[np.ndarray], to_split: list[np.ndarray], sizes: tuple, size_split_idx: int, idx_to_split: int, idx_per_array: list[int], cuda_kernel: cuda.compiler.AutoJitCUDAKernel, threads_per_block: tuple):
 
         start_idx = 0
         split_idx = 0
@@ -992,15 +1230,17 @@ class Optics:
                 for i in range(len(to_split)):
                     to_split[i] = to_split[i][split_idx+1:,:]
 
-
             split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[0])
             if split_idx < 1:
                 break
 
             split_data = []
             for i in range(len(to_split)):
-                split_data.append(np.take(to_split[i],(start_idx,start_idx+split_idx+1), axis=idx_to_split[i]))
+                split_data.append(np.take(to_split[i],range(start_idx,start_idx+split_idx), axis=idx_per_array[i]))
 
+            sizes2 = list(sizes)
+            sizes2[size_split_idx] = len(range(start_idx,(start_idx+split_idx)))
+            sizes = tuple(sizes2)
             blocks_per_grid = tuple(
                 ceil(sizes[k] / threads_per_block[k])
                 for k in range(len(threads_per_block))
@@ -1011,12 +1251,8 @@ class Optics:
                 batched_device_data.append(cuda.to_device(to_split[i]))
 
 
-            cuda_kernel[blocks_per_grid, threads_per_block](
-                device_data,
-                batched_device_data,
-                threads_per_block,
-                blocks_per_grid,
-            )
+            arg_list = external_args + device_data + batched_device_data
+            cuda_kernel[blocks_per_grid, threads_per_block](*arg_list)
             # receive batched data results
             for i in range(len(batched_device_data)):
                 res[i][start_idx:start_idx+split_idx] = batched_device_data[i].copy_to_host()
@@ -1027,38 +1263,6 @@ class Optics:
                 done = True
 
         return res
-
-    def __test_wrapper_e_field_angular(self, device_data: list[np.ndarray], batched_device_data: list[np.ndarray], threads_per_block, blocks_per_grid):
-
-        particles_position_device = device_data[0]
-        idx_device = device_data[1]
-        sfc_device = device_data[2]
-        k_medium_device = device_data[3]
-
-        azimuthal_angles_device = batched_device_data[0]
-        e_r_device = batched_device_data[1]
-        pilm_device = batched_device_data[2]
-        taulm_device = batched_device_data[3]
-        e_field_theta_real_device = batched_device_data[4]
-        e_field_theta_imag_device = batched_device_data[5]
-        e_field_phi_real_device = batched_device_data[6]
-        e_field_phi_imag_device = batched_device_data[7]
-
-        compute_electric_field_angle_components_gpu[blocks_per_grid, threads_per_block](
-            self.simulation.numerics.lmax,
-            particles_position_device,
-            idx_device,
-            sfc_device,
-            k_medium_device,
-            azimuthal_angles_device,
-            e_r_device,
-            pilm_device,
-            taulm_device,
-            e_field_theta_real_device,
-            e_field_theta_imag_device,
-            e_field_phi_real_device,
-            e_field_phi_imag_device,
-        )
 
     def __compute_data_split(self, data: list[np.ndarray], idx_list: list, threads_per_block: int) -> int:
 
