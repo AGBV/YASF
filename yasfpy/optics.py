@@ -709,14 +709,17 @@ class Optics:
                     #     to_split[i] = to_split[i].take(indices=range(start_idx,idx_to_split), axis=idx_per_array[i])
 
                 split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[1])
+                print(f"{split_idx =}")
                 if split_idx < 1:
                     break
 
                 split_device_data = []
                 for i in range(len(to_split)):
-                    split_device_data.append(cuda.to_device(np.take(to_split[i], (start_idx, start_idx+split_idx+1), axis=idx_per_array[i])))
+                    split_device_data.append(cuda.to_device(np.take(to_split[i], range(start_idx,start_idx+split_idx), axis=idx_per_array[i])))
+                    print(f"{to_split[i].shape = }")
+                    print(f"{np.take(to_split[i], range(start_idx, start_idx+split_idx), axis=idx_per_array[i]).shape}")
 
-                sizes = (jmax, len(range(start_idx,(start_idx+split_idx+1))), wavelengths)
+                sizes = (jmax, len(range(start_idx,(start_idx+split_idx))), wavelengths)
 
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
@@ -740,7 +743,7 @@ class Optics:
                     split_device_data[6],
                     split_device_data[7],
                 )
-
+                print(f"{start_idx = }")
                 e_field_theta_real[start_idx:start_idx+split_idx,:] = split_device_data[4].copy_to_host()
                 e_field_theta_imag[start_idx:start_idx+split_idx,:] = split_device_data[5].copy_to_host()
                 e_field_phi_real[start_idx:start_idx+split_idx,:] = split_device_data[6].copy_to_host()
@@ -749,6 +752,8 @@ class Optics:
                 _ = split_device_data[1].copy_to_host()
                 _ = split_device_data[2].copy_to_host()
                 _ = split_device_data[3].copy_to_host()
+
+                cuda.current_context().memory_manager.deallocations.clear()
 
                 # update start_idx
                 start_idx += split_idx+1
@@ -979,11 +984,11 @@ class Optics:
 
     def __compute_data_split(self, data: list[np.ndarray], idx_list: list, threads_per_block: int) -> int:
 
-        # buffer = 10000 # buffer to accomodate for varying GPU mem usage
+        buffer = 1000000000 # buffer to accomodate for varying GPU mem usage
         device = cuda.select_device(0)
         handle = cuda.cudadrv.devices.get_context()
         mem_info = cuda.cudadrv.driver.Context(device,handle).get_memory_info()
-        free_bytes = mem_info.free
+        free_bytes = mem_info.free-buffer
         total_data_bytes = 0
         for array in data:
             total_data_bytes += array.size*array.itemsize
