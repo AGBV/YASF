@@ -172,7 +172,9 @@ class Numerics:
             self.log.info("Found translation table and loaded it!")
         else:
             if not force_compute:
-                self.log.warning(f"Didnt find translation_ab5 table in specified directory: {dpath}")
+                self.log.warning(
+                    f"Didnt find translation_ab5 table in specified directory: {dpath}"
+                )
 
             self.log.scatter("Computing the translation table")
             jmax = jmult_max(1, self.lmax)
@@ -189,9 +191,9 @@ class Numerics:
 
             # Could be paralilized around jmax^2!
             # Speed-up using the index lookup table (compute_idx_lookups) instead of single_index2multi.
-            for j in range(0, jmax ** 2):
+            for j in range(0, jmax**2):
                 j1 = j // jmax
-                j2 = j  % jmax
+                j2 = j % jmax
                 _, tau1, l1, m1 = single_index2multi(j1, self.lmax)
                 _, tau2, l2, m2 = single_index2multi(j2, self.lmax)
                 for p in range(0, 2 * self.lmax + 1):
@@ -199,63 +201,32 @@ class Numerics:
                         self.translation_ab5[j1, j2, p] = (
                             np.power(
                                 1j,
-                                abs(m1 - m2)
-                                - abs(m1)
-                                - abs(m2)
-                                + l2
-                                - l1
-                                + p,
+                                abs(m1 - m2) - abs(m1) - abs(m2) + l2 - l1 + p,
                             )
                             * np.power(-1.0, m1 - m2)
                             * np.sqrt(
                                 (2 * l1 + 1)
                                 * (2 * l2 + 1)
-                                / (
-                                    2
-                                    * l1
-                                    * (l1 + 1)
-                                    * l2
-                                    * (l2 + 1)
-                                )
+                                / (2 * l1 * (l1 + 1) * l2 * (l2 + 1))
                             )
-                            * (
-                                l1 * (l1 + 1)
-                                + l2 * (l2 + 1)
-                                - p * (p + 1)
-                            )
+                            * (l1 * (l1 + 1) + l2 * (l2 + 1) - p * (p + 1))
                             * np.sqrt(2 * p + 1)
                             * wig.wig3jj_array(
-                                2
-                                * np.array(
-                                    [l1, l2, p, m1, -m2, -m1 + m2]
-                                )
+                                2 * np.array([l1, l2, p, m1, -m2, -m1 + m2])
                             )
-                            * wig.wig3jj_array(
-                                2 * np.array([l1, l2, p, 0, 0, 0])
-                            )
+                            * wig.wig3jj_array(2 * np.array([l1, l2, p, 0, 0, 0]))
                         )
                     elif p > 0:
                         self.translation_ab5[j1, j2, p] = (
                             np.power(
                                 1j,
-                                abs(m1 - m2)
-                                - abs(m1)
-                                - abs(m2)
-                                + l2
-                                - l1
-                                + p,
+                                abs(m1 - m2) - abs(m1) - abs(m2) + l2 - l1 + p,
                             )
                             * np.power(-1.0, m1 - m2)
                             * np.sqrt(
                                 (2 * l1 + 1)
                                 * (2 * l2 + 1)
-                                / (
-                                    2
-                                    * l1
-                                    * (l1 + 1)
-                                    * l2
-                                    * (l2 + 1)
-                                )
+                                / (2 * l1 * (l1 + 1) * l2 * (l2 + 1))
                             )
                             * np.lib.scimath.sqrt(
                                 (l1 + l2 + 1 + p)
@@ -265,15 +236,9 @@ class Numerics:
                                 * (2 * p + 1)
                             )
                             * wig.wig3jj_array(
-                                2
-                                * np.array(
-                                    [l1, l2, p, m1, -m2, -m1 + m2]
-                                )
+                                2 * np.array([l1, l2, p, m1, -m2, -m1 + m2])
                             )
-                            * wig.wig3jj_array(
-                                2
-                                * np.array([l1, l2, p - 1, 0, 0, 0])
-                            )
+                            * wig.wig3jj_array(2 * np.array([l1, l2, p - 1, 0, 0, 0]))
                         )
 
             wig.wig_table_free()
