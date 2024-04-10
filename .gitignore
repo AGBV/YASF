@@ -3,7 +3,7 @@ docs/todo_gen.md
 
 # Ignore wheel files
 /*.whl
-
+yasfpy/data
 # Ignore current project files
 src/optics.py
 

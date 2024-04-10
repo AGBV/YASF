@@ -4,6 +4,11 @@ from typing import Union, Callable
 import numpy as np
 import pywigxjpf as wig
 
+from pathlib import Path
+import pickle, os
+from importlib.resources import files
+
+
 from yasfpy.functions.misc import jmult_max
 from yasfpy.functions.misc import multi2single_index
 from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
@@ -149,6 +154,26 @@ class Numerics:
         The function computes the coefficients for the associated Legendre polynomials.
         """
         self.__plm_coefficients()
+
+    def load_translation_table(self):
+        dpath = Path(f"{files(__package__) / 'data'}")
+        if not os.path.exists(dpath):
+            os.makedirs(dpath)
+
+        if os.path.isfile(dpath / f"lmax{self.lmax}.pickle"):
+            data_raw = dpath.joinpath(Path(f'lmax{self.lmax}.pickle')).read_bytes()
+            data = pickle.loads(data_raw)
+            self.translation_ab5 = data["wig"]
+            print("Found translation table and loaded it!")
+        else:
+            print(f"Didnt find translation_ab5 table in specified directory: {dpath}")
+            print("Calculating required data")
+            self.compute_translation_table()
+            res = {"wig": self.translation_ab5}
+            with open(dpath / f"lmax{self.lmax}.pickle", "wb") as f:
+                pickle.dump(res,f)
+            print("Calculated translation table!")
+
 
     def compute_translation_table(self):
         """
