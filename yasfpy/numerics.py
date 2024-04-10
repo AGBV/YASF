@@ -161,7 +161,7 @@ class Numerics:
             os.makedirs(dpath)
 
         if os.path.isfile(dpath / f"lmax{self.lmax}.pickle"):
-            data_raw = dpath.joinpath(Path(f'lmax{self.lmax}.pickle')).read_bytes()
+            data_raw = dpath.joinpath(Path(f"lmax{self.lmax}.pickle")).read_bytes()
             data = pickle.loads(data_raw)
             self.translation_ab5 = data["wig"]
             print("Found translation table and loaded it!")
@@ -171,9 +171,8 @@ class Numerics:
             self.compute_translation_table()
             res = {"wig": self.translation_ab5}
             with open(dpath / f"lmax{self.lmax}.pickle", "wb") as f:
-                pickle.dump(res,f)
+                pickle.dump(res, f)
             print("Calculated translation table!")
-
 
     def compute_translation_table(self):
         """
