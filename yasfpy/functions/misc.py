@@ -17,7 +17,7 @@ def jmult_max(num_part, lmax):
     Returns:
         (int): The maximum value of jmult.
     """
-    return 2 * num_part * lmax * (lmax + 2)
+    return num_part * 2 * lmax * (lmax + 2)
 
 
 def multi2single_index(j_s, tau, l, m, lmax):
@@ -25,11 +25,11 @@ def multi2single_index(j_s, tau, l, m, lmax):
     Converts the multi-index (j_s, tau, l, m) to a single index.
 
     Args:
-        j_s (int): The value of j_s.
-        tau (int): The value of tau.
-        l (int): The value of l.
-        m (int): The value of m.
-        lmax (int): The maximum value of l.
+        j_s (int): Particle index.
+        tau (int): Polarization value (1 or 2).
+        l (int): The value of l (between 0 and lmax).
+        m (int): The value of m (between -l and l).
+        lmax (int): Cutoff value for the field expansion.
 
     Returns:
         (int): The single index corresponding to the multi-index (j_s, tau, l, m).
@@ -49,13 +49,13 @@ def single_index2multi(idx, lmax):
 
     Args:
         idx (int): The single index.
-        lmax (int): The maximum angular momentum quantum number.
+        lmax (int): Cutoff value for the field expansion.
 
     Returns:
-        j_s (int): The spin index.
-        tau (int): The isospin index.
-        l (float): The orbital angular momentum quantum number.
-        m (int): The magnetic quantum number.
+        j_s (int): Particle index.
+        tau (int): Polarization value (1 or 2).
+        l (float): The value of l (between 0 and lmax).
+        m (int): The value of m (between -l and l).
     """
     j_s = idx // (2 * lmax * (lmax + 2))
     idx_new = idx % (2 * lmax * (lmax + 2))
