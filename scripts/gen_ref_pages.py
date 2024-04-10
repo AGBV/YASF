@@ -39,9 +39,7 @@ for path in sorted(src.rglob("*.py")):
             f"""---
             comments: true
             ---
-            ::: {ident}""".replace(
-                "    ", ""
-            )
+            ::: {ident}""".replace("    ", "")
         )
 
     mkdocs_gen_files.set_edit_path(full_doc_path, path)

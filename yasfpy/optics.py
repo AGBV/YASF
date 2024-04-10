@@ -918,7 +918,6 @@ class Optics:
         cuda_kernel: Callable,
         threads_per_block: tuple,
     ):
-
         total_bytes = 0
         for array in to_split:
             total_bytes += array.size * array.itemsize
@@ -943,7 +942,6 @@ class Optics:
         print(f"Need to process {total_bytes*1e-9} GB of data")
 
         while not done:
-
             split_idx = self.__compute_data_split(
                 to_split,
                 idx_list=idx_per_array,
@@ -1011,7 +1009,6 @@ class Optics:
     def __compute_data_split(
         self, data: list[np.ndarray], idx_list: list, threads_per_block: int
     ) -> int:
-
         device = cuda.select_device(0)
         handle = cuda.cudadrv.devices.get_context()
         mem_info = cuda.cudadrv.driver.Context(device, handle).get_memory_info()
