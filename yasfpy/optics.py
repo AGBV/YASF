@@ -437,8 +437,7 @@ class Optics:
             )
         if 1 - integral / (4 * np.pi) > precision:
             return False
-        else:
-            return True
+        return True
 
     def compute_asymmetry(self):
         """Computes the asymmetry parameter by numerical integration over the phase function.

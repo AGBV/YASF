@@ -554,7 +554,7 @@ class Simulation:
         if sampling_points.shape[0] < 1:
             self.log.error("Number of sampling points must be bigger than zero!")
             return
-        elif sampling_points.shape[1] != 3:
+        if sampling_points.shape[1] != 3:
             self.log.error("The points have to have three coordinates (x,y,z)!")
             return
 
