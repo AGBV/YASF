@@ -697,7 +697,6 @@ class Optics:
             while not done:
 
                 split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[1])
-                print(f"{split_idx =}")
                 if split_idx < 1:
                     break
 
@@ -750,7 +749,11 @@ class Optics:
             e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
             e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
 
+
+            print("...................................................")
             print("Done with e field calculations...")
+            print("...................................................")
+
             # continue with next calculation
 
             intensity = np.zeros_like(e_field_theta_real)
@@ -1046,7 +1049,9 @@ class Optics:
             e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
             e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
 
+            print("...................................................")
             print("Done with e field calculations...")
+            print("...................................................")
             # continue with next calculation
 
             intensity = np.zeros_like(e_field_theta_real)
@@ -1055,6 +1060,7 @@ class Optics:
             dolq = np.zeros_like(e_field_theta_real)
             dolu = np.zeros_like(e_field_theta_real)
             docp = np.zeros_like(e_field_theta_real)
+
 
             to_split = [
                     np.ascontiguousarray(e_field_theta_real),
@@ -1071,22 +1077,16 @@ class Optics:
             ]
             threads_per_block = (1024, 1) # this allows ~65000 wavelengths, limits required batching
 
-            start_idx = 0
-            split_idx = 0
             idx_per_array = [0]*len(to_split)
 
-            sizes = (split_idx, wavelengths)
-            blocks_per_grid = tuple(
-                ceil(sizes[k] / threads_per_block[k])
-                for k in range(len(threads_per_block))
-            )
+            sizes = (angles, wavelengths)
             size_idx_split = 0
 
             external_args = [
                 self.simulation.parameters.k_medium.size,
                 self.simulation.numerics.azimuthal_angles.size,
             ]
-            res = self.__data_batching(external_args, device_data,to_split,sizes,size_idx_split, idx_to_split, idx_per_array, compute_polarization_components_gpu, blocks_per_grid)
+            res = self.__data_batching(external_args,[],to_split,sizes,size_idx_split, idx_to_split, idx_per_array, compute_polarization_components_gpu, threads_per_block)
 
             intensity = res[4]
             dop = res[5]
@@ -1094,7 +1094,6 @@ class Optics:
             dolq = res[7]
             dolu = res[8]
             docp = res[9]
-
 
         self.scattering_angles = self.simulation.numerics.polar_angles
         k_medium = self.simulation.parameters.k_medium
@@ -1224,19 +1223,30 @@ class Optics:
         split_idx = 0
         done = False
 
+        # build arrays for results
+        # axis along which we split needs to be zero
         res = []
         for i in range(len(to_split)):
-            res.append(np.empty(to_split[i].shape,float))
+            needed_shape = list(to_split[i].shape)
+            needed_shape[idx_per_array[i]] = 0
+            needed_shape = tuple(needed_shape)
+            res.append(np.empty(needed_shape,float))
+
+
+        print(f"Need to process {total_bytes*1e-9} GB of data")
 
         while not done:
 
             split_idx = self.__compute_data_split(to_split, idx_list=idx_per_array, threads_per_block=threads_per_block[size_split_idx])
             if split_idx < 1:
                 break
+            if split_idx+start_idx > idx_to_split:
+                print("End, reset split_idx")
+                split_idx = idx_to_split - start_idx
 
             split_data = []
             for i in range(len(to_split)):
-                split_data.append(np.take(to_split[i],range(start_idx,start_idx+split_idx-1), axis=idx_per_array[i]))
+                split_data.append(np.take(to_split[i],range(start_idx,start_idx+split_idx), axis=idx_per_array[i]))
 
             # check total size of data to be put on GPU
             used_bytes = 0
@@ -1245,8 +1255,9 @@ class Optics:
             total_bytes -= used_bytes
             print(f"{total_bytes*1e-9} GB of data remaining")
 
+            # modify number of blocks per grid needed for kernel with current split
             sizes2 = list(sizes)
-            sizes2[size_split_idx] = len(range(start_idx,(start_idx+split_idx-1)))
+            sizes2[size_split_idx] = len(range(start_idx,(start_idx+split_idx)))
             sizes = tuple(sizes2)
             blocks_per_grid = tuple(
                 ceil(sizes[k] / threads_per_block[k])
@@ -1270,7 +1281,7 @@ class Optics:
             del batched_device_data, split_data, arg_list
 
             # update start_idx
-            start_idx += split_idx+1
+            start_idx += split_idx
             if start_idx >= idx_to_split:
                 done = True
 
@@ -1282,7 +1293,6 @@ class Optics:
             handle = cuda.cudadrv.devices.get_context()
             mem_info = cuda.cudadrv.driver.Context(device,handle).get_memory_info()
             buffer = 0.05*mem_info.total  # buffer to accomodate for varying GPU mem usage
-            print(f"{buffer = }")
             free_bytes = mem_info.free-buffer
             total_data_bytes = 0
             for array in data:
@@ -1308,7 +1318,6 @@ class Optics:
             print(f"{free_bytes*1e-9} GB of data available on GPU")
             print(f"Unused GPU memory: {(free_bytes-total_data_bytes)*1e-6} MB")
 
-            print(f"{num//threads_per_block} > {2**16-1}?")
             if num//threads_per_block > 2**16-1:
                 num = (2**16-1)*threads_per_block
                 print("Need to limit number of blocks due to limited number of blocks per grid!")
