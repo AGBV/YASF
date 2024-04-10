@@ -5,6 +5,8 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 import YASF.yasfpy.log as log
 
+
+from importlib.resources import files
 from typing import Union, Callable
 import numpy as np
 import pywigxjpf as wig
@@ -157,16 +159,17 @@ class Numerics:
         self.__plm_coefficients()
 
     def check_for_translation_table(self, directory: Path):
+        # check if data directory exists, else create it
+        print("::::")
+        print(Path(__file__).parent.resolve())
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        # this is supposed to be used to load the data
+
         if os.path.isfile(directory / f"lmax{self.lmax}.pickle"):
-            with open(directory / f"lmax{self.lmax}.pickle", "rb") as f:
-                data = pickle.load(f)
+            data_raw = files('yasfpy.data').joinpath(f'lmax{self.lmax}.pickle').read_bytes()
+            data = pickle.loads(data_raw)
             self.translation_ab5 = data["wig"]
-            print("Found translation table and loaded it!")
-        elif os.path.isfile(directory / f"lmax{self.lmax}.dat"):
-            f_data = [i.strip().strip("i").replace("E","e").split() for i in open(directory / f"lmax{self.lmax}.dat").readlines()]
-            dshape = tuple([int(f_data[0][0]), int(f_data[0][1]), int(f_data[1][0])])
-            f1 = [complex(float(i[0]),float(i[1])) for i in f_data[2:]]
-            self.translation_ab5 = np.array(f1).reshape(dshape)
             print("Found translation table and loaded it!")
         else:
             print(f"Didnt find translation table in specified directory: {directory}")
@@ -176,6 +179,26 @@ class Numerics:
             with open(f"lmax{self.lmax}", "wb") as f:
                 pickle.dump(res,f)
             print("Calculated translation table!")
+
+        # if os.path.isfile(directory / f"lmax{self.lmax}.pickle"):
+        #     with open(directory / f"lmax{self.lmax}.pickle", "rb") as f:
+        #         data = pickle.load(f)
+        #     self.translation_ab5 = data["wig"]
+        #     print("Found translation table and loaded it!")
+        # elif os.path.isfile(directory / f"lmax{self.lmax}.dat"):
+        #     f_data = [i.strip().strip("i").replace("E","e").split() for i in open(directory / f"lmax{self.lmax}.dat").readlines()]
+        #     dshape = tuple([int(f_data[0][0]), int(f_data[0][1]), int(f_data[1][0])])
+        #     f1 = [complex(float(i[0]),float(i[1])) for i in f_data[2:]]
+        #     self.translation_ab5 = np.array(f1).reshape(dshape)
+        #     print("Found translation table and loaded it!")
+        # else:
+        #     print(f"Didnt find translation table in specified directory: {directory}")
+        #     print("Starting calculation")
+        #     self.compute_translation_table()
+        #     res = {"wig": self.translation_ab5}
+        #     with open(f"lmax{self.lmax}", "wb") as f:
+        #         pickle.dump(res,f)
+        #     print("Calculated translation table!")
 
     def compute_translation_table(self):
         """
