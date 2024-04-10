@@ -106,7 +106,7 @@ def legendre_normalized_trigon_legacy(x, y=None, lmax=4):
     import numpy as np
 
     plm = sym.zeros(lmax + 1, lmax + 1)
-    if y == None:
+    if y is None:
         ct = sym.cos(x)
         st = sym.sin(x)
     elif isinstance(x, sym.core.symbol.Symbol) and isinstance(

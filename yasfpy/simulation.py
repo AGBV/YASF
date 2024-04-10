@@ -399,7 +399,7 @@ class Simulation:
 
         idx_lookup = self.idx_lookup
 
-        if idx != None:
+        if idx is not None:
             spherical_hankel_lookup = spherical_hankel_lookup[:, :, :, idx]
             spherical_hankel_lookup = np.copy(
                 spherical_hankel_lookup[:, :, :, np.newaxis]
@@ -472,7 +472,7 @@ class Simulation:
                 "\t Time taken for coupling matrix: %f" % (time_end - preparation_time)
             )
 
-        if idx != None:
+        if idx is not None:
             wx = np.squeeze(wx)
 
         return wx
