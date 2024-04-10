@@ -10,7 +10,7 @@ from importlib.resources import files
 
 
 from yasfpy.functions.misc import jmult_max
-from yasfpy.functions.misc import multi2single_index
+from yasfpy.functions.misc import single_index2multi
 from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
 
@@ -155,7 +155,7 @@ class Numerics:
         """
         self.__plm_coefficients()
 
-    def compute_translation_table(self):
+    def compute_translation_table(self, force_compute=False):
         """
         The function computes a translation table using Wigner 3j symbols and stores the results in a
         numpy array.
@@ -165,14 +165,14 @@ class Numerics:
         if not os.path.exists(dpath):
             os.makedirs(dpath)
 
-        if os.path.isfile(dpath / f"lmax{self.lmax}.pickle"):
+        if os.path.isfile(dpath / f"lmax{self.lmax}.pickle") and not force_compute:
             data_raw = dpath.joinpath(Path(f"lmax{self.lmax}.pickle")).read_bytes()
             data = pickle.loads(data_raw)
             self.translation_ab5 = data["wig"]
-            print("Found translation table and loaded it!")
+            self.log.info("Found translation table and loaded it!")
         else:
-            print(f"Didnt find translation_ab5 table in specified directory: {dpath}")
-            print("Calculating required data")
+            if not force_compute:
+                self.log.warning(f"Didnt find translation_ab5 table in specified directory: {dpath}")
 
             self.log.scatter("Computing the translation table")
             jmax = jmult_max(1, self.lmax)
@@ -182,102 +182,99 @@ class Numerics:
 
             # No idea why or how this value for max_two_j works,
             # but got it through trial and error.
-            # If you get any Wigner errors, change this value (e.g. 3*lmax)
+            # If you get any Wigner errors, change this value (e.g. 4*lmax or lmax**2)
             max_two_j = 3 * self.lmax
             wig.wig_table_init(max_two_j, 3)
             wig.wig_temp_init(max_two_j)
 
-            # Needs to be paralilized or the loop needs to be shortened!
-            # Probably using one/two loop(s) and index using the lookup table.
-            for tau1 in range(1, 3):
-                for l1 in range(1, self.lmax + 1):
-                    for m1 in range(-l1, l1 + 1):
-                        j1 = multi2single_index(0, tau1, l1, m1, self.lmax)
-                        for tau2 in range(1, 3):
-                            for l2 in range(1, self.lmax + 1):
-                                for m2 in range(-l2, l2 + 1):
-                                    j2 = multi2single_index(0, tau2, l2, m2, self.lmax)
-                                    for p in range(0, 2 * self.lmax + 1):
-                                        if tau1 == tau2:
-                                            self.translation_ab5[j1, j2, p] = (
-                                                np.power(
-                                                    1j,
-                                                    abs(m1 - m2)
-                                                    - abs(m1)
-                                                    - abs(m2)
-                                                    + l2
-                                                    - l1
-                                                    + p,
-                                                )
-                                                * np.power(-1.0, m1 - m2)
-                                                * np.sqrt(
-                                                    (2 * l1 + 1)
-                                                    * (2 * l2 + 1)
-                                                    / (
-                                                        2
-                                                        * l1
-                                                        * (l1 + 1)
-                                                        * l2
-                                                        * (l2 + 1)
-                                                    )
-                                                )
-                                                * (
-                                                    l1 * (l1 + 1)
-                                                    + l2 * (l2 + 1)
-                                                    - p * (p + 1)
-                                                )
-                                                * np.sqrt(2 * p + 1)
-                                                * wig.wig3jj_array(
-                                                    2
-                                                    * np.array(
-                                                        [l1, l2, p, m1, -m2, -m1 + m2]
-                                                    )
-                                                )
-                                                * wig.wig3jj_array(
-                                                    2 * np.array([l1, l2, p, 0, 0, 0])
-                                                )
-                                            )
-                                        elif p > 0:
-                                            self.translation_ab5[j1, j2, p] = (
-                                                np.power(
-                                                    1j,
-                                                    abs(m1 - m2)
-                                                    - abs(m1)
-                                                    - abs(m2)
-                                                    + l2
-                                                    - l1
-                                                    + p,
-                                                )
-                                                * np.power(-1.0, m1 - m2)
-                                                * np.sqrt(
-                                                    (2 * l1 + 1)
-                                                    * (2 * l2 + 1)
-                                                    / (
-                                                        2
-                                                        * l1
-                                                        * (l1 + 1)
-                                                        * l2
-                                                        * (l2 + 1)
-                                                    )
-                                                )
-                                                * np.lib.scimath.sqrt(
-                                                    (l1 + l2 + 1 + p)
-                                                    * (l1 + l2 + 1 - p)
-                                                    * (p + l1 - l2)
-                                                    * (p - l1 + l2)
-                                                    * (2 * p + 1)
-                                                )
-                                                * wig.wig3jj_array(
-                                                    2
-                                                    * np.array(
-                                                        [l1, l2, p, m1, -m2, -m1 + m2]
-                                                    )
-                                                )
-                                                * wig.wig3jj_array(
-                                                    2
-                                                    * np.array([l1, l2, p - 1, 0, 0, 0])
-                                                )
-                                            )
+            # Could be paralilized around jmax^2!
+            # Speed-up using the index lookup table (compute_idx_lookups) instead of single_index2multi.
+            for j in range(0, jmax ** 2):
+                j1 = j // jmax
+                j2 = j  % jmax
+                _, tau1, l1, m1 = single_index2multi(j1, self.lmax)
+                _, tau2, l2, m2 = single_index2multi(j2, self.lmax)
+                for p in range(0, 2 * self.lmax + 1):
+                    if tau1 == tau2:
+                        self.translation_ab5[j1, j2, p] = (
+                            np.power(
+                                1j,
+                                abs(m1 - m2)
+                                - abs(m1)
+                                - abs(m2)
+                                + l2
+                                - l1
+                                + p,
+                            )
+                            * np.power(-1.0, m1 - m2)
+                            * np.sqrt(
+                                (2 * l1 + 1)
+                                * (2 * l2 + 1)
+                                / (
+                                    2
+                                    * l1
+                                    * (l1 + 1)
+                                    * l2
+                                    * (l2 + 1)
+                                )
+                            )
+                            * (
+                                l1 * (l1 + 1)
+                                + l2 * (l2 + 1)
+                                - p * (p + 1)
+                            )
+                            * np.sqrt(2 * p + 1)
+                            * wig.wig3jj_array(
+                                2
+                                * np.array(
+                                    [l1, l2, p, m1, -m2, -m1 + m2]
+                                )
+                            )
+                            * wig.wig3jj_array(
+                                2 * np.array([l1, l2, p, 0, 0, 0])
+                            )
+                        )
+                    elif p > 0:
+                        self.translation_ab5[j1, j2, p] = (
+                            np.power(
+                                1j,
+                                abs(m1 - m2)
+                                - abs(m1)
+                                - abs(m2)
+                                + l2
+                                - l1
+                                + p,
+                            )
+                            * np.power(-1.0, m1 - m2)
+                            * np.sqrt(
+                                (2 * l1 + 1)
+                                * (2 * l2 + 1)
+                                / (
+                                    2
+                                    * l1
+                                    * (l1 + 1)
+                                    * l2
+                                    * (l2 + 1)
+                                )
+                            )
+                            * np.lib.scimath.sqrt(
+                                (l1 + l2 + 1 + p)
+                                * (l1 + l2 + 1 - p)
+                                * (p + l1 - l2)
+                                * (p - l1 + l2)
+                                * (2 * p + 1)
+                            )
+                            * wig.wig3jj_array(
+                                2
+                                * np.array(
+                                    [l1, l2, p, m1, -m2, -m1 + m2]
+                                )
+                            )
+                            * wig.wig3jj_array(
+                                2
+                                * np.array([l1, l2, p - 1, 0, 0, 0])
+                            )
+                        )
 
             wig.wig_table_free()
             wig.wig_temp_free()
