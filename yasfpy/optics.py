@@ -316,7 +316,7 @@ class Optics:
         if check_phase_function:
             res = self.__check_phase_function()
             assert (
-                res == True
+                res is True
             ), "The phase function does have the desired precision. Please increase the amount of angles used."
 
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
@@ -804,7 +804,7 @@ class Optics:
         if check_phase_function:
             res = self.__check_phase_function()
             assert (
-                res == True
+                res is True
             ), "The phase function does have the desired precision. Please increase the amount of angles used."
 
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
