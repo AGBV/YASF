@@ -176,7 +176,9 @@ class Numerics:
 
             self.log.scatter("Computing the translation table")
             jmax = jmult_max(1, self.lmax)
-            self.translation_ab5 = np.zeros((jmax, jmax, 2 * self.lmax + 1), dtype=complex)
+            self.translation_ab5 = np.zeros(
+                (jmax, jmax, 2 * self.lmax + 1), dtype=complex
+            )
 
             # No idea why or how this value for max_two_j works,
             # but got it through trial and error.
@@ -211,7 +213,13 @@ class Numerics:
                                                 * np.sqrt(
                                                     (2 * l1 + 1)
                                                     * (2 * l2 + 1)
-                                                    / (2 * l1 * (l1 + 1) * l2 * (l2 + 1))
+                                                    / (
+                                                        2
+                                                        * l1
+                                                        * (l1 + 1)
+                                                        * l2
+                                                        * (l2 + 1)
+                                                    )
                                                 )
                                                 * (
                                                     l1 * (l1 + 1)
@@ -244,7 +252,13 @@ class Numerics:
                                                 * np.sqrt(
                                                     (2 * l1 + 1)
                                                     * (2 * l2 + 1)
-                                                    / (2 * l1 * (l1 + 1) * l2 * (l2 + 1))
+                                                    / (
+                                                        2
+                                                        * l1
+                                                        * (l1 + 1)
+                                                        * l2
+                                                        * (l2 + 1)
+                                                    )
                                                 )
                                                 * np.lib.scimath.sqrt(
                                                     (l1 + l2 + 1 + p)
@@ -260,7 +274,8 @@ class Numerics:
                                                     )
                                                 )
                                                 * wig.wig3jj_array(
-                                                    2 * np.array([l1, l2, p - 1, 0, 0, 0])
+                                                    2
+                                                    * np.array([l1, l2, p - 1, 0, 0, 0])
                                                 )
                                             )
 
