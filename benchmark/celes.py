@@ -15,8 +15,10 @@ from yasfpy.simulation import Simulation
 
 data = {}
 
+
 def celes_setup():
     pass
+
 
 def celes_run():
     path = f"tests/data/celes_*.fits"
@@ -30,9 +32,7 @@ def celes_run():
         f = fits.open(data_file)
         positions = np.array([f[1].data[c] for c in ["x", "y", "z"]]).transpose()
         radii = f[1].data["r"]
-        refractive_indices = np.array(
-            [f[1].data[c] for c in ["n", "k"]]
-        ).transpose()
+        refractive_indices = np.array([f[1].data[c] for c in ["n", "k"]]).transpose()
 
         beam_width = f[3].header["HIERARCH BEAM WIDTH"]
         polar_angle = f[3].header["HIERARCH POLAR ANGLE"]
@@ -54,9 +54,7 @@ def celes_run():
         polar_angles = f[7].data["polar_angles_array"][:npol]
         azimuthal_angles = f[7].data["azimuthal_angles_array"][:nazi]
 
-        particles = Particles(
-            positions, radii, refractive_indices
-        )
+        particles = Particles(positions, radii, refractive_indices)
         initial_field = InitialField(
             beam_width=f[3].header["HIERARCH BEAM WIDTH"],
             focal_point=np.array((0, 0, 0)),
@@ -86,9 +84,7 @@ def celes_run():
             solver=solver,
         )
 
-        simulation = Simulation(
-            parameters, numerics
-        )
+        simulation = Simulation(parameters, numerics)
 
         numerics.compute_translation_table()
 
@@ -101,8 +97,11 @@ def celes_run():
 
         f.close()
 
+
 runner = pyperf.Runner()
-runner.timeit(name="sort a sorted list",
-              stmt="sorted(s, key=f)",
-              setup="f = lambda x: x; s = list(range(1000))")
-runner.dump('bench2.json')
+runner.timeit(
+    name="sort a sorted list",
+    stmt="sorted(s, key=f)",
+    setup="f = lambda x: x; s = list(range(1000))",
+)
+runner.dump("bench2.json")
