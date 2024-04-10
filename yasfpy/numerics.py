@@ -161,22 +161,22 @@ class Numerics:
     def check_for_translation_table(self, directory: Path):
         # check if data directory exists, else create it
         print("::::")
-        print(Path(__file__).parent.resolve())
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        dpath = Path(f"{files(__package__) / 'data'}")
+        if not os.path.exists(dpath):
+            os.makedirs(dpath)
         # this is supposed to be used to load the data
 
-        if os.path.isfile(directory / f"lmax{self.lmax}.pickle"):
-            data_raw = files('yasfpy.data').joinpath(f'lmax{self.lmax}.pickle').read_bytes()
+        if os.path.isfile(dpath / f"lmax{self.lmax}.pickle"):
+            data_raw = dpath.joinpath(Path(f'lmax{self.lmax}.pickle')).read_bytes()
             data = pickle.loads(data_raw)
             self.translation_ab5 = data["wig"]
             print("Found translation table and loaded it!")
         else:
-            print(f"Didnt find translation table in specified directory: {directory}")
-            print("Starting calculation")
+            print(f"Didnt find translation_ab5 table in specified directory: {dpath}")
+            print("Calculating required data")
             self.compute_translation_table()
             res = {"wig": self.translation_ab5}
-            with open(f"lmax{self.lmax}", "wb") as f:
+            with open(dpath / f"lmax{self.lmax}.pickle", "wb") as f:
                 pickle.dump(res,f)
             print("Calculated translation table!")
 
