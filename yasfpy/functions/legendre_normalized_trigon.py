@@ -103,7 +103,6 @@ def legendre_normalized_trigon_legacy(x, y=None, lmax=4):
 
     """
     import sympy as sym
-    import numpy as np
 
     plm = sym.zeros(lmax + 1, lmax + 1)
     if y is None:

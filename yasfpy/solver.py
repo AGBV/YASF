@@ -99,9 +99,6 @@ class Solver:
         return value, err_code
 
 
-import numpy as np
-
-
 class GMResCounter(object):
     """
     The GMResCounter class is a helper class that counts the number of iterations and displays the
