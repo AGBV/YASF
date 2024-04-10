@@ -1095,6 +1095,26 @@ class Optics:
             dolu = res[8]
             docp = res[9]
 
+        else:
+            e_field_theta, e_field_phi = compute_electric_field_angle_components(
+                self.simulation.numerics.lmax,
+                self.simulation.parameters.particles.position,
+                self.simulation.idx_lookup,
+                self.simulation.scattered_field_coefficients,
+                self.simulation.parameters.k_medium,
+                self.simulation.numerics.azimuthal_angles,
+                self.simulation.numerics.e_r,
+                pilm,
+                taulm,
+            )
+
+            intensity, dop, dolp, dolq, dolu, docp = compute_polarization_components(
+                self.simulation.parameters.k_medium.size,
+                self.simulation.numerics.azimuthal_angles.size,
+                e_field_theta,
+                e_field_phi,
+            )
+
         self.scattering_angles = self.simulation.numerics.polar_angles
         k_medium = self.simulation.parameters.k_medium
         if type(self.simulation.parameters.k_medium) == pd.core.series.Series:
