@@ -918,7 +918,6 @@ class Optics:
         cuda_kernel: Callable,
         threads_per_block: tuple,
     ):
-
         total_bytes = 0
         for array in to_split:
             total_bytes += array.size * array.itemsize
@@ -934,8 +933,8 @@ class Optics:
         # build arrays for results
         # axis along which we split needs to be zero
         res = []
-        for i in range(len(to_split)):
-            needed_shape = list(to_split[i].shape)
+        for i, item in enumerate(to_split):
+            needed_shape = list(item.shape)
             needed_shape[idx_per_array[i]] = 0
             needed_shape = tuple(needed_shape)
             res.append(np.empty(needed_shape, float))
@@ -943,7 +942,6 @@ class Optics:
         print(f"Need to process {total_bytes*1e-9} GB of data")
 
         while not done:
-
             split_idx = self.__compute_data_split(
                 to_split,
                 idx_list=idx_per_array,
@@ -956,10 +954,10 @@ class Optics:
                 split_idx = idx_to_split - start_idx
 
             split_data = []
-            for i in range(len(to_split)):
+            for i, item in enumerate(to_split):
                 split_data.append(
                     np.take(
-                        to_split[i],
+                        item,
                         range(start_idx, start_idx + split_idx),
                         axis=idx_per_array[i],
                     )
@@ -991,10 +989,10 @@ class Optics:
             cuda_kernel[blocks_per_grid, threads_per_block](*arg_list)
 
             # receive batched data results
-            for i in range(len(batched_device_data)):
+            for i, item in enumerate(batched_device_data):
                 res[i] = np.append(
                     res[i],
-                    np.array(batched_device_data[i].copy_to_host()),
+                    np.array(item.copy_to_host()),
                     axis=idx_per_array[i],
                 )
 
@@ -1011,7 +1009,6 @@ class Optics:
     def __compute_data_split(
         self, data: list[np.ndarray], idx_list: list, threads_per_block: int
     ) -> int:
-
         device = cuda.select_device(0)
         handle = cuda.cudadrv.devices.get_context()
         mem_info = cuda.cudadrv.driver.Context(device, handle).get_memory_info()
@@ -1027,15 +1024,15 @@ class Optics:
         while total_data_bytes > free_bytes:
             new_data_bytes = 0
             num -= 1000
-            for i in range(len(data)):
-                temp_shape = data[i].shape
+            for i, item in enumerate(data):
+                temp_shape = item.shape
                 temp_size = 1
                 for s in temp_shape:
                     if s == idx:
                         temp_size *= num
                     else:
                         temp_size *= s
-                new_data_bytes += temp_size * data[i].itemsize
+                new_data_bytes += temp_size * item.itemsize
             total_data_bytes = new_data_bytes
 
         print(f"{free_bytes*1e-9} GB of data available on GPU")
