@@ -1,4 +1,5 @@
-import yasfpy.log as log
+import logging
+#import yasfpy.log as log
 from time import time
 
 import numpy as np
@@ -42,7 +43,8 @@ class Simulation:
         self.parameters = parameters
         self.numerics = numerics
 
-        self.log = log.scattering_logger(__name__)
+        # self.log = log.infoing_logger(__name__)
+        self.log = logging.getLogger(self.__class__.__module__)
         self.__setup()
 
     def legacy_compute_lookup_particle_distances(self):
@@ -173,7 +175,7 @@ class Simulation:
         #   self.sph_h, nan=0) + np.isnan(self.sph_h) * 1
 
         lookup_computation_time_stop = time()
-        self.log.scatter(
+        self.log.debug(
             "Computing lookup tables took %f s"
             % (lookup_computation_time_stop - lookup_computation_time_start)
         )
@@ -262,21 +264,21 @@ class Simulation:
         Attributes:
             initial_field_coefficients (np.ndarray): Initial field coefficients
         """
-        self.log.scatter("compute initial field coefficients ...")
+        self.log.info("compute initial field coefficients ...")
 
         if np.isfinite(self.parameters.initial_field.beam_width) and (
             self.parameters.initial_field.beam_width > 0
         ):
-            self.log.scatter("\t Gaussian beam ...")
+            self.log.info("\t Gaussian beam ...")
             if self.parameters.initial_field.normal_incidence:
                 self.__compute_initial_field_coefficients_wavebundle_normal_incidence()
             else:
                 self.log.error("\t this case is not implemented")
         else:
-            self.log.scatter("\t plane wave ...")
+            self.log.info("\t plane wave ...")
             self.__compute_initial_field_coefficients_planewave()
 
-        self.log.scatter("done")
+        self.log.info("done")
 
     def compute_right_hand_side(self):
         r"""
@@ -385,7 +387,7 @@ class Simulation:
             wx (np.ndarray): An array of shape (n, m, p), where n is the number of particles, m is the number of features for each
                 particle, and p is the number of wavelengths. It represents the coupling matrix `wx`.
         """
-        self.log.scatter("prepare particle coupling ... ")
+        self.log.debug("prepare particle coupling ... ")
         preparation_time = time()
 
         lmax = self.numerics.lmax
@@ -406,7 +408,7 @@ class Simulation:
             )
             wavelengths_size = 1
 
-        self.log.scatter("\t Starting Wx computation")
+        self.log.debug("\t Starting Wx computation")
         if self.numerics.gpu:
             wx_real = np.zeros(x.shape + (wavelengths_size,), dtype=float)
             wx_imag = np.zeros_like(wx_real)
@@ -444,11 +446,11 @@ class Simulation:
             wx = wx_real + 1j * wx_imag
             # particle_interaction.parallel_diagnostics(level=4)
             time_end = time()
-            self.log.scatter(
+            self.log.debug(
                 "\t Time taken for preparation: %f"
                 % (coupling_matrix_time - preparation_time)
             )
-            self.log.scatter(
+            self.log.debug(
                 "\t Time taken for coupling matrix: %f"
                 % (time_end - coupling_matrix_time)
             )
@@ -468,7 +470,7 @@ class Simulation:
                 e_j_dm_phi_loopup,
             )
             time_end = time()
-            self.log.scatter(
+            self.log.debug(
                 "\t Time taken for coupling matrix: %f" % (time_end - preparation_time)
             )
 
@@ -490,7 +492,7 @@ class Simulation:
         """
         wx = self.coupling_matrix_multiply(value, idx)
 
-        self.log.scatter("apply T-matrix ...")
+        self.log.debug("apply T-matrix ...")
         t_matrix_start = time()
 
         twx = (
@@ -502,7 +504,7 @@ class Simulation:
         mx = value - twx
 
         t_matrix_stop = time()
-        self.log.scatter(f"\t done in {t_matrix_stop - t_matrix_start} seconds.")
+        self.log.debug(f"\t done in {t_matrix_stop - t_matrix_start} seconds.")
 
         return mx
 
@@ -514,7 +516,7 @@ class Simulation:
                 the `right_hand_side` variable is used as the initial guess.
 
         """
-        self.log.scatter("compute scattered field coefficients ...")
+        self.log.info("compute scattered field coefficients ...")
         jmax = self.parameters.particles.number * self.numerics.nmax
         self.scattered_field_coefficients = np.zeros_like(
             self.initial_field_coefficients
@@ -533,7 +535,7 @@ class Simulation:
             )
             b = self.right_hand_side[:, :, w].ravel()
             x0 = guess[:, :, w].ravel()
-            self.log.scatter(
+            self.log.info(
                 "Solver run %d/%d" % (w + 1, self.parameters.wavelengths_number)
             )
             x, err_code = self.numerics.solver.run(A, b, x0)
@@ -676,6 +678,6 @@ class Simulation:
             )
 
         field_time_stop = time()
-        self.log.scatter(
+        self.log.info(
             f"\t Time taken for field calculation: {field_time_stop - field_time_start}"
         )

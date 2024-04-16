@@ -1,3 +1,4 @@
+import logging
 import yasfpy.log as log
 
 from typing import Union, Callable
@@ -55,7 +56,8 @@ class Numerics:
                 amplitudes. If no solver is provided, the default solver will be used.
 
         """
-        self.log = log.scattering_logger(__name__)
+        # self.log = log.scattering_logger(__name__)
+        self.log = logging.getLogger(self.__class__.__module__)
         self.lmax = lmax
 
         self.sampling_points_number = np.squeeze(sampling_points_number)
@@ -176,7 +178,7 @@ class Numerics:
                     f"Didnt find translation_ab5 table in specified directory: {dpath}"
                 )
 
-            self.log.scatter("Computing the translation table")
+            self.log.info("Computing the translation table")
             jmax = jmult_max(1, self.lmax)
             self.translation_ab5 = np.zeros(
                 (jmax, jmax, 2 * self.lmax + 1), dtype=complex
@@ -247,7 +249,7 @@ class Numerics:
             res = {"wig": self.translation_ab5}
             with open(dpath / f"lmax{self.lmax}.pickle", "wb") as f:
                 pickle.dump(res, f)
-            print("Calculated translation table!")
+            self.log.info("Calculated translation table!")
 
     @staticmethod
     def compute_fibonacci_sphere_points(n: int = 100):

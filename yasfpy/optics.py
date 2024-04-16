@@ -42,7 +42,7 @@ class Optics:
         self.c_ext = np.zeros_like(simulation.parameters.wavelength, dtype=complex)
         self.c_sca = np.zeros_like(simulation.parameters.wavelength, dtype=complex)
 
-        self.log = logging.getLogger(__name__)
+        self.log = logging.getLogger(self.__class__.__module__)
 
     def compute_cross_sections(self):
         """

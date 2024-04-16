@@ -1,4 +1,4 @@
-name: yasf-env
+name: yasf-env-test
 channels:
   - numba
   - conda-forge
