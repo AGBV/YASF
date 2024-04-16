@@ -16,6 +16,7 @@ from yasfpy.solver import Solver
 from yasfpy.numerics import Numerics
 from yasfpy.simulation import Simulation
 
+
 class TestCELES(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
