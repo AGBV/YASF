@@ -124,6 +124,7 @@ class Simulation:
         Notes:
             This function uses numba (https://numba.pydata.org/) under the hood to speed up the computations.
         """
+        print("WOOOOOOOOOOOOOOOOOOOOOOOOOO __compute_lookups, cool!")
         lookup_computation_time_start = time()
         # TODO: new, could be error prone and is not tested yet!
         self.sph_j, self.sph_h, self.e_j_dm_phi, self.plm = mutual_lookup(
@@ -191,6 +192,8 @@ class Simulation:
         - [__compute_idx_lookups][simulation.Simulation.__compute_idx_lookup]
         - [__compute_lookups][simulation.Simulation.__compute_lookups]
         """
+
+        print("WOOOOOOOOOOOOOOOOOOOOOOOOOO simulation.__setup.py, cool!")
         self.__compute_idx_lookup()
         self.__compute_lookups()
 

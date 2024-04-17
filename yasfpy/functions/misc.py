@@ -7,6 +7,7 @@ from YASF.yasfpy.particles import Particles
 from YASF.yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
 import numpy as np
+from time import monotonic
 from scipy.special import spherical_jn
 from scipy.special import hankel1, lpmv
 
@@ -178,6 +179,7 @@ def mutual_lookup(
     if parallel:
         from yasfpy.functions.cpu_numba import compute_lookup_tables
 
+        print("JA MOIN GRÜßE AUS BUXTEHUDE")
         spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm = compute_lookup_tables(
             lmax, size_parameter, phi, cosine_theta
         )
@@ -185,6 +187,17 @@ def mutual_lookup(
         p_range = np.arange(2 * lmax + 1)
         p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
         size_parameter_extended = size_parameter[np.newaxis, :, :, :]
+        print("Ayooooooooooo")
+        print(f"{p_range.shape = }")
+        print(f"{size_parameter_extended.shape = }")
+        print(np.mean(size_parameter_extended))
+        print(np.max(size_parameter_extended))
+        print(f"{len(np.unique(size_parameter_extended)) = }")
+        test = np.round(size_parameter_extended,4)
+        print(f"{len(np.unique(test)) = }")
+        test = np.round(size_parameter_extended,6)
+        print(f"{len(np.unique(test)) = }")
+        t = monotonic()
         spherical_hankel = np.sqrt(
             np.divide(
                 np.pi / 2,
@@ -193,7 +206,11 @@ def mutual_lookup(
                 where=size_parameter_extended != 0,
             )
         ) * hankel1(p_range + 1 / 2, size_parameter_extended)
+        print(f"Spherical hankel took {monotonic()-t}s!!")
+        print("JA MOIN GRÜßE AUS BUXTEHUDE")
+        t = monotonic()
         spherical_bessel = spherical_jn(p_range, size_parameter_extended)
+        print(f"Spherical bessel took {monotonic()-t}s!!")
 
         if derivatives:
             spherical_hankel_lower = np.sqrt(
