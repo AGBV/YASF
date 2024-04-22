@@ -4,7 +4,8 @@ from math import ceil
 import pandas as pd
 import numpy as np
 from numba import cuda
-import os,sys,time,copy
+import os,sys,copy
+from time import monotonic
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -983,6 +984,7 @@ class Optics:
                 that the `c` and `b` bounds should be computed. If `False`, the function will return
                 without computing the `c` and `b` bounds.
         """
+        print("YO IM CALCULATING THE PHASE FUNCTION")
         pilm, taulm = spherical_functions_trigon(
             self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
         )
@@ -1040,6 +1042,7 @@ class Optics:
             threads_per_block = (1, 16*16, 2)
             external_args = [self.simulation.numerics.lmax]
             sizes_idx_split = 1
+            print("Starting batching")
             res = self.__data_batching(external_args,device_data,to_split, sizes, sizes_idx_split, idx_to_split, idx_per_array, compute_electric_field_angle_components_gpu, threads_per_block)
             e_field_theta_real = res[4]
             e_field_theta_imag = res[5]
@@ -1096,6 +1099,7 @@ class Optics:
             docp = res[9]
 
         else:
+            print("WOOOOOOOOOOOOOOOOW")
             e_field_theta, e_field_phi = compute_electric_field_angle_components(
                 self.simulation.numerics.lmax,
                 self.simulation.parameters.particles.position,
@@ -1264,9 +1268,11 @@ class Optics:
                 print("End, reset split_idx")
                 split_idx = idx_to_split - start_idx
 
+            t = monotonic()
             split_data = []
             for i in range(len(to_split)):
                 split_data.append(np.take(to_split[i],range(start_idx,start_idx+split_idx), axis=idx_per_array[i]))
+            print(f"Splitting took {monotonic()-t}s")
 
             # check total size of data to be put on GPU
             used_bytes = 0
@@ -1285,17 +1291,22 @@ class Optics:
             )
 
             # send data to device
+            t = monotonic()
             batched_device_data = []
             for i in range(len(to_split)):
                 batched_device_data.append(cuda.to_device(split_data[i]))
-
+            print(f"Sending data to device took {monotonic()-t}s")
             # call kernel
             arg_list = external_args + device_data2 + batched_device_data
+            t = monotonic()
             cuda_kernel[blocks_per_grid, threads_per_block](*arg_list)
+            print(f"Kernel took {monotonic()-t}s")
 
             # receive batched data results
+            t = monotonic()
             for i in range(len(batched_device_data)):
                 res[i] = np.append(res[i],np.array(batched_device_data[i].copy_to_host()),axis=idx_per_array[i])
+            print(f"Copy data from GPU took {monotonic()-t}s")
 
             # deallocate objects that use data on gpu so that cuda will deallocate memory
             del batched_device_data, split_data, arg_list
