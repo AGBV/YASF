@@ -193,7 +193,7 @@ def mutual_lookup(
         print(np.mean(size_parameter_extended))
         print(np.max(size_parameter_extended))
         print(f"{len(np.unique(size_parameter_extended)) = }")
-        test = np.round(size_parameter_extended,4)
+        test = np.round(size_parameter_extended,8)
         print(f"{len(np.unique(test)) = }")
         test = np.round(size_parameter_extended,6)
         print(f"{len(np.unique(test)) = }")

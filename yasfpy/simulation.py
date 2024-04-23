@@ -13,6 +13,7 @@ from scipy.sparse.linalg import LinearOperator
 
 # from scipy.spatial.distance import pdist, squareform
 from scipy.special import spherical_jn, spherical_yn
+from time import monotonic
 
 # from scipy.special import hankel1
 # from scipy.special import lpmv
@@ -223,6 +224,7 @@ class Simulation:
 
         self.scatter_to_internal = np.zeros_like(self.mie_coefficients)
 
+        print(f"{self.parameters.particles.num_unique_pairs = }")
         for u_i in range(self.parameters.particles.num_unique_pairs):
             for tau in range(1, 3):
                 for l in range(1, self.numerics.lmax + 1):
@@ -299,6 +301,8 @@ class Simulation:
         -----
         For more information regarding the equation, please refer to the paper by Celes (https://arxiv.org/abs/1706.02145).
         """
+        print(f"{self.parameters.particles.single_unique_array_idx.shape = }")
+        print(f"{self.initial_field_coefficients.shape = }")
         self.right_hand_side = (
             self.mie_coefficients[self.parameters.particles.single_unique_array_idx, :]
             * self.initial_field_coefficients
@@ -327,6 +331,8 @@ class Simulation:
             - self.parameters.initial_field.focal_point
         )
         kvec = np.outer(np.array((sb * np.cos(alpha), sb * np.sin(alpha), cb)), k)
+        print(f"{relative_particle_positions.shape = }")
+        print(f"{kvec.shape = }")
         eikr = np.exp(1j * np.matmul(relative_particle_positions, kvec))
 
         # clean up some memory?
@@ -530,21 +536,26 @@ class Simulation:
         self.scattered_field_err_codes = np.zeros(self.parameters.wavelengths_number)
         if guess is None:
             guess = self.right_hand_side
+        print(f"{self.parameters.wavelengths_number = }")
         for w in range(self.parameters.wavelengths_number):
             # def mmm(x):
             #     return self.master_matrix_multiply(x, w)
 
             # A = LinearOperator(shape=(jmax, jmax), matvec=mmm)
 
+            t = monotonic()
             A = LinearOperator(
                 shape=(jmax, jmax), matvec=lambda x: self.master_matrix_multiply(x, w)
             )
+            print(f"Linear Op took: {monotonic()-t}s")
             b = self.right_hand_side[:, :, w].ravel()
             x0 = guess[:, :, w].ravel()
             self.log.scatter(
                 "Solver run %d/%d" % (w + 1, self.parameters.wavelengths_number)
             )
+            t = monotonic()
             x, err_code = self.numerics.solver.run(A, b, x0)
+            print(f"Solver took: {monotonic()-t}s")
             self.scattered_field_coefficients[:, :, w] = x.reshape(
                 self.right_hand_side.shape[:2]
             )

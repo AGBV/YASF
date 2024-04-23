@@ -1300,6 +1300,7 @@ class Optics:
             arg_list = external_args + device_data2 + batched_device_data
             t = monotonic()
             cuda_kernel[blocks_per_grid, threads_per_block](*arg_list)
+            cuda.synchronize()
             print(f"Kernel took {monotonic()-t}s")
 
             # receive batched data results
