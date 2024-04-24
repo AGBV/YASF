@@ -6,6 +6,7 @@ import numpy as np
 from numba import cuda
 import os,sys,copy
 from time import monotonic
+import pickle
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,7 +51,7 @@ class Optics:
 
         self.log = logging.getLogger(__name__)
 
-    def compute_cross_sections(self):
+    def compute_cross_sections(self, gpu: bool=True):
         """
         Compute the scattering and extinction cross sections.
 
@@ -79,7 +80,7 @@ class Optics:
 
         idx_lookup = self.simulation.idx_lookup
 
-        if self.simulation.numerics.gpu:
+        if gpu:
             c_sca_real = np.zeros(wavelengths, dtype=float)
             c_sca_imag = np.zeros_like(c_sca_real)
 
@@ -99,6 +100,7 @@ class Optics:
             blocks_per_grid_z = ceil(wavelengths / threads_per_block[2])
             blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y, blocks_per_grid_z)
 
+            t = monotonic()
             compute_scattering_cross_section_gpu[blocks_per_grid, threads_per_block](
                 lmax,
                 particle_number,
@@ -111,6 +113,8 @@ class Optics:
                 c_sca_real_device,
                 c_sca_imag_device,
             )
+            cuda.synchronize()
+            print(f"cross-section kernel took {monotonic()-t}s!")
             c_sca_real = c_sca_real_device.copy_to_host()
             c_sca_imag = c_sca_imag_device.copy_to_host()
             c_sca = c_sca_real + 1j * c_sca_imag
@@ -972,7 +976,7 @@ class Optics:
 
         self.__compute_c_and_b()
 
-    def compute_phase_function(self, legendre_coefficients_number: int = 15, c_and_b: Union[bool, tuple] = False, check_phase_function: bool = False,):
+    def compute_phase_function(self, legendre_coefficients_number: int = 15, c_and_b: Union[bool, tuple] = False, check_phase_function: bool = False,gpu: bool=True):
         """Generalized batching for phase function computation
 
         Args:
@@ -989,7 +993,7 @@ class Optics:
             self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
         )
 
-        if self.simulation.numerics.gpu:
+        if gpu:
             jmax = (
                 self.simulation.parameters.particles.number
                 * self.simulation.numerics.nmax
@@ -1014,9 +1018,17 @@ class Optics:
                 self.simulation.scattered_field_coefficients,
                 self.simulation.parameters.k_medium,
             ]
-
+            device_dict = {
+                "positions": device_data[0],
+                "idx_lookup": device_data[1],
+                "scattered_field_coefficients": device_data[2],
+                "k_medium": device_data[3],
+            }
+            with open("device_dict_256.pickle", "wb") as f:
+                pickle.dump(device_dict,f)
             sizes = (jmax, angles, wavelengths)
-            threads_per_block = (16, 16, 2)
+            print(sizes)
+            threads_per_block = (1, 1, 2)
 
             blocks_per_grid = tuple(
                 ceil(sizes[k] / threads_per_block[k])
@@ -1032,6 +1044,18 @@ class Optics:
                 np.ascontiguousarray(e_field_phi_real),
                 np.ascontiguousarray(e_field_phi_imag),
             ]
+            split_dict = {
+                "azimuthal_angles": to_split[0],
+                "e_r": to_split[1],
+                "pilm": to_split[2],
+                "taulm": to_split[3],
+                "e_field_theta_real": to_split[4],
+                "e_field_theta_imag": to_split[5],
+                "e_field_phi_real": to_split[6],
+                "e_field_phi_imag": to_split[7],
+            }
+            with open("split_dict_256.pickle", "wb") as f:
+                pickle.dump(split_dict,f)
 
             idx_to_split = self.simulation.numerics.azimuthal_angles.shape[0]
 
@@ -1039,7 +1063,7 @@ class Optics:
             for array in to_split:
                 idx_per_array.append(np.where(np.array(array.shape) == idx_to_split)[0][0])
 
-            threads_per_block = (1, 16*16, 2)
+            threads_per_block = (512, 2, 1)
             external_args = [self.simulation.numerics.lmax]
             sizes_idx_split = 1
             print("Starting batching")
