@@ -492,6 +492,115 @@ class Simulation:
 
         return wx
 
+    def coupling_matrix_multiply2(self, x: np.ndarray, idx: np.ndarray):
+        """Computes the coupling matrix `wx` based on the input parameters.
+
+        Args:
+            x (np.ndarray): An input array of shape (n,) or (n, m), where n is the number of particles and m is the number
+                of features for each particle. This array represents the input data for which the coupling
+                matrix needs to be computed.
+            idx (int): An optional integer that specifies the index of a specific spherical harmonic mode. If `idx` is provided,
+                the computation will only be performed for that specific mode. If `idx` is not provided or set to `None`,
+                the computation will be performed for all spherical harmonic modes.
+
+        Returns:
+            wx (np.ndarray): An array of shape (n, m, p), where n is the number of particles, m is the number of features for each
+                particle, and p is the number of wavelengths. It represents the coupling matrix `wx`.
+        """
+        self.log.scatter("prepare particle coupling ... ")
+        preparation_time = time()
+
+        lmax = self.numerics.lmax
+        particle_number = self.parameters.particles.number
+        jmax = particle_number * 2 * lmax * (lmax + 2)
+        wavelengths_size = self.parameters.k_medium.shape[0]
+        translation_table = self.numerics.translation_ab5
+        associated_legendre_lookup = self.plm
+        spherical_hankel_lookup = self.sph_h
+        e_j_dm_phi_loopup = self.e_j_dm_phi
+
+        idx_lookup = self.idx_lookup
+
+        # if idx != None:
+        #     spherical_hankel_lookup = spherical_hankel_lookup[:, :, :, idx]
+        #     spherical_hankel_lookup = np.copy(
+        #         spherical_hankel_lookup[:, :, :, np.newaxis]
+        #     )
+        wavelengths_size = idx.shape[0]
+
+        self.log.scatter("\t Starting Wx computation")
+        if self.numerics.gpu:
+            wx_real = np.zeros(x.shape + (wavelengths_size,), dtype=float)
+            wx_imag = np.zeros_like(wx_real)
+
+            idx_device = cuda.to_device(idx_lookup)
+            x_device = cuda.to_device(x)
+            wx_real_device = cuda.to_device(wx_real)
+            wx_imag_device = cuda.to_device(wx_imag)
+            translation_device = cuda.to_device(translation_table)
+            associated_legendre_device = cuda.to_device(associated_legendre_lookup)
+            spherical_hankel_device = cuda.to_device(spherical_hankel_lookup)
+            e_j_dm_phi_device = cuda.to_device(e_j_dm_phi_loopup)
+
+            threads_per_block = (16, 16, 2)
+            blocks_per_grid_x = ceil(jmax / threads_per_block[0])
+            blocks_per_grid_y = ceil(jmax / threads_per_block[1])
+            blocks_per_grid_z = ceil(wavelengths_size / threads_per_block[2])
+            blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y, blocks_per_grid_z)
+
+            coupling_matrix_time = time()
+            particle_interaction_gpu[blocks_per_grid, threads_per_block](
+                lmax,
+                particle_number,
+                idx_device,
+                x_device,
+                wx_real_device,
+                wx_imag_device,
+                translation_device,
+                associated_legendre_device,
+                spherical_hankel_device,
+                e_j_dm_phi_device,
+            )
+            wx_real = wx_real_device.copy_to_host()
+            wx_imag = wx_imag_device.copy_to_host()
+            wx = wx_real + 1j * wx_imag
+            # particle_interaction.parallel_diagnostics(level=4)
+            time_end = time()
+            self.log.scatter(
+                "\t Time taken for preparation: %f"
+                % (coupling_matrix_time - preparation_time)
+            )
+            self.log.scatter(
+                "\t Time taken for coupling matrix: %f"
+                % (time_end - coupling_matrix_time)
+            )
+        else:
+            # from numba_progress import ProgressBar
+            # num_iterations = jmax * jmax * wavelengths
+            # progress = ProgressBar(total=num_iterations)
+            # progress = None
+            wx = particle_interaction(
+                lmax,
+                particle_number,
+                idx_lookup,
+                x,
+                translation_table,
+                associated_legendre_lookup,
+                spherical_hankel_lookup,
+                e_j_dm_phi_loopup,
+            )
+            time_end = time()
+            self.log.scatter(
+                "\t Time taken for coupling matrix: %f" % (time_end - preparation_time)
+            )
+
+        if idx != None:
+            wx = np.squeeze(wx)
+
+        return wx
+
+
+
     def master_matrix_multiply(self, value: np.ndarray, idx: int):
         """Applies a T-matrix to a given value and returns the result.
 
@@ -520,6 +629,37 @@ class Simulation:
         self.log.scatter(f"\t done in {t_matrix_stop - t_matrix_start} seconds.")
 
         return mx
+
+    def master_matrix_multiply2(self, value: np.ndarray, idx: np.ndarray):
+        """Applies a T-matrix to a given value and returns the result.
+
+        Args:
+            value (np.ndarray): The input value for the matrix multiplication operation.
+            idx (int): The index of the matrix to be multiplied.
+
+        Returns:
+            mx (np.ndarray): The result of the matrix multiplication operation.
+
+        """
+        wx = self.coupling_matrix_multiply2(value, idx)
+
+        self.log.scatter("apply T-matrix ...")
+        t_matrix_start = time()
+
+        twx = (
+            self.mie_coefficients[
+                self.parameters.particles.single_unique_array_idx, :, :
+            ].ravel(order="C")
+            * wx
+        )
+        mx = value - twx
+
+        t_matrix_stop = time()
+        self.log.scatter(f"\t done in {t_matrix_stop - t_matrix_start} seconds.")
+
+        return mx
+
+
 
     def compute_scattered_field_coefficients(self, guess: np.ndarray = None):
         """The function computes the scattered field coefficients using a linear operator and a solver.
@@ -557,46 +697,41 @@ class Simulation:
             t = monotonic()
             x, err_code = self.numerics.solver.run(A, b, x0)
             print(f"Solver took: {monotonic()-t}s")
+            print(f"{self.scattered_field_coefficients.shape}")
             self.scattered_field_coefficients[:, :, w] = x.reshape(
                 self.right_hand_side.shape[:2]
             )
             self.scattered_field_err_codes[w] = err_code
 
 
-    def compute_scattered_field_coefficients2(self, guess: np.ndarray = None, coreN: int=25):
-        """The function computes the scattered field coefficients using a linear operator and a solver.
-
-        Args:
-            guess (np.ndarray): Optional. The initial guess for the solution of the linear system. If no guess is provided,
-                the `right_hand_side` variable is used as the initial guess.
-
-        """
+    def compute_scattered_field_coefficients2(self, guess: np.ndarray = None):
         self.log.scatter("compute scattered field coefficients ...")
-        self.jmax = self.parameters.particles.number * self.numerics.nmax
+        jmax = self.parameters.particles.number * self.numerics.nmax
         self.scattered_field_coefficients = np.zeros_like(
             self.initial_field_coefficients
         )
         self.scattered_field_err_codes = np.zeros(self.parameters.wavelengths_number)
         if guess is None:
             guess = self.right_hand_side
-        self.guess = guess
         print(f"{self.parameters.wavelengths_number = }")
-        # for w in range(self.parameters.wavelengths_number):
-        with Pool(coreN) as p:
-            res = p.map(self.__main_solver_routine, list(range(self.parameters.wavelengths_number)))
 
-
-    def __main_solver_routine(self, w):
+        t = monotonic()
         A = LinearOperator(
-            shape=(self.jmax, self.jmax), matvec=lambda x: self.master_matrix_multiply(x, w)
+            shape=(jmax, jmax), matvec=lambda x: self.master_matrix_multiply2(x, np.array(list(range(self.parameters.wavelengths_number))))
         )
-        b = self.right_hand_side[:, :, w].ravel()
-        x0 = self.guess[:, :, w].ravel()
+        print(f"Linear Op took: {monotonic()-t}s")
+        b = self.right_hand_side[:, :, :].ravel()
+        x0 = guess[:, :, :].ravel()
+        # self.log.scatter(
+        #     "Solver run %d/%d" % (w + 1, self.parameters.wavelengths_number)
+        # )
+        t = monotonic()
         x, err_code = self.numerics.solver.run(A, b, x0)
-        self.scattered_field_coefficients[:, :, w] = x.reshape(
+        print(f"Solver took: {monotonic()-t}s")
+        self.scattered_field_coefficients[:, :, :] = x.reshape(
             self.right_hand_side.shape[:2]
         )
-        self.scattered_field_err_codes[w] = err_code
+        # self.scattered_field_err_codes[w] = err_code
 
 
 
