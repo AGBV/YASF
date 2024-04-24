@@ -31,6 +31,7 @@ from YASF.yasfpy.functions.cpu_numba import compute_idx_lookups
 from YASF.yasfpy.functions.cpu_numba import particle_interaction, compute_field
 from YASF.yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_gpu
 
+from multiprocessing import Pool
 
 class Simulation:
     """This class represents the simulation of YASF (Yet Another Scattering Framework).
@@ -560,6 +561,44 @@ class Simulation:
                 self.right_hand_side.shape[:2]
             )
             self.scattered_field_err_codes[w] = err_code
+
+
+    def compute_scattered_field_coefficients2(self, guess: np.ndarray = None, coreN: int=25):
+        """The function computes the scattered field coefficients using a linear operator and a solver.
+
+        Args:
+            guess (np.ndarray): Optional. The initial guess for the solution of the linear system. If no guess is provided,
+                the `right_hand_side` variable is used as the initial guess.
+
+        """
+        self.log.scatter("compute scattered field coefficients ...")
+        self.jmax = self.parameters.particles.number * self.numerics.nmax
+        self.scattered_field_coefficients = np.zeros_like(
+            self.initial_field_coefficients
+        )
+        self.scattered_field_err_codes = np.zeros(self.parameters.wavelengths_number)
+        if guess is None:
+            guess = self.right_hand_side
+        self.guess = guess
+        print(f"{self.parameters.wavelengths_number = }")
+        # for w in range(self.parameters.wavelengths_number):
+        with Pool(coreN) as p:
+            res = p.map(self.__main_solver_routine, list(range(self.parameters.wavelengths_number)))
+
+
+    def __main_solver_routine(self, w):
+        A = LinearOperator(
+            shape=(self.jmax, self.jmax), matvec=lambda x: self.master_matrix_multiply(x, w)
+        )
+        b = self.right_hand_side[:, :, w].ravel()
+        x0 = self.guess[:, :, w].ravel()
+        x, err_code = self.numerics.solver.run(A, b, x0)
+        self.scattered_field_coefficients[:, :, w] = x.reshape(
+            self.right_hand_side.shape[:2]
+        )
+        self.scattered_field_err_codes[w] = err_code
+
+
 
     def compute_fields(self, sampling_points: np.ndarray):
         """The function `compute_fields` calculates the field at given sampling points using either CPU or
