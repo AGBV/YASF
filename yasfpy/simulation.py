@@ -717,7 +717,7 @@ class Simulation:
 
         t = monotonic()
         A = LinearOperator(
-            shape=(jmax, jmax), matvec=lambda x: self.master_matrix_multiply2(x, np.array(list(range(self.parameters.wavelengths_number))))
+            shape=(jmax, jmax), matvec=lambda x: self.master_matrix_multiply2(x, np.array(list(range(self.parameters.wavelengths_number)))), matmat = lambda x: self.master_matrix_multiply2(x, np.array(list(range(self.parameters.wavelengths_number))))
         )
         print(f"Linear Op took: {monotonic()-t}s")
         b = self.right_hand_side[:, :, :].ravel()
