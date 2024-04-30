@@ -177,9 +177,11 @@ def mutual_lookup(
     size_parameter = distances * np.array(refractive_index)[np.newaxis, np.newaxis, :]
 
     if parallel:
-        from yasfpy.functions.cpu_numba import multicore_hankel_bessel_lookup
+        from YASF.yasfpy.functions.cpu_numba import multicore_hankel_bessel_lookup
 
-        spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm = multicore_hankel_bessel_lookup(lmax, size_parameter, phi, cosine_theta)
+        spherical_bessel, spherical_hankel = multicore_hankel_bessel_lookup(lmax, size_parameter, phi, cosine_theta)
+
+
     else:
         p_range = np.arange(2 * lmax + 1)
         p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
@@ -209,53 +211,53 @@ def mutual_lookup(
         spherical_bessel = spherical_jn(p_range, size_parameter_extended)
         print(f"Spherical bessel took {monotonic()-t}s!!")
 
-        if derivatives:
-            spherical_hankel_lower = np.sqrt(
-                np.divide(
-                    np.pi / 2,
-                    size_parameter_extended,
-                    out=np.zeros_like(size_parameter_extended),
-                    where=size_parameter_extended != 0,
+    if derivatives:
+        spherical_hankel_lower = np.sqrt(
+            np.divide(
+                np.pi / 2,
+                size_parameter_extended,
+                out=np.zeros_like(size_parameter_extended),
+                where=size_parameter_extended != 0,
+            )
+        ) * hankel1(-1 / 2, size_parameter_extended)
+        spherical_hankel_lower = np.vstack(
+            (spherical_hankel_lower, spherical_hankel[:-1, :, :, :])
+        )
+        spherical_hankel_derivative = (
+            size_parameter_extended * spherical_hankel_lower
+            - p_range * spherical_hankel
+        )
+
+        # p_range = np.arange(2 * lmax + 2) - 1
+        # p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
+        # spherical_hankel = np.sqrt(np.divide(np.pi / 2, size_parameter_extended, out = np.zeros_like(size_parameter_extended), where = size_parameter_extended != 0)) * hankel1(p_range + 1/2, size_parameter_extended)
+        # spherical_hankel_derivative = size_parameter_extended * spherical_hankel[:-1, :, :, :] - p_range[1:, :, :, :] * spherical_hankel[1:, :, :, :]
+
+        p_lm = legendre_normalized_trigon(lmax, cosine_theta, sine_theta)
+    else:
+        spherical_hankel_derivative = None
+
+        p_lm = np.zeros(
+            (lmax + 1) * (2 * lmax + 1) * np.prod(size_parameter.shape[:2])
+        ).reshape(((lmax + 1) * (2 * lmax + 1),) + size_parameter.shape[:2])
+        for p in range(2 * lmax + 1):
+            for absdm in range(p + 1):
+                cml = np.sqrt(
+                    (2 * p + 1)
+                    / 2
+                    * np.prod(1 / np.arange(p - absdm + 1, p + absdm + 1))
                 )
-            ) * hankel1(-1 / 2, size_parameter_extended)
-            spherical_hankel_lower = np.vstack(
-                (spherical_hankel_lower, spherical_hankel[:-1, :, :, :])
-            )
-            spherical_hankel_derivative = (
-                size_parameter_extended * spherical_hankel_lower
-                - p_range * spherical_hankel
-            )
+                # if np.isnan(cml):
+                #     print(p)
+                #     print(absdm)
+                p_lm[p * (p + 1) // 2 + absdm, :, :] = (
+                    cml * np.power(-1.0, absdm) * lpmv(absdm, p, cosine_theta)
+                )
 
-            # p_range = np.arange(2 * lmax + 2) - 1
-            # p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
-            # spherical_hankel = np.sqrt(np.divide(np.pi / 2, size_parameter_extended, out = np.zeros_like(size_parameter_extended), where = size_parameter_extended != 0)) * hankel1(p_range + 1/2, size_parameter_extended)
-            # spherical_hankel_derivative = size_parameter_extended * spherical_hankel[:-1, :, :, :] - p_range[1:, :, :, :] * spherical_hankel[1:, :, :, :]
-
-            p_lm = legendre_normalized_trigon(lmax, cosine_theta, sine_theta)
-        else:
-            spherical_hankel_derivative = None
-
-            p_lm = np.zeros(
-                (lmax + 1) * (2 * lmax + 1) * np.prod(size_parameter.shape[:2])
-            ).reshape(((lmax + 1) * (2 * lmax + 1),) + size_parameter.shape[:2])
-            for p in range(2 * lmax + 1):
-                for absdm in range(p + 1):
-                    cml = np.sqrt(
-                        (2 * p + 1)
-                        / 2
-                        * np.prod(1 / np.arange(p - absdm + 1, p + absdm + 1))
-                    )
-                    # if np.isnan(cml):
-                    #     print(p)
-                    #     print(absdm)
-                    p_lm[p * (p + 1) // 2 + absdm, :, :] = (
-                        cml * np.power(-1.0, absdm) * lpmv(absdm, p, cosine_theta)
-                    )
-
-        phi = phi[np.newaxis, :, :]
-        p_range = np.arange(-2 * lmax, 2 * lmax + 1)
-        p_range = p_range[:, np.newaxis, np.newaxis]
-        e_j_dm_phi = np.exp(1j * p_range * phi)
+    phi = phi[np.newaxis, :, :]
+    p_range = np.arange(-2 * lmax, 2 * lmax + 1)
+    p_range = p_range[:, np.newaxis, np.newaxis]
+    e_j_dm_phi = np.exp(1j * p_range * phi)
 
     return (
         spherical_bessel,

@@ -3,7 +3,7 @@ from numba import jit, prange, complex128, float64, int64
 import numpy as np
 from scipy.special import spherical_jn, hankel1, lpmv
 from multiprocessing import Pool
-
+import os
 
 @jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
 def particle_interaction(
@@ -470,63 +470,40 @@ def compute_lookup_tables(
     return spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm
 
 def multicore_shperical_jn(a: np.ndarray,x: np.ndarray,N: int=None):
-    slice_len = -(-x.shape[0] // N) # divide array into N chunks of length slice_len
-    final_res = np.empty((0,a.shape[1]))
-    arglist = [tuple([a,x[i*slice_len:(i+1)*slice_len,:]]) for i in range(N)]
-    if N is not None:
-        with Pool(N) as p:
-            res = p.starmap(spherical_jn, arglist)
-        for array in res:
-            final_res = np.append(final_res, np.squeeze(array), axis=0)
-    else:
-        with Pool() as p:
-            res = p.starmap(spherical_jn, arglist)
-        for array in res:
-            final_res = np.append(final_res, np.squeeze(array), axis=0)
+    print(f"{N = }")
+    slice_len = -(-x.shape[1] // N) # divide array into N chunks of length slice_len
+    final_res = np.empty((a.shape[0],0, x.shape[2], x.shape[3]))
+    arglist = [tuple([a,x[:,i*slice_len:(i+1)*slice_len,:,:]]) for i in range(N)]
+    with Pool(N) as p:
+        res = p.starmap(spherical_jn, arglist)
+    for array in res:
+        final_res = np.append(final_res, np.squeeze(array), axis=1)
     return final_res
 
 def multicore_spherical_hankel1(a: np.ndarray,x: np.ndarray,N: int=None):
-    slice_len = -(-x.shape[0] // N)  # divide array into N chunks of length slice_len
-    final_res = np.empty((0,a.shape[1]))
-    arglist = [tuple([a+1/2,x[i*slice_len:(i+1)*slice_len,:]]) for i in range(N)]
-    if N is not None:
-        with Pool(N) as p:
-            res = p.starmap(hankel1, arglist)
-        for array in res:
-            final_res = np.append(final_res, np.squeeze(array), axis=0)
-        hankel = np.sqrt(np.pi/(2*x)) * final_res
-    else:
-        with Pool() as p:
-            res = p.starmap(hankel1, arglist)
-        for array in res:
-            final_res = np.append(final_res, np.squeeze(array), axis=0)
-        hankel = np.sqrt(np.pi/(2*x)) * final_res
+    print(f"{N = }")
+    slice_len = -(-x.shape[1] // N)  # divide array into N chunks of length slice_len
+    final_res = np.empty((a.shape[0],0,x.shape[2], x.shape[3]))
+    arglist = [tuple([a+1/2,x[:,i*slice_len:(i+1)*slice_len,:,:]]) for i in range(N)]
+    with Pool(N) as p:
+        res = p.starmap(hankel1, arglist)
+    for array in res:
+        final_res = np.append(final_res, np.squeeze(array), axis=1)
+    hankel = np.sqrt(np.pi/(2*x)) * final_res
 
     return hankel
 
 def multicore_hankel_bessel_lookup(lmax: int, size_parameter: np.ndarray, phi: np.ndarray, cosine_theta: np.ndarray, Ncore: int=None):
-    orders = np.arange(2*lmax+1)[np.newaxis,:]
-    size_parameter = size_parameter[:, np.newaxis]
-    spherical_bessel = multicore_shperical_jn(orders,size_parameter,Ncore)
-    spherical_hankel = multicore_spherical_hankel1(orders,size_parameter,Ncore)
-    e_j_dm_phi = np.zeros(
-        (4 * lmax + 1) * np.prod(size_parameter.shape[:2]), dtype=complex
-    ).reshape((4 * lmax + 1,) + size_parameter.shape[:2])
-    p_lm = np.zeros(
-        (lmax + 1) * (2 * lmax + 1) * np.prod(size_parameter.shape[:2])
-    ).reshape(((lmax + 1) * (2 * lmax + 1),) + size_parameter.shape[:2])
-    for p in prange(2 * lmax + 1):
-        e_j_dm_phi[p, :, :] = np.exp(1j * (p - 2 * lmax) * phi)
-        e_j_dm_phi[p + 2 * lmax, :, :] = np.exp(1j * p * phi)
-        for absdm in range(p + 1):
-            cml = np.sqrt(
-                (2 * p + 1) / 2 / np.prod(np.arange(p - absdm + 1, p + absdm + 1))
-            )
-            p_lm[p * (p + 1) // 2 + absdm, :, :] = (
-                cml * np.power(-1.0, absdm) * lpmv(absdm, p, cosine_theta)
-            )
+    if Ncore is None:
+        Ncore = os.cpu_count()
 
-    return spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm
+    p_range = np.arange(2 * lmax + 1)
+    p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
+    size_parameter = size_parameter[np.newaxis, :, :, :]
+    spherical_bessel = multicore_shperical_jn(p_range,size_parameter,Ncore)
+    spherical_hankel = multicore_spherical_hankel1(p_range,size_parameter,Ncore)
+
+    return spherical_bessel, spherical_hankel
 
 @jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
 def compute_field(

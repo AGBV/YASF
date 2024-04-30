@@ -134,6 +134,7 @@ class Simulation:
             self.parameters.particles.position,
             self.parameters.particles.position,
             self.parameters.k_medium,
+            parallel=True
         )[:4]
 
         # lmax = self.numerics.lmax
