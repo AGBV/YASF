@@ -177,26 +177,23 @@ def mutual_lookup(
     size_parameter = distances * np.array(refractive_index)[np.newaxis, np.newaxis, :]
 
     if parallel:
-        from yasfpy.functions.cpu_numba import compute_lookup_tables
+        from yasfpy.functions.cpu_numba import multicore_hankel_bessel_lookup
 
-        print("JA MOIN GRÜßE AUS BUXTEHUDE")
-        spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm = compute_lookup_tables(
-            lmax, size_parameter, phi, cosine_theta
-        )
+        spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm = multicore_hankel_bessel_lookup(lmax, size_parameter, phi, cosine_theta)
     else:
         p_range = np.arange(2 * lmax + 1)
         p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
         size_parameter_extended = size_parameter[np.newaxis, :, :, :]
-        print("Ayooooooooooo")
-        print(f"{p_range.shape = }")
-        print(f"{size_parameter_extended.shape = }")
-        print(np.mean(size_parameter_extended))
-        print(np.max(size_parameter_extended))
-        print(f"{len(np.unique(size_parameter_extended)) = }")
-        test = np.round(size_parameter_extended,8)
-        print(f"{len(np.unique(test)) = }")
-        test = np.round(size_parameter_extended,6)
-        print(f"{len(np.unique(test)) = }")
+        # print("Ayooooooooooo")
+        # print(f"{p_range.shape = }")
+        # print(f"{size_parameter_extended.shape = }")
+        # print(np.mean(size_parameter_extended))
+        # print(np.max(size_parameter_extended))
+        # print(f"{len(np.unique(size_parameter_extended)) = }")
+        # test = np.round(size_parameter_extended,8)
+        # print(f"{len(np.unique(test)) = }")
+        # test = np.round(size_parameter_extended,6)
+        # print(f"{len(np.unique(test)) = }")
         t = monotonic()
         spherical_hankel = np.sqrt(
             np.divide(
