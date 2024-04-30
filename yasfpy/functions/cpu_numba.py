@@ -4,6 +4,7 @@ import numpy as np
 from scipy.special import spherical_jn, hankel1, lpmv
 from multiprocessing import Pool
 import os
+from time import monotonic
 
 @jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
 def particle_interaction(
@@ -470,7 +471,6 @@ def compute_lookup_tables(
     return spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm
 
 def multicore_shperical_jn(a: np.ndarray,x: np.ndarray,N: int=None):
-    print(f"{N = }")
     slice_len = -(-x.shape[1] // N) # divide array into N chunks of length slice_len
     final_res = np.empty((a.shape[0],0, x.shape[2], x.shape[3]))
     arglist = [tuple([a,x[:,i*slice_len:(i+1)*slice_len,:,:]]) for i in range(N)]
@@ -481,7 +481,6 @@ def multicore_shperical_jn(a: np.ndarray,x: np.ndarray,N: int=None):
     return final_res
 
 def multicore_spherical_hankel1(a: np.ndarray,x: np.ndarray,N: int=None):
-    print(f"{N = }")
     slice_len = -(-x.shape[1] // N)  # divide array into N chunks of length slice_len
     final_res = np.empty((a.shape[0],0,x.shape[2], x.shape[3]))
     arglist = [tuple([a+1/2,x[:,i*slice_len:(i+1)*slice_len,:,:]]) for i in range(N)]
@@ -489,7 +488,8 @@ def multicore_spherical_hankel1(a: np.ndarray,x: np.ndarray,N: int=None):
         res = p.starmap(hankel1, arglist)
     for array in res:
         final_res = np.append(final_res, np.squeeze(array), axis=1)
-    hankel = np.sqrt(np.pi/(2*x)) * final_res
+    # hankel = np.sqrt(np.pi/(2*x)) * final_res
+    hankel =  np.sqrt(np.divide(np.pi / 2, x, out=np.zeros_like(x), where=x != 0,)) * final_res
 
     return hankel
 
@@ -500,8 +500,12 @@ def multicore_hankel_bessel_lookup(lmax: int, size_parameter: np.ndarray, phi: n
     p_range = np.arange(2 * lmax + 1)
     p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
     size_parameter = size_parameter[np.newaxis, :, :, :]
-    spherical_bessel = multicore_shperical_jn(p_range,size_parameter,Ncore)
+    t = monotonic()
     spherical_hankel = multicore_spherical_hankel1(p_range,size_parameter,Ncore)
+    print(f"Spherical hankel took {monotonic()-t}s")
+    t = monotonic()
+    spherical_bessel = multicore_shperical_jn(p_range,size_parameter,Ncore)
+    print(f"Spherical bessel took {monotonic()-t}s")
 
     return spherical_bessel, spherical_hankel
 

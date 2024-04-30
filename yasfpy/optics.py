@@ -80,6 +80,12 @@ class Optics:
 
         idx_lookup = self.simulation.idx_lookup
 
+        print(f"{idx_lookup.shape = }")
+        print(f"{translation_table.shape = }")
+        print(f"{associated_legendre_lookup.shape = }")
+        print(f"{spherical_bessel_lookup.shape = }")
+        print(f"{e_j_dm_phi_loopup.shape = }")
+
         if gpu:
             c_sca_real = np.zeros(wavelengths, dtype=float)
             c_sca_imag = np.zeros_like(c_sca_real)

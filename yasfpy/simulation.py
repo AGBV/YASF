@@ -13,7 +13,7 @@ from scipy.sparse.linalg import LinearOperator
 
 # from scipy.spatial.distance import pdist, squareform
 from scipy.special import spherical_jn, spherical_yn
-from time import monotonic
+from time import monotonic, sleep
 
 # from scipy.special import hankel1
 # from scipy.special import lpmv
@@ -32,6 +32,7 @@ from YASF.yasfpy.functions.cpu_numba import particle_interaction, compute_field
 from YASF.yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_gpu
 
 from multiprocessing import Pool
+import pickle
 
 class Simulation:
     """This class represents the simulation of YASF (Yet Another Scattering Framework).
@@ -136,6 +137,16 @@ class Simulation:
             self.parameters.k_medium,
             parallel=True
         )[:4]
+        print(f"{self.sph_j.shape = }")
+        # print(f"{self.sph_j[:,:5,:5,:5] = }")
+        print(f"{self.sph_h.shape = }")
+        # print(f"{self.sph_h[:,:5,:5,:5] = }")
+
+        with open("bessel_multi.pickle","wb") as f:
+            pickle.dump({"sph_j": self.sph_j, "sph_h": self.sph_h},f)
+
+        sleep(100)
+
 
         # lmax = self.numerics.lmax
         # particle_number = self.parameters.particles.number
