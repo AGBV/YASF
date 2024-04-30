@@ -124,6 +124,47 @@ def compute_scattering_cross_section_gpu(
     cuda.atomic.add(c_sca_real, w, p_dependent.real)
     cuda.atomic.add(c_sca_imag, w, p_dependent.imag)
 
+@cuda.jit(fastmath=True)
+def compute_scattering_cross_section_gpu_no_atomic(
+    lmax: int,
+    particle_number: int,
+    idx: np.ndarray,
+    sfc: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+    c_sca_real: np.ndarray,
+    c_sca_imag: np.ndarray,
+):
+    jmax = particle_number * 2 * lmax * (lmax + 2)
+    channels = sph_h.shape[-1]
+
+    j1, j2, w = cuda.grid(3)
+
+    if (j1 >= jmax) or (j2 >= jmax) or (w >= channels):
+        return
+
+    s1, n1, _, _, m1 = idx[j1, :]
+    s2, n2, _, _, m2 = idx[j2, :]
+
+    delta_m = abs(m1 - m2)
+    f = sfc[:, :, w]
+
+    p_dependent = complex(0)
+    for p in range(delta_m, 2 * lmax + 1):
+        p_dependent += (
+            translation_table[n2, n1, p]
+            * plm[p * (p + 1) // 2 + delta_m, s1, s2]
+            * sph_h[p, s1, s2, w]
+        )
+    p_dependent *= (
+        f[s1, n1].conjugate() * e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * f[s2, n2]
+    )
+
+    # atomic.add performs the += operation in sync
+    c_sca_real[j1,j2,w] = p_dependent.real
+    c_sca_imag[j1,j2,w] = p_dependent.imag
 
 @cuda.jit(fastmath=True)
 def compute_radial_independent_scattered_field_gpu(
