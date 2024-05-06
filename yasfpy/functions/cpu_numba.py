@@ -477,7 +477,7 @@ def multicore_shperical_jn(a: np.ndarray,x: np.ndarray,N: int=None):
     with Pool(N) as p:
         res = p.starmap(spherical_jn, arglist)
     for array in res:
-        final_res = np.append(final_res, np.squeeze(array), axis=1)
+        final_res = np.append(final_res, array, axis=1)
     return final_res
 
 def multicore_spherical_hankel1(a: np.ndarray,x: np.ndarray,N: int=None):
@@ -487,8 +487,7 @@ def multicore_spherical_hankel1(a: np.ndarray,x: np.ndarray,N: int=None):
     with Pool(N) as p:
         res = p.starmap(hankel1, arglist)
     for array in res:
-        final_res = np.append(final_res, np.squeeze(array), axis=1)
-    # hankel = np.sqrt(np.pi/(2*x)) * final_res
+        final_res = np.append(final_res, array, axis=1)
     hankel =  np.sqrt(np.divide(np.pi / 2, x, out=np.zeros_like(x), where=x != 0,)) * final_res
 
     return hankel
