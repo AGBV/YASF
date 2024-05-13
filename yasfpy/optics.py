@@ -1,5 +1,5 @@
 import logging
-from typing import Union
+from typing import Union, Callable
 from math import ceil
 import pandas as pd
 import numpy as np
