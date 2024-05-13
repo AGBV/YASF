@@ -176,7 +176,7 @@ class Simulation:
         #   self.sph_h, nan=0) + np.isnan(self.sph_h) * 1
 
         lookup_computation_time_stop = time()
-        self.log.debug(
+        self.log.info(
             "Computing lookup tables took %f s"
             % (lookup_computation_time_stop - lookup_computation_time_start)
         )
@@ -564,7 +564,8 @@ class Simulation:
         # scatter_to_internal_table = np.sum((self.parameters.particles.position[:, np.newaxis, :] - sampling_points[np.newaxis, :, :])**2, axis = 2)
         # scatter_to_internal_table = scatter_to_internal_table < self.parameters.particles.r[:, np.newaxis]**2
 
-        print("Computing mutual lookup")
+        self.log.info("Computing mutual lookup")
+        lookup_computation_time_start = time()
         (
             _,
             sph_h,
@@ -585,16 +586,21 @@ class Simulation:
             derivatives=True,
             parallel=False,
         )
+        lookup_computation_time_stop = time()
+        self.log.info(
+            "Computing lookup tables took %f s",
+            lookup_computation_time_stop - lookup_computation_time_start,
+        )
         pi_lm, tau_lm = spherical_functions_trigon(
             self.numerics.lmax, cosine_theta, sine_theta
         )
         # print(sph_h.size)
 
-        print("Computing field...")
+        self.log.info("Computing field...")
         field_time_start = time()
         self.sampling_points = sampling_points
         if self.numerics.gpu:
-            print("\t...using GPU")
+            self.log.info("\t...using GPU")
             field_real = np.zeros(
                 (self.parameters.k_medium.size, sampling_points.shape[0], 3),
                 dtype=float,
@@ -661,7 +667,7 @@ class Simulation:
             self.scattered_field = field_real + 1j * field_imag
 
         else:
-            print("\t...using CPU")
+            self.log.info("\t...using CPU")
             self.scattered_field = compute_field(
                 self.numerics.lmax,
                 self.idx_lookup,
