@@ -129,17 +129,30 @@ class YASF:
         self.simulation = Simulation(self.parameters, self.numerics)
         self.optics = Optics(self.simulation)
 
-        folder = self.config["output"]["folder"] if "folder" in self.config["output"] else "."
+        folder = (
+            self.config["output"]["folder"]
+            if "folder" in self.config["output"]
+            else "."
+        )
         folder = os.sep.join(folder.replace("\\", "/").split("/"))
-
 
         filename = None
         if "file" in self.config["particles"]["geometry"]:
             filename = self.config["particles"]["geometry"]["file"].split(os.sep)[-1]
             filename = filename.split(".")[0]
-        filename = self.config["output"]["filename"] if "filename" in self.config["output"] else filename
-        filename = self.config["output"] if isinstance(self.config["output"], str) else filename
-        self.output_filename = os.path.join(folder, filename) if (filename is not None) else None
+        filename = (
+            self.config["output"]["filename"]
+            if "filename" in self.config["output"]
+            else filename
+        )
+        filename = (
+            self.config["output"]
+            if isinstance(self.config["output"], str)
+            else filename
+        )
+        self.output_filename = (
+            os.path.join(folder, filename) if (filename is not None) else None
+        )
 
     def run(self, points: np.ndarray = None):
         self.particles.compute_volume_equivalent_area()
