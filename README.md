@@ -8,12 +8,13 @@
 </p>
 
 [![DOI](https://zenodo.org/badge/636196317.svg)](https://zenodo.org/doi/10.5281/zenodo.11193987)
-[![DeepSource](https://app.deepsource.com/gh/AGBV/YASF.svg/?label=code+coverage&show_trend=true&token=qvVGCeQ5niqoLdaj12vk1hIU)](https://app.deepsource.com/gh/AGBV/YASF/)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/f4f8ef02c45748d9b2b477d7f29d219d)](https://app.codacy.com/gh/AGBV/YASF/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![License: MIT](https://img.shields.io/badge/License-MIT-success.svg)](https://opensource.org/licenses/MIT)
 [![Unit tests](https://github.com/AGBV/YASF/actions/workflows/testing.yml/badge.svg)](https://github.com/AGBV/YASF/actions/workflows/testing.yml)
 ![Docs](https://github.com/AGBV/YASF/actions/workflows/mkdocs.yml/badge.svg)
 ![PYPI](https://github.com/AGBV/YASF/actions/workflows/pypi.yml/badge.svg)
+
+[![DeepSource](https://app.deepsource.com/gh/AGBV/YASF.svg/?label=code+coverage&show_trend=true&token=qvVGCeQ5niqoLdaj12vk1hIU)](https://app.deepsource.com/gh/AGBV/YASF/)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/f4f8ef02c45748d9b2b477d7f29d219d)](https://app.codacy.com/gh/AGBV/YASF/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 # Yet Another Scattering Framework
 
