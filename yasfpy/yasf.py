@@ -136,6 +136,11 @@ class YASF:
         )
         folder = os.sep.join(folder.replace("\\", "/").split("/"))
 
+        extension = (
+            self.config["output"]["extension"]
+            if "extension" in self.config["output"]
+            else "pbz2"
+        )
         filename = None
         if "file" in self.config["particles"]["geometry"]:
             filename = self.config["particles"]["geometry"]["file"].split(os.sep)[-1]
@@ -149,6 +154,9 @@ class YASF:
             self.config["output"]
             if isinstance(self.config["output"], str)
             else filename
+        )
+        filename = (
+            f"{filename}.{extension}" if len(filename.split(".")) == 1 else filename
         )
         self.output_filename = (
             os.path.join(folder, filename) if (filename is not None) else None
