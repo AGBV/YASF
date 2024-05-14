@@ -1,7 +1,6 @@
 import os
 import json
 import yaml
-import warnings
 import logging
 
 import numpy as np
@@ -53,12 +52,12 @@ class YASF:
                 "The particle geometry file needs at least 4 columns (x, y, z, r) and an optinal refractive index column"
             )
         elif spheres.shape[1] == 4:
-            warnings.warn(
+            self.log.warning(
                 "4 columns have been provided. Implying that all particles belong to the same material."
             )
             spheres[4] = np.zeros((spheres.shape[0], 1))
         elif spheres.shape[1] >= 5:
-            warnings.warn(
+            self.log.warning(
                 "More than 5 columns have been provided. Everything after the 5th will be ignored!"
             )
         spheres = spheres.to_numpy()
