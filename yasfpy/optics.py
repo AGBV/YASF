@@ -75,7 +75,7 @@ class Optics:
 
         if self.simulation.numerics.gpu:
             jmax = particle_number * 2 * lmax * (lmax + 2)
-            c_sca_real = np.zeros((jmax,wavelengths), dtype=float)
+            c_sca_real = np.zeros((jmax, wavelengths), dtype=float)
             c_sca_imag = np.zeros_like(c_sca_real)
 
             idx_device = cuda.to_device(idx_lookup)
@@ -106,9 +106,9 @@ class Optics:
                 c_sca_imag_device,
             )
             c_sca_real = c_sca_real_device.copy_to_host()
-            c_sca_real = np.sum(c_sca_real,axis=0)
+            c_sca_real = np.sum(c_sca_real, axis=0)
             c_sca_imag = c_sca_imag_device.copy_to_host()
-            c_sca_imag = np.sum(c_sca_imag,axis=0)
+            c_sca_imag = np.sum(c_sca_imag, axis=0)
             c_sca = c_sca_real + 1j * c_sca_imag
 
         else:
