@@ -122,8 +122,8 @@ def compute_scattering_cross_section_gpu(
     )
 
     # atomic.add performs the += operation in sync
-    cuda.atomic.add(c_sca_real[j1], w, p_dependent.real)
-    cuda.atomic.add(c_sca_imag[j2], w, p_dependent.imag)
+    cuda.atomic.add(c_sca_real, (j1,w), p_dependent.real)
+    cuda.atomic.add(c_sca_imag, (j1,w), p_dependent.imag)
 
 
 @cuda.jit(fastmath=True)
