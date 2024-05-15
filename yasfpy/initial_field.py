@@ -1,4 +1,5 @@
-import yasfpy.log as log
+import logging
+# import yasfpy.log as log
 
 import numpy as np
 
@@ -43,7 +44,8 @@ class InitialField:
         self.beam_width = beam_width
         self.focal_point = focal_point
 
-        self.log = log.scattering_logger(__name__)
+        # self.log = log.scattering_logger(__name__)
+        self.log = logging.getLogger(self.__class__.__module__)
         self.__setup()
 
     def __set_pol_idx(self):

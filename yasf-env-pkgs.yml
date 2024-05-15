@@ -1,4 +1,4 @@
-name: yasf-env-test
+name: yasf-env-pkgs
 channels:
   - numba
   - conda-forge

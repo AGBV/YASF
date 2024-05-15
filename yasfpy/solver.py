@@ -1,8 +1,8 @@
-import yasfpy.log as log
+import logging
+# import yasfpy.log as log
 
 import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres, lgmres, bicgstab
-from . import log
 
 
 class Solver:
@@ -33,7 +33,8 @@ class Solver:
         self.max_iter = int(max_iter)
         self.restart = int(restart)
 
-        self.log = log.scattering_logger(__name__)
+        # self.log = log.scattering_logger(__name__)
+        self.log = logging.getLogger(self.__class__.__module__)
 
     def run(self, a: LinearOperator, b: np.ndarray, x0: np.ndarray = None):
         """
@@ -87,7 +88,7 @@ class Solver:
                 a,
                 b,
                 x0,
-                tol=self.tolerance,
+                rtol=self.tolerance,
                 atol=self.tolerance**2,
                 maxiter=self.max_iter,
                 callback=counter,
@@ -97,9 +98,6 @@ class Solver:
             exit(1)
 
         return value, err_code
-
-
-import numpy as np
 
 
 class GMResCounter(object):
@@ -118,7 +116,8 @@ class GMResCounter(object):
             callback_type (str, optional): The type of callback to be used. It can have two possible values.
 
         """
-        self.log = log.scattering_logger(__name__)
+        # self.log = log.scattering_logger(__name__)
+        self.log = logging.getLogger(self.__class__.__module__)
         self._disp = disp
         self.niter = 0
         if callback_type == "pr_norm":
@@ -144,8 +143,8 @@ class GMResCounter(object):
             # msg = "% 10i \t " % self.niter + np.array2string(rk)
             msg = f"{self.niter:10} \t {np.array2string(rk)}"
 
-        self.log.numerics(self.header)
-        self.log.numerics(msg)
+        self.log.debug(self.header)
+        self.log.debug(msg)
         if self._disp:
             print(self.header)
             print(msg)

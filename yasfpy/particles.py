@@ -1,3 +1,4 @@
+import logging
 import yasfpy.log as log
 
 import numpy as np
@@ -39,7 +40,8 @@ class Particles:
         self.refractive_index = refractive_index
         self.type = shape_type
 
-        self.log = log.scattering_logger(__name__)
+        # self.log = log.scattering_logger(__name__)
+        self.log = logging.getLogger(self.__class__.__module__)
 
         # TODO: Keep it for now, remove later...
         self.refractive_index_table = refractive_index_table

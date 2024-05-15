@@ -82,7 +82,9 @@ class TestCELES(unittest.TestCase):
                 cls.data[input_file]["parameters"], cls.data[input_file]["numerics"]
             )
 
-            cls.data[input_file]["numerics"].compute_translation_table()
+            cls.data[input_file]["numerics"].compute_translation_table(
+                force_compute=True
+            )
 
             cls.data[input_file]["simulation"].compute_mie_coefficients()
             cls.data[input_file]["simulation"].compute_initial_field_coefficients()

@@ -1,9 +1,10 @@
-# to-do generated files
-docs/todo_gen.md
+# Ignore generated requirements.txt files from poetry
+# (usually needed for the yasf-env-pkgs conda environment)
+requirements.txt
 
 # Ignore wheel files
 /*.whl
-
+yasfpy/data
 # Ignore current project files
 src/optics.py
 

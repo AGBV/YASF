@@ -46,21 +46,16 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
 
     if (field_type, tau) == ("scattered", 1):
         return -(jmx * djx - jx * djmx) / (jmx * dhx - hx * djmx)  # -b
-    elif (field_type, tau) == ("scattered", 2):
-        return -(m**2 * jmx * djx - jx * djmx) / (
-            m**2 * jmx * dhx - hx * djmx
-        )  # -a
-    elif (field_type, tau) == ("internal", 1):
+    if (field_type, tau) == ("scattered", 2):
+        return -(m**2 * jmx * djx - jx * djmx) / (m**2 * jmx * dhx - hx * djmx)  # -a
+    if (field_type, tau) == ("internal", 1):
         return (jx * dhx - hx * djx) / (jmx * dhx - hx * djmx)  # c
-    elif (field_type, tau) == ("internal", 2):
+    if (field_type, tau) == ("internal", 2):
         return (m * jx * dhx - m * hx * djx) / (m**2 * jmx * dhx - hx * djmx)  # d
-    elif (field_type, tau) == ("ratio", 1):
+    if (field_type, tau) == ("ratio", 1):
         return (jx * dhx - hx * djx) / -(jmx * djx - jx * djmx)  # c / -b
-    elif (field_type, tau) == ("ratio", 2):
-        return (m * jx * dhx - m * hx * djx) / -(
-            m**2 * jmx * djx - jx * djmx
-        )  # d / -a
-    else:
-        logger = log.scattering_logger("t_entry")
-        logger.error("Not a valid field type provided. Returning None!")
-        raise ValueError("Not a valid field type provided. Returning None!")
+    if (field_type, tau) == ("ratio", 2):
+        return (m * jx * dhx - m * hx * djx) / -(m**2 * jmx * djx - jx * djmx)  # d / -a
+    logger = log.scattering_logger("t_entry")
+    logger.error("Not a valid field type provided. Returning None!")
+    raise ValueError("Not a valid field type provided. Returning None!")

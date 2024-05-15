@@ -45,7 +45,7 @@ def material_handler(links):
                 data["material"] = material
             else:
                 print("No matching handler found for file type")
-    data['ref_idx'] = data['ref_idx'].sort_values(by=['wavelength'])
+    data["ref_idx"] = data["ref_idx"].sort_values(by=["wavelength"])
     return data
 
 
@@ -109,9 +109,7 @@ def handle_refractiveindex_info(url):
                     1
                     + np.sum(
                         [
-                            coefficients[i]
-                            * x**2
-                            / (x**2 - coefficients[i + 1] ** 2)
+                            coefficients[i] * x**2 / (x**2 - coefficients[i + 1] ** 2)
                             for i in range(1, len(coefficients), 2)
                         ],
                         axis=0,

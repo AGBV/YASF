@@ -107,7 +107,6 @@ def compute_scattering_cross_section_gpu(
     s2, n2, _, _, m2 = idx[j2, :]
 
     delta_m = abs(m1 - m2)
-    f = sfc[:, :, w]
 
     p_dependent = complex(0)
     for p in range(delta_m, 2 * lmax + 1):
@@ -117,7 +116,9 @@ def compute_scattering_cross_section_gpu(
             * sph_h[p, s1, s2, w]
         )
     p_dependent *= (
-        f[s1, n1].conjugate() * e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * f[s2, n2]
+        sfc[s1, n1, w].conjugate()
+        * e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2]
+        * sfc[s2, n2, w]
     )
 
     # atomic.add performs the += operation in sync
