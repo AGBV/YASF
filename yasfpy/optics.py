@@ -74,7 +74,8 @@ class Optics:
         idx_lookup = self.simulation.idx_lookup
 
         if self.simulation.numerics.gpu:
-            c_sca_real = np.zeros(wavelengths, dtype=float)
+            jmax = particle_number * 2 * lmax * (lmax + 2)
+            c_sca_real = np.zeros((jmax,wavelengths), dtype=float)
             c_sca_imag = np.zeros_like(c_sca_real)
 
             idx_device = cuda.to_device(idx_lookup)
@@ -86,7 +87,6 @@ class Optics:
             spherical_bessel_device = cuda.to_device(spherical_bessel_lookup)
             e_j_dm_phi_device = cuda.to_device(e_j_dm_phi_loopup)
 
-            jmax = particle_number * 2 * lmax * (lmax + 2)
             threads_per_block = (16, 16, 2)
             blocks_per_grid_x = ceil(jmax / threads_per_block[0])
             blocks_per_grid_y = ceil(jmax / threads_per_block[1])
@@ -106,7 +106,9 @@ class Optics:
                 c_sca_imag_device,
             )
             c_sca_real = c_sca_real_device.copy_to_host()
+            c_sca_real = np.max(c_sca_real,axis=0)
             c_sca_imag = c_sca_imag_device.copy_to_host()
+            c_sca_imag = np.max(c_sca_imag,axis=0)
             c_sca = c_sca_real + 1j * c_sca_imag
 
         else:
