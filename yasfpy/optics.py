@@ -80,14 +80,9 @@ class Optics:
 
         idx_lookup = self.simulation.idx_lookup
 
-        print(f"{idx_lookup.shape = }")
-        print(f"{translation_table.shape = }")
-        print(f"{associated_legendre_lookup.shape = }")
-        print(f"{spherical_bessel_lookup.shape = }")
-        print(f"{e_j_dm_phi_loopup.shape = }")
-
         if gpu:
-            c_sca_real = np.zeros(wavelengths, dtype=float)
+            jmax = particle_number * 2 * lmax * (lmax + 2)
+            c_sca_real = np.zeros((jmax,wavelengths), dtype=float)
             c_sca_imag = np.zeros_like(c_sca_real)
 
             idx_device = cuda.to_device(idx_lookup)
@@ -99,15 +94,14 @@ class Optics:
             spherical_bessel_device = cuda.to_device(spherical_bessel_lookup)
             e_j_dm_phi_device = cuda.to_device(e_j_dm_phi_loopup)
 
-            jmax = particle_number * 2 * lmax * (lmax + 2)
             threads_per_block = (16, 16, 2)
             blocks_per_grid_x = ceil(jmax / threads_per_block[0])
             blocks_per_grid_y = ceil(jmax / threads_per_block[1])
             blocks_per_grid_z = ceil(wavelengths / threads_per_block[2])
             blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y, blocks_per_grid_z)
-
+            lmax = int(lmax)
             t = monotonic()
-            compute_scattering_cross_section_gpu[blocks_per_grid, threads_per_block](
+            compute_scattering_cross_section_gpu2[blocks_per_grid, threads_per_block](
                 lmax,
                 particle_number,
                 idx_device,
@@ -121,8 +115,8 @@ class Optics:
             )
             cuda.synchronize()
             print(f"cross-section kernel took {monotonic()-t}s!")
-            c_sca_real = c_sca_real_device.copy_to_host()
-            c_sca_imag = c_sca_imag_device.copy_to_host()
+            c_sca_real = np.sum(c_sca_real_device.copy_to_host(),axis=0)
+            c_sca_imag = np.sum(c_sca_imag_device.copy_to_host(),axis=0)
             c_sca = c_sca_real + 1j * c_sca_imag
 
         else:
@@ -1024,14 +1018,6 @@ class Optics:
                 self.simulation.scattered_field_coefficients,
                 self.simulation.parameters.k_medium,
             ]
-            device_dict = {
-                "positions": device_data[0],
-                "idx_lookup": device_data[1],
-                "scattered_field_coefficients": device_data[2],
-                "k_medium": device_data[3],
-            }
-            with open("device_dict_256.pickle", "wb") as f:
-                pickle.dump(device_dict,f)
             sizes = (jmax, angles, wavelengths)
             print(sizes)
             threads_per_block = (1, 1, 2)
@@ -1050,18 +1036,6 @@ class Optics:
                 np.ascontiguousarray(e_field_phi_real),
                 np.ascontiguousarray(e_field_phi_imag),
             ]
-            split_dict = {
-                "azimuthal_angles": to_split[0],
-                "e_r": to_split[1],
-                "pilm": to_split[2],
-                "taulm": to_split[3],
-                "e_field_theta_real": to_split[4],
-                "e_field_theta_imag": to_split[5],
-                "e_field_phi_real": to_split[6],
-                "e_field_phi_imag": to_split[7],
-            }
-            with open("split_dict_256.pickle", "wb") as f:
-                pickle.dump(split_dict,f)
 
             idx_to_split = self.simulation.numerics.azimuthal_angles.shape[0]
 
