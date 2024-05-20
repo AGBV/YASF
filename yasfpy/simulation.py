@@ -142,12 +142,6 @@ class Simulation:
         print(f"{self.sph_h.shape = }")
         # print(f"{self.sph_h[:,:5,:5,:5] = }")
 
-        with open("bessel_multi.pickle","wb") as f:
-            pickle.dump({"sph_j": self.sph_j, "sph_h": self.sph_h},f)
-
-        sleep(100)
-
-
         # lmax = self.numerics.lmax
         # particle_number = self.parameters.particles.number
 
