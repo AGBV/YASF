@@ -99,9 +99,8 @@ class Optics:
             blocks_per_grid_y = ceil(jmax / threads_per_block[1])
             blocks_per_grid_z = ceil(wavelengths / threads_per_block[2])
             blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y, blocks_per_grid_z)
-            lmax = int(lmax)
             t = monotonic()
-            compute_scattering_cross_section_gpu2[blocks_per_grid, threads_per_block](
+            compute_scattering_cross_section_gpu[blocks_per_grid, threads_per_block](
                 lmax,
                 particle_number,
                 idx_device,
@@ -456,7 +455,6 @@ class Optics:
         delta_phi = (2 * np.pi) / self.simulation.numerics.sampling_points_number[0]
         delta_theta = np.pi / self.simulation.numerics.sampling_points_number[1]
         g = np.sum(self.phase_function_3d*np.cos(self.simulation.numerics.polar_angles)[:,np.newaxis]*np.sin(self.simulation.numerics.polar_angles)[:,np.newaxis]*delta_phi*delta_theta,axis=0) / (4 * np.pi)
-        print(f"{g = }")
         self.g = g
 
     def __compute_correction(self) -> float:
@@ -492,7 +490,6 @@ class Optics:
         g_n = np.sum(self.phase_function_3d*np.cos(self.simulation.numerics.polar_angles)[:,np.newaxis]*np.sin(self.simulation.numerics.polar_angles)[:,np.newaxis]*delta_phi*delta_theta,axis=0)
         correction = np.sum(self.phase_function_3d*np.cos(self.simulation.numerics.polar_angles)[:,np.newaxis]*np.sin(self.simulation.numerics.azimuthal_angles)[:,np.newaxis]*delta_phi*delta_theta,axis=0)
         g = (g_n+correction) / (4 * np.pi)
-        print(f"corrected g: {g}")
         self.g_corr = g
 
     def compute_asymmetry_coeff(self):
@@ -707,10 +704,10 @@ class Optics:
 
                 split_data = []
                 for i in range(len(to_split)):
-                    split_data.append(cuda.to_device(np.take(to_split[i], range(start_idx,start_idx+split_idx-1), axis=idx_per_array[i])))
+                    split_data.append(cuda.to_device(np.take(to_split[i], range(start_idx,start_idx+split_idx), axis=idx_per_array[i])))
 
 
-                sizes = (jmax, len(range(start_idx,(start_idx+split_idx-1))), wavelengths)
+                sizes = (jmax, len(range(start_idx,(start_idx+split_idx))), wavelengths)
 
                 blocks_per_grid = tuple(
                     ceil(sizes[k] / threads_per_block[k])
@@ -740,7 +737,6 @@ class Optics:
                 e_field_phi_imag[start_idx:start_idx+split_idx,:] = np.array(split_data[7].copy_to_host())
 
                 # delete device arrays
-                print(sys.getrefcount(split_data))
                 del split_data
 
                 # flush deallocation queue
@@ -1019,7 +1015,6 @@ class Optics:
                 self.simulation.parameters.k_medium,
             ]
             sizes = (jmax, angles, wavelengths)
-            print(sizes)
             threads_per_block = (1, 1, 2)
 
             blocks_per_grid = tuple(
@@ -1103,7 +1098,6 @@ class Optics:
             docp = res[9]
 
         else:
-            print("WOOOOOOOOOOOOOOOOW")
             e_field_theta, e_field_phi = compute_electric_field_angle_components(
                 self.simulation.numerics.lmax,
                 self.simulation.parameters.particles.position,
