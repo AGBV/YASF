@@ -77,8 +77,21 @@ class Optics:
         associated_legendre_lookup = self.simulation.plm
         spherical_bessel_lookup = self.simulation.sph_j
         e_j_dm_phi_loopup = self.simulation.e_j_dm_phi
-
         idx_lookup = self.simulation.idx_lookup
+        data_dict = {
+                "lmax": lmax,
+                "particle_number": particle_number,
+                "idx_lookup": idx_lookup,
+                "f": f,
+                "translation_table": translation_table,
+                "associated_legendre_lookup": associated_legendre_lookup,
+                "spherical_bessel_lookup": spherical_bessel_lookup,
+                "e_j_dm_phi_loopup": e_j_dm_phi_loopup,
+                "k_medium": self.simulation.parameters.k_medium,
+                "channel": spherical_bessel_lookup.shape[-1]}
+
+        with open("cross_section_data.pkl", "wb") as fil:
+            pickle.dump(data_dict, fil)
 
         if gpu:
             jmax = particle_number * 2 * lmax * (lmax + 2)
@@ -134,6 +147,9 @@ class Optics:
                 e_j_dm_phi_loopup,
             )
 
+            res = {"c_sca": c_sca}
+            with open("c_sca_results.pkl", "wb") as f:
+                pickle.dump(res, f)
         self.c_sca = (
             c_sca / np.power(np.abs(self.simulation.parameters.k_medium), 2) * np.pi
         )
