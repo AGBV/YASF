@@ -132,13 +132,17 @@ class Optics:
 
         # TODO: No idea why the pi is needed! Check with other frameworks. Else move to efficiency below.
         self.c_ext = np.real(c_ext) * np.pi
-        self.c_sca = np.abs(c_sca)  * np.pi
+        self.c_sca = np.abs(c_sca) * np.pi
 
         self.albedo = self.c_sca / self.c_ext
 
     def compute_efficiencies(self):
-        self.q_sca = self.c_sca / self.simulation.parameters.particles.geometric_projection
-        self.q_ext = self.c_ext / self.simulation.parameters.particles.geometric_projection
+        self.q_sca = (
+            self.c_sca / self.simulation.parameters.particles.geometric_projection
+        )
+        self.q_ext = (
+            self.c_ext / self.simulation.parameters.particles.geometric_projection
+        )
 
         self.q_ext *= np.abs(self.simulation.parameters.medium_refractive_index)
         self.q_sca *= np.abs(self.simulation.parameters.medium_refractive_index)

@@ -15,6 +15,7 @@ import numpy as np
 
 HASH_TYPE = "sha256"
 
+
 def material_handler(links, cache: bool = True, local: bool = True):
     """
     Handles the processing of material data from various sources.

@@ -100,7 +100,7 @@ class Parameters:
                 self.ref_idx_table = self.__interpolate_refractive_index_from_table()
             else:
                 self.ref_idx_table = self.particles.refractive_index_table
-            
+
             self.k_particle = (
                 np.take(self.ref_idx_table, self.particles.refractive_index, axis=0)
                 * np.array(self.omega)[np.newaxis, :]

@@ -43,6 +43,7 @@ def multi2single_index(j_s, tau, l, m, lmax):
         + l
     )
 
+
 @nb.njit(nogil=True, fastmath=True)
 def single_index2multi(idx, lmax):
     """
@@ -250,6 +251,7 @@ def mutual_lookup(
         spherical_hankel_derivative,
     )
 
+
 def generate_refractive_index_table(urls: list) -> list:
     """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
     URL using the `material_handler` function, and returns a list of the retrieved data.
@@ -267,6 +269,7 @@ def generate_refractive_index_table(urls: list) -> list:
         data[k] = material_handler(url)
 
     return data
+
 
 def interpolate_refractive_index_from_table(
     wavelengths: np.ndarray, materials: list, species_idx: np.ndarray
