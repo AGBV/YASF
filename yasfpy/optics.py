@@ -54,14 +54,13 @@ class Optics:
         a = self.simulation.initial_field_coefficients
         f = self.simulation.scattered_field_coefficients
 
-        self.c_ext = np.zeros(
-            self.simulation.parameters.wavelengths_number, dtype=complex
-        )
-        self.c_ext -= (
-            np.sum(np.conjugate(a) * f, axis=(0, 1))
-            / np.power(self.simulation.parameters.k_medium, 2)
-            * np.pi
-        )
+        c_ext = np.zeros(self.simulation.parameters.wavelengths_number, dtype=complex)
+        c_ext -= np.sum(np.conjugate(a) * f, axis=(0, 1))
+        # self.c_ext -= (
+        #     np.sum(np.conjugate(a) * f, axis=(0, 1))
+        #     / np.power(self.simulation.parameters.k_medium, 2)
+        #     * np.pi
+        # )
 
         lmax = self.simulation.numerics.lmax
         particle_number = self.simulation.parameters.particles.number
@@ -75,7 +74,8 @@ class Optics:
 
         if self.simulation.numerics.gpu:
             jmax = particle_number * 2 * lmax * (lmax + 2)
-            c_sca_real = np.zeros((jmax,wavelengths), dtype=float)
+            c_sca_real = np.zeros((jmax, wavelengths), dtype=float)
+            # c_sca_real = np.zeros(wavelengths, dtype=float)
             c_sca_imag = np.zeros_like(c_sca_real)
 
             idx_device = cuda.to_device(idx_lookup)
@@ -106,16 +106,15 @@ class Optics:
                 c_sca_imag_device,
             )
             c_sca_real = c_sca_real_device.copy_to_host()
-            c_sca_real = np.sum(c_sca_real,axis=0)
             c_sca_imag = c_sca_imag_device.copy_to_host()
-            c_sca_imag = np.sum(c_sca_imag,axis=0)
+            c_sca_real = np.sum(c_sca_real, axis=0)
+            c_sca_imag = np.sum(c_sca_imag, axis=0)
             c_sca = c_sca_real + 1j * c_sca_imag
 
         else:
             # from numba_progress import ProgressBar
             # num_iterations = jmax * jmax * wavelengths
             # progress = ProgressBar(total=num_iterations)
-            progress = None
             c_sca = compute_scattering_cross_section(
                 lmax,
                 particle_number,
@@ -127,14 +126,22 @@ class Optics:
                 e_j_dm_phi_loopup,
             )
 
-        self.c_sca = (
-            c_sca / np.power(np.abs(self.simulation.parameters.k_medium), 2) * np.pi
-        )
+        k_medium_abs_squared = np.power(np.abs(self.simulation.parameters.k_medium), 2)
+        c_sca /= k_medium_abs_squared
+        c_ext /= k_medium_abs_squared
 
-        self.c_ext = np.real(self.c_ext)
-        self.c_sca = np.real(self.c_sca)
+        # TODO: No idea why the pi is needed! Check with other frameworks. Else move to efficiency below.
+        self.c_ext = np.real(c_ext) * np.pi
+        self.c_sca = np.abs(c_sca)  * np.pi
 
         self.albedo = self.c_sca / self.c_ext
+
+    def compute_efficiencies(self):
+        self.q_sca = self.c_sca / self.simulation.parameters.particles.geometric_projection
+        self.q_ext = self.c_ext / self.simulation.parameters.particles.geometric_projection
+
+        self.q_ext *= np.abs(self.simulation.parameters.medium_refractive_index)
+        self.q_sca *= np.abs(self.simulation.parameters.medium_refractive_index)
 
     def compute_phase_funcition(
         self,

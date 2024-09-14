@@ -1,11 +1,16 @@
-import os
-import json
-import yaml
+import pyperf
 import logging
+
+import pstats
+import cProfile
+from pyinstrument import Profiler
+from pyinstrument.renderers import SpeedscopeRenderer
+import speedscope
 
 import numpy as np
 import pandas as pd
 
+from yasfpy.config import Config
 from yasfpy.particles import Particles
 from yasfpy.initial_field import InitialField
 from yasfpy.parameters import Parameters
@@ -18,148 +23,47 @@ from yasfpy.optics import Optics
 class YASF:
     config: dict = None
 
-    def __init__(self, path_config: str, path_particles: str = None):
-        match path_config.split(".")[-1]:
-            case "json":
-                with open(path_config) as data:
-                    self.config = json.load(data)
-            case "yaml" | "yml":
-                with open(path_config) as data:
-                    self.config = yaml.safe_load(data)
-            case _:
-                raise Exception(
-                    "The provided config file needs to be a json or yaml file!"
-                )
-
-        self.log = logging.getLogger(self.__class__.__module__)
-        self.__setup()
-
-    def __setup(self):
-        material = Particles.generate_refractive_index_table(
-            self.config["particles"]["material"]
-        )
-        delim = (
-            self.config["particles"]["geometry"]["delimiter"]
-            if "delimiter" in self.config["particles"]["geometry"]
-            else ","
-        )
-        delim = "\s+" if delim == "whitespace" else delim
-        spheres = pd.read_csv(
-            self.config["particles"]["geometry"]["file"], header=None, sep=delim
-        )
-        if spheres.shape[1] < 4:
-            raise Exception(
-                "The particle geometry file needs at least 4 columns (x, y, z, r) and an optinal refractive index column"
-            )
-        elif spheres.shape[1] == 4:
-            self.log.warning(
-                "4 columns have been provided. Implying that all particles belong to the same material."
-            )
-            spheres[4] = np.zeros((spheres.shape[0], 1))
-        elif spheres.shape[1] >= 5:
-            self.log.warning(
-                "More than 5 columns have been provided. Everything after the 5th will be ignored!"
-            )
-        spheres = spheres.to_numpy()
-
-        if isinstance(self.config["parameters"]["wavelength"], list):
-            wavelength = self.config["parameters"]["wavelength"]
-        elif isinstance(self.config["parameters"]["wavelength"], dict):
-            wavelength = np.arange(
-                self.config["parameters"]["wavelength"]["start"],
-                self.config["parameters"]["wavelength"]["stop"],
-                self.config["parameters"]["wavelength"]["step"],
-            )
-        else:
-            raise Exception(
-                "Please provide the wavelength as an array, or the (start, stop, step) linspace parameters."
-            )
-        medium_url = (
-            self.config["parameters"]["medium"]["url"]
-            if "url" in self.config["parameters"]["medium"]
-            else self.config["parameters"]["medium"]
-        )
-        medium = Particles.generate_refractive_index_table([medium_url])
-        scale = (
-            self.config["parameters"]["medium"]["scale"]
-            if "scale" in self.config["parameters"]["medium"]
-            else 1
-        )
-        medium_refractive_index = np.interp(
-            wavelength / scale,
-            medium[0]["ref_idx"]["wavelength"],
-            medium[0]["ref_idx"]["n"] + 1j * medium[0]["ref_idx"]["k"],
-        )
+    def __init__(self, path_config: str, preprocess: bool = True):
+        self.path_config = path_config
+        self.config = Config(path_config, preprocess)
 
         self.particles = Particles(
-            spheres[:, 0:3],
-            spheres[:, 3],
-            spheres[:, 4],
-            refractive_index_table=material,
+            self.config.spheres[:, 0:3],
+            self.config.spheres[:, 3],
+            self.config.spheres[:, 4],
+            refractive_index_table=self.config.refractive_index_interpolated,
+            # refractive_index_table=self.config.material,
         )
         self.initial_field = InitialField(
-            beam_width=self.config["initial_field"]["beam_width"],
-            focal_point=np.array(self.config["initial_field"]["focal_point"]),
-            polar_angle=self.config["initial_field"]["polar_angle"],
-            azimuthal_angle=self.config["initial_field"]["azimuthal_angle"],
-            polarization=self.config["initial_field"]["polarization"],
+            beam_width=self.config.config["initial_field"]["beam_width"],
+            focal_point=np.array(self.config.config["initial_field"]["focal_point"]),
+            polar_angle=self.config.config["initial_field"]["polar_angle"],
+            azimuthal_angle=self.config.config["initial_field"]["azimuthal_angle"],
+            polarization=self.config.config["initial_field"]["polarization"],
         )
         self.parameters = Parameters(
-            wavelength=wavelength,
-            medium_refractive_index=medium_refractive_index,
+            wavelength=self.config.wavelength,
+            medium_refractive_index=self.config.medium_refractive_index,
             particles=self.particles,
             initial_field=self.initial_field,
         )
         self.solver = Solver(
-            solver_type=self.config["solver"]["type"],
-            tolerance=self.config["solver"]["tolerance"],
-            max_iter=self.config["solver"]["max_iter"],
-            restart=self.config["solver"]["restart"],
+            solver_type=self.config.config["solver"]["type"],
+            tolerance=self.config.config["solver"]["tolerance"],
+            max_iter=self.config.config["solver"]["max_iter"],
+            restart=self.config.config["solver"]["restart"],
         )
         self.numerics = Numerics(
-            lmax=self.config["numerics"]["lmax"],
-            sampling_points_number=self.config["numerics"]["sampling_points"],
-            particle_distance_resolution=self.config["numerics"][
+            lmax=self.config.config["numerics"]["lmax"],
+            sampling_points_number=self.config.config["numerics"]["sampling_points"],
+            particle_distance_resolution=self.config.config["numerics"][
                 "particle_distance_resolution"
             ],
-            gpu=self.config["numerics"]["gpu"],
+            gpu=self.config.config["numerics"]["gpu"],
             solver=self.solver,
         )
         self.simulation = Simulation(self.parameters, self.numerics)
         self.optics = Optics(self.simulation)
-
-        folder = (
-            self.config["output"]["folder"]
-            if "folder" in self.config["output"]
-            else "."
-        )
-        folder = os.sep.join(folder.replace("\\", "/").split("/"))
-
-        extension = (
-            self.config["output"]["extension"]
-            if "extension" in self.config["output"]
-            else "pbz2"
-        )
-        filename = None
-        if "file" in self.config["particles"]["geometry"]:
-            filename = self.config["particles"]["geometry"]["file"].split(os.sep)[-1]
-            filename = filename.split(".")[0]
-        filename = (
-            self.config["output"]["filename"]
-            if "filename" in self.config["output"]
-            else filename
-        )
-        filename = (
-            self.config["output"]
-            if isinstance(self.config["output"], str)
-            else filename
-        )
-        filename = (
-            f"{filename}.{extension}" if len(filename.split(".")) == 1 else filename
-        )
-        self.output_filename = (
-            os.path.join(folder, filename) if (filename is not None) else None
-        )
 
     def run(self, points: np.ndarray = None):
         self.particles.compute_volume_equivalent_area()
@@ -169,8 +73,78 @@ class YASF:
         self.simulation.compute_initial_field_coefficients()
         self.simulation.compute_right_hand_side()
         self.simulation.compute_scattered_field_coefficients()
-        self.optics.compute_cross_sections()
-        self.optics.compute_phase_funcition()
+        if self.config.config["optics"]:
+            self.optics.compute_cross_sections()
+            self.optics.compute_efficiencies()
+            self.optics.compute_phase_funcition()
 
+        # NOTE: Legacy, needs to be removed
         if points is not None:
             self.optics.simulation.compute_fields(points)
+
+        if "points" in self.config.config:
+            points = np.stack(
+                (
+                    self.config.config["points"]["x"],
+                    self.config.config["points"]["y"],
+                    self.config.config["points"]["z"],
+                ),
+                axis=1,
+            )
+            self.optics.simulation.compute_fields(points)
+
+    @staticmethod
+    def benchmark(config_path: str = None, runner: pyperf.Runner = None):
+        if config_path is None:
+            raise Exception("Plase provide a config file!")
+        if runner is None:
+            raise Exception("Plase provide a runner for benchmarking!")
+        runner.bench_func("yasf_init", lambda: YASF(config_path))
+        yasf_instance = YASF(config_path)
+        runner.bench_func("yasf_run", lambda: yasf_instance.run())
+
+    @staticmethod
+    def profiler(config_path: str = None, output: str = None):
+        if config_path is None:
+            raise Exception("Plase provide a config file!")
+        with cProfile.Profile() as pr:
+            yasf_instance = YASF(config_path)
+            yasf_instance.run()
+            stats = pstats.Stats(pr).sort_stats(pstats.SortKey.TIME)
+            stats.print_stats() if output is None else stats.dump_stats(output)
+            return yasf_instance
+
+        # with Profiler() as profiler:
+        #     yasf_instance = YASF(config_path)
+        #     yasf_instance.run()
+
+        #     with open(output, 'w') as f:
+        #         f.write(profiler.render(renderer=SpeedscopeRenderer()))
+
+        # profiler = Profiler()
+        # profiler.start()
+        # yasf_instance = YASF(config_path)
+        # yasf_instance.run()
+        # profiler.stop()
+        # with open(output, 'w') as f:
+        #     f.write(profiler.render(renderer=SpeedscopeRenderer()))
+
+        # with speedscope.track(output):
+        #     yasf_instance = YASF(config_path)
+        #     yasf_instance.run()
+
+        #     return yasf_instance
+
+        # https://backend.orbit.dtu.dk/ws/portalfiles/portal/5501107/paper.pdf
+        # page 4
+        # r = np.sqrt(self.particles.geometric_projection / np.pi)
+        # im_n = self.config.medium_refractive_index.imag
+        # wl = self.config.wavelength
+        # alpha = 4 * np.pi * r * im_n / wl
+        # gamma = 2 * (1 + (alpha - 1) * np.exp(alpha)) / alpha ** 2
+        # correction = np.exp(-alpha) / gamma
+        # self.optics.q_sca *= correction
+        # print(r)
+        # print(alpha)
+        # print(gamma)
+        # print(correction)

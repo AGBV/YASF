@@ -525,12 +525,8 @@ class Simulation:
         self.scattered_field_err_codes = np.zeros(self.parameters.wavelengths_number)
         if guess is None:
             guess = self.right_hand_side
+        # TODO: Look into performing this loop in parallel
         for w in range(self.parameters.wavelengths_number):
-            # def mmm(x):
-            #     return self.master_matrix_multiply(x, w)
-
-            # A = LinearOperator(shape=(jmax, jmax), matvec=mmm)
-
             A = LinearOperator(
                 shape=(jmax, jmax), matvec=lambda x: self.master_matrix_multiply(x, w)
             )
@@ -594,12 +590,11 @@ class Simulation:
         pi_lm, tau_lm = spherical_functions_trigon(
             self.numerics.lmax, cosine_theta, sine_theta
         )
-        # print(sph_h.size)
 
         self.log.info("Computing field...")
         field_time_start = time()
         self.sampling_points = sampling_points
-        if self.numerics.gpu:
+        if not self.numerics.gpu:
             self.log.info("\t...using GPU")
             field_real = np.zeros(
                 (self.parameters.k_medium.size, sampling_points.shape[0], 3),

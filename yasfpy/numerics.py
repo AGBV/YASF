@@ -187,7 +187,7 @@ class Numerics:
             # No idea why or how this value for max_two_j works,
             # but got it through trial and error.
             # If you get any Wigner errors, change this value (e.g. 4*lmax or lmax**2)
-            max_two_j = 3 * self.lmax
+            max_two_j = 3 * self.lmax + 1
             wig.wig_table_init(max_two_j, 3)
             wig.wig_temp_init(max_two_j)
 

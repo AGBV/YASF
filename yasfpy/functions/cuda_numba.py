@@ -109,15 +109,17 @@ def compute_scattering_cross_section_gpu(
     delta_m = abs(m1 - m2)
 
     p_dependent = complex(0)
-    for p in range(delta_m, 2 * lmax + 1):
+    # for p in range(delta_m, 2 * lmax + 1):
+    for p in range(delta_m, m1 + m2 + 1):
         p_dependent += (
-            translation_table[n2, n1, p]
+            # translation_table[n2, n1, p]
+            translation_table[n1, n2, p]
             * plm[p * (p + 1) // 2 + delta_m, s1, s2]
             * sph_h[p, s1, s2, w]
         )
     p_dependent *= (
         sfc[s1, n1, w].conjugate()
-        * e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2]
+        * e_j_dm_phi[m1 - m2 + 2 * lmax, s1, s2]
         * sfc[s2, n2, w]
     )
 

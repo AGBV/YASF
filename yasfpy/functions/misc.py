@@ -1,6 +1,7 @@
-from yasfpy.particles import Particles
+from yasfpy.functions.material_handler import material_handler
 from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 
+import numba as nb
 import numpy as np
 from scipy.special import spherical_jn
 from scipy.special import hankel1, lpmv
@@ -42,7 +43,7 @@ def multi2single_index(j_s, tau, l, m, lmax):
         + l
     )
 
-
+@nb.njit(nogil=True, fastmath=True)
 def single_index2multi(idx, lmax):
     """
     Convert a single index to multi-indices (j_s, tau, l, m) for spherical harmonics.
@@ -226,9 +227,6 @@ def mutual_lookup(
                         / 2
                         * np.prod(1 / np.arange(p - absdm + 1, p + absdm + 1))
                     )
-                    # if np.isnan(cml):
-                    #     print(p)
-                    #     print(absdm)
                     p_lm[p * (p + 1) // 2 + absdm, :, :] = (
                         cml * np.power(-1.0, absdm) * lpmv(absdm, p, cosine_theta)
                     )
@@ -252,6 +250,23 @@ def mutual_lookup(
         spherical_hankel_derivative,
     )
 
+def generate_refractive_index_table(urls: list) -> list:
+    """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
+    URL using the `material_handler` function, and returns a list of the retrieved data.
+
+    Args:
+        urls (list): A list of URLs representing different materials.
+
+    Returns:
+        data (list): A list of data. Each element in the list corresponds to a URL in the input list,
+            and the data is obtained by calling the `material_handler` function on each URL.
+
+    """
+    data = [None] * len(urls)
+    for k, url in enumerate(urls):
+        data[k] = material_handler(url)
+
+    return data
 
 def interpolate_refractive_index_from_table(
     wavelengths: np.ndarray, materials: list, species_idx: np.ndarray
@@ -263,7 +278,7 @@ def interpolate_refractive_index_from_table(
             at different wavelengths.
     """
 
-    refractive_index_table = Particles.generate_refractive_index_table(materials)
+    refractive_index_table = generate_refractive_index_table(materials)
 
     unique_refractive_indices, _ = np.unique(species_idx, return_inverse=True, axis=0)
     num_unique_refractive_indices = unique_refractive_indices.shape[0]

@@ -3,6 +3,8 @@ from numba import jit, prange, complex128, float64, int64
 import numpy as np
 from scipy.special import spherical_jn, hankel1, lpmv
 
+from yasfpy.functions.misc import single_index2multi
+
 
 @jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
 def particle_interaction(
@@ -86,6 +88,22 @@ def compute_idx_lookups(lmax: int, particle_number: int):
     idx = np.zeros(nmax * particle_number * 5, dtype=int64).reshape(
         (nmax * particle_number, 5)
     )
+
+    # TODO: Needs further testing!
+    # TODO: Make it go brrrr
+    # for i in prange(particle_number * nmax):
+    #     s = i // (2 * lmax * (lmax + 2))
+    #     i_new = i % (2 * lmax * (lmax + 2))
+    #     tau = i_new // (lmax * (lmax + 2)) + 1
+    #     i_new = i_new % (lmax * (lmax + 2))
+    #     l = np.floor(np.sqrt(i_new + 1))
+    #     m = i_new - (l * l + l - 1)
+    #     n = (tau - 1) * lmax * (lmax + 2) + (l - 1) * (l + 1) + l + m
+    #     idx[i, 0] = s
+    #     idx[i, 1] = n
+    #     idx[i, 2] = tau
+    #     idx[i, 3] = l
+    #     idx[i, 4] = m
 
     for s in prange(particle_number):
         for tau in range(1, 3):

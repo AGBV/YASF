@@ -1,21 +1,28 @@
 import re
 import io
-import pandas as pd
+import os
+import hashlib
 import yaml
+import pandas as pd
 
 # import urllib.request
+from pathlib import Path
+from importlib.resources import files
 from urllib.parse import unquote
 import requests as req
 
 import numpy as np
 
+HASH_TYPE = "sha256"
 
-def material_handler(links):
+def material_handler(links, cache: bool = True, local: bool = True):
     """
     Handles the processing of material data from various sources.
 
     Args:
         links (str or list): The link(s) to the material data source(s).
+        cache (bool): cache the downloaded file using sha256 string
+        local (bool): load locally cached files if available
 
     Returns:
         (dict): A dictionary containing the processed material data and information.
@@ -24,20 +31,45 @@ def material_handler(links):
     if not isinstance(links, list):
         links = [links]
 
+    data_path = Path(f"{files(__package__) / 'data'}")
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
+
     data = dict(ref_idx=pd.DataFrame(columns=["wavelength", "n", "k"]), material=None)
     for link in links:
         link = link.strip()
         if link[:4] == "http":
-            if "refractiveindex.info" in link:
+            is_cached = False
+            h = hashlib.new(HASH_TYPE)
+            h.update(link.encode("utf-8"))
+            cache_file_name = os.path.join(data_path, f"{h.hexdigest()}.csv")
+            material_file_name = os.path.join(data_path, f"{h.hexdigest()}.txt")
+            if os.path.isfile(cache_file_name):
+                df = pd.read_csv(cache_file_name)
+                material = "NaN"
+                with open(material_file_name, "r") as fh:
+                    material = fh.read()
+                is_cached = True
+                # print(f"Reading {link} from cache: {cache_file_name}.")
+            elif "refractiveindex.info" in link:
                 df, material = handle_refractiveindex_info(link)
-                data["ref_idx"] = pd.concat([data["ref_idx"], df])
-                data["material"] = material
-            elif "http://eodg.atm.ox.ac.uk" in link:
+                # data["ref_idx"] = pd.concat([data["ref_idx"], df])
+                # data["material"] = material
+            elif "eodg.atm.ox.ac.uk" in link:
                 df, material = handle_eodg(link)
-                data["ref_idx"] = pd.concat([data["ref_idx"], df])
-                data["material"] = material
+                # data["ref_idx"] = pd.concat([data["ref_idx"], df])
+                # data["material"] = material
             else:
-                print("No matching handler found for url")
+                print(f"No matching handler found for {link}")
+                continue
+            data["ref_idx"] = pd.concat([data["ref_idx"], df])
+            data["material"] = material
+
+            if not is_cached:
+                # print(f"{link} was not cached. Not caching at {cache_file_name}.")
+                df.to_csv(cache_file_name, index=False)
+                with open(material_file_name, "w") as fh:
+                    fh.write(material)
         else:
             if ".csv" in link:
                 df, material = handle_csv(link)

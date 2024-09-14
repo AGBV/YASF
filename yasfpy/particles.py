@@ -1,11 +1,11 @@
 import logging
-import yasfpy.log as log
+# import yasfpy.log as log
 
 import numpy as np
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import pdist
 
-from yasfpy.functions.material_handler import material_handler
+# from yasfpy.functions.material_handler import material_handler
 
 
 class Particles:
@@ -47,39 +47,39 @@ class Particles:
         self.refractive_index_table = refractive_index_table
 
         if refractive_index_table is None:
-            if self.refractive_index.shape[1] == 2:
+            if (len(refractive_index.shape) > 2):
+                raise Exception("Refractive index should be either an integer array, complex array, or a two column float matrix!")
+            elif (len(refractive_index.shape) == 2) and (self.refractive_index.shape[1] > 2):
+                raise Exception("Refractive index should be either an integer array, complex array, or a two column float matrix!")
+
+            elif (len(refractive_index.shape) > 1) and (refractive_index.shape[1] == 2):
                 self.refractive_index = (
-                    self.refractive_index[:, 0] + 1j * self.refractive_index[:, 1]
-                )
-            elif self.refractive_index.shape[1] > 2:
-                self.log.error(
-                    "Refractive index should be either complex or a two column matrix!"
+                    refractive_index[:, 0] + 1j * refractive_index[:, 1]
                 )
         else:
             self.refractive_index = refractive_index.astype(int)
-            self.refractive_index_table = refractive_index_table
 
         self.number = r.shape[0]
         self.__setup_impl()
 
-    @staticmethod
-    def generate_refractive_index_table(urls: list) -> list:
-        """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
-        URL using the `material_handler` function, and returns a list of the retrieved data.
+    # @staticmethod
+    # def generate_refractive_index_table(urls: list) -> list:
+    #     """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
+    #     URL using the `material_handler` function, and returns a list of the retrieved data.
 
-        Args:
-            urls (list): A list of URLs representing different materials.
+    #     Args:
+    #         urls (list): A list of URLs representing different materials.
 
-        Returns:
-            data (list): A list of data. Each element in the list corresponds to a URL in the input list,
-                and the data is obtained by calling the `material_handler` function on each URL.
+    #     Returns:
+    #         data (list): A list of data. Each element in the list corresponds to a URL in the input list,
+    #             and the data is obtained by calling the `material_handler` function on each URL.
 
-        """
-        data = [None] * len(urls)
-        for k, url in enumerate(urls):
-            data[k] = material_handler(url)
+    #     """
+    #     data = [None] * len(urls)
+    #     for k, url in enumerate(urls):
+    #         data[k] = material_handler(url)
 
-        return data
+    #     return data
 
     def compute_unique_refractive_indices(self):
         """Computes the unique refractive indices and their indices."""
@@ -138,8 +138,7 @@ class Particles:
             if len(self.position) == 1:
                 self.max_particle_distance = 0
             else:
-                assert len(self.position) == 1
-                "SCIPY CONVEX HULL NEEDS 4 POINT MINIMUM; not currently accounted for"
+                self.max_particle_distance = max(pdist(self.position))
 
         else:
             hull = ConvexHull(self.position)

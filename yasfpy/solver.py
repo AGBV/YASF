@@ -2,7 +2,7 @@ import logging
 # import yasfpy.log as log
 
 import numpy as np
-from scipy.sparse.linalg import LinearOperator, gmres, lgmres, bicgstab
+from scipy.sparse.linalg import LinearOperator, gmres, lgmres, bicgstab, cg, cgs, qmr, gcrotmk, tfqmr
 
 
 class Solver:
@@ -53,6 +53,8 @@ class Solver:
         if x0 is None:
             x0 = np.copy(b)
 
+        x0 = np.zeros_like(b)
+
         if np.any(np.isnan(b)):
             print(b)
 
@@ -75,9 +77,9 @@ class Solver:
                 a,
                 b,
                 x0,
-                restart=self.restart,
+                restart=self.rerestartstart,
                 tol=self.tolerance,
-                atol=self.tolerance**2,
+                atol=0,
                 maxiter=self.max_iter,
                 callback=counter,
                 callback_type="pr_norm",
@@ -89,9 +91,52 @@ class Solver:
                 b,
                 x0,
                 rtol=self.tolerance,
-                atol=self.tolerance**2,
+                atol=0,
                 maxiter=self.max_iter,
                 callback=counter,
+            )
+        elif self.type == "cgs":
+            # counter = GMResCounter(callback_type="x")
+            value, err_code = cgs(
+                a,
+                b,
+                x0,
+                rtol=self.tolerance,
+                atol=0,
+                maxiter=self.max_iter,
+                # callback=co
+            )
+        elif self.type == "qmr":
+            value, err_code = qmr(
+                a,
+                b,
+                x0=x0,
+                rtol=self.tolerance,
+                atol=0,
+                maxiter=self.max_iter,
+                # callback=co
+            )
+        elif self.type == "gcrotmk":
+            # counter = GMResCounter(callback_type="x")
+            value, err_code = gcrotmk(
+                a,
+                b,
+                x0,
+                rtol=self.tolerance,
+                atol=0,
+                maxiter=self.max_iter,
+                # callback=co
+            )
+        elif self.type == "tfqmr":
+            # counter = GMResCounter(callback_type="x")
+            value, err_code = tfqmr(
+                a,
+                b,
+                x0,
+                rtol=self.tolerance,
+                atol=0,
+                maxiter=self.max_iter,
+                # callback=co
             )
         else:
             self.log.error("Please specify a valid solver type")
