@@ -43,7 +43,7 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
     djx = x * spherical_jn(l - 1, x) - l * jx
     djmx = mx * spherical_jn(l - 1, mx) - l * jmx
     dhx = x * (spherical_jn(l - 1, x) + 1j * spherical_yn(l - 1, x)) - l * hx
-    
+
     # if (field_type, tau) == ("scattered", 1):
     #     return -(jmx * djx - jx * djmx) / (jmx * dhx - hx * djmx)  # -b
     # if (field_type, tau) == ("scattered", 2):
@@ -60,7 +60,9 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
         case ("scattered", 1):
             return -(jmx * djx - jx * djmx) / (jmx * dhx - hx * djmx)  # -b
         case ("scattered", 2):
-            return -(m**2 * jmx * djx - jx * djmx) / (m**2 * jmx * dhx - hx * djmx)  # -a
+            return -(m**2 * jmx * djx - jx * djmx) / (
+                m**2 * jmx * dhx - hx * djmx
+            )  # -a
         case ("internal", 1):
             return (jx * dhx - hx * djx) / (jmx * dhx - hx * djmx)  # c
         case ("internal", 2):
@@ -68,6 +70,8 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
         case ("ratio", 1):
             return (jx * dhx - hx * djx) / -(jmx * djx - jx * djmx)  # c / -b
         case ("ratio", 2):
-            return (m * jx * dhx - m * hx * djx) / -(m**2 * jmx * djx - jx * djmx)  # d / -a
+            return (m * jx * dhx - m * hx * djx) / -(
+                m**2 * jmx * djx - jx * djmx
+            )  # d / -a
         case _:
             raise ValueError("Not a valid field type provided. Returning None!")

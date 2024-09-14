@@ -47,10 +47,16 @@ class Particles:
         self.refractive_index_table = refractive_index_table
 
         if refractive_index_table is None:
-            if (len(refractive_index.shape) > 2):
-                raise Exception("Refractive index should be either an integer array, complex array, or a two column float matrix!")
-            elif (len(refractive_index.shape) == 2) and (self.refractive_index.shape[1] > 2):
-                raise Exception("Refractive index should be either an integer array, complex array, or a two column float matrix!")
+            if len(refractive_index.shape) > 2:
+                raise Exception(
+                    "Refractive index should be either an integer array, complex array, or a two column float matrix!"
+                )
+            elif (len(refractive_index.shape) == 2) and (
+                self.refractive_index.shape[1] > 2
+            ):
+                raise Exception(
+                    "Refractive index should be either an integer array, complex array, or a two column float matrix!"
+                )
 
             elif (len(refractive_index.shape) > 1) and (refractive_index.shape[1] == 2):
                 self.refractive_index = (

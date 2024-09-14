@@ -6,23 +6,42 @@ from yasfpy.config import Config
 DEFAULT_BIN_PATH = ""
 DEFAULT_CONF_PATH = ""
 
-class ADDAManager():
 
-    def __init__(self, config_path: str=DEFAULT_CONF_PATH, binary: str=DEFAULT_BIN_PATH, output_file: str="wow"):
+class ADDAManager:
+    def __init__(
+        self,
+        config_path: str = DEFAULT_CONF_PATH,
+        binary: str = DEFAULT_BIN_PATH,
+        output_file: str = "wow",
+    ):
         self.config = Config(config_path)
         self.binary = binary
         self.output_file = output_file
 
-
     def __exec(self, runner: pyperf.Runner = None):
         # command = [self.binary, self.input_args]
         if self.config.spheres.shape[0] > 1:
-            print("WARNING! MORE THAN 1 SPHERE DETECTED IN CONFIG! USING ONLY THE FIRST SPHERE!")
+            print(
+                "WARNING! MORE THAN 1 SPHERE DETECTED IN CONFIG! USING ONLY THE FIRST SPHERE!"
+            )
 
-        diameter = self.config.spheres[0,3]*2 # TODO: THIS ALWAYS NEEDS TO BE IN NANOMETERS
-        for wi,wavelength in enumerate(self.config.wavelength):
-
-            command = [self.binary, f"-size", f"{diameter}", f"-lambda", f"{wavelength}", f"-m", f"{self.config.medium_refractive_index[wi].real}",f"{self.config.medium_refractive_index[wi].imag}", "-asym", f"-dir", f"run_sphere_r{diameter}_l{wavelength}"]
+        diameter = (
+            self.config.spheres[0, 3] * 2
+        )  # TODO: THIS ALWAYS NEEDS TO BE IN NANOMETERS
+        for wi, wavelength in enumerate(self.config.wavelength):
+            command = [
+                self.binary,
+                f"-size",
+                f"{diameter}",
+                f"-lambda",
+                f"{wavelength}",
+                f"-m",
+                f"{self.config.medium_refractive_index[wi].real}",
+                f"{self.config.medium_refractive_index[wi].imag}",
+                "-asym",
+                f"-dir",
+                f"run_sphere_r{diameter}_l{wavelength}",
+            ]
         if runner is None:
             os.system(" ".join(command))
         else:
@@ -30,43 +49,38 @@ class ADDAManager():
             runner.bench_command("mstm3_exec", command)
 
     def __read(self):
-        q_exts: list[float] =  []
+        q_exts: list[float] = []
         q_scats: list[float] = []
         gs: list[float] = []
         c_exts: list[float] = []
         c_scats: list[float] = []
-        diameter = self.config.spheres[0,3]*2
+        diameter = self.config.spheres[0, 3] * 2
         for wavelength in self.config.wavelength:
             with open(f"run_sphere_r{diameter}_l{wavelength}/CrossSec-Y", "r") as f:
                 data = f.readlines()
             for line in data:
-                if len(re.findall("^g\t=",line)) > 0:
+                if len(re.findall("^g\t=", line)) > 0:
                     g = float(line.split("=")[-1].strip().split(",")[-1].strip(")"))
                     gs.append(g)
-                if len(re.findall("Qsca\t",line)) > 0:
+                if len(re.findall("Qsca\t", line)) > 0:
                     q_sca = float(line.split("=")[-1].strip())
                     q_scats.append(q_sca)
-                if len(re.findall("Qext\t",line)) > 0:
+                if len(re.findall("Qext\t", line)) > 0:
                     q_ext = float(line.split("=")[-1].strip())
                     q_exts.append(q_ext)
-                if len(re.findall("Csca\t",line)) > 0:
+                if len(re.findall("Csca\t", line)) > 0:
                     c_sca = float(line.split("=")[-1].strip())
                     c_scats.append(c_sca)
-                if len(re.findall("Cext\t",line)) > 0:
+                if len(re.findall("Cext\t", line)) > 0:
                     c_ext = float(line.split("=")[-1].strip())
                     c_exts.append(c_ext)
         adda = {
-            "cross_sections": {
-                "C_scat": c_scats,
-                "C_ext": c_ext
-            },
+            "cross_sections": {"C_scat": c_scats, "C_ext": c_ext},
             "efficiencies": {
                 "Q_scat": q_scats,
                 "Q_ext": q_exts,
             },
-            "asymmetry": {
-                "g": gs
-            }
+            "asymmetry": {"g": gs},
         }
         self.output = adda
 
@@ -109,6 +123,7 @@ class ADDAManager():
         if cleanup:
             self.clean()
 
+
 if __name__ == "__main__":
     adda = ADDAManager("./config.json", "./MSTM3/src/mstm")
     # See params at
@@ -116,4 +131,3 @@ if __name__ == "__main__":
     runner = pyperf.Runner(values=1, processes=5, warmups=1)
     adda.run(runner)
     # adda.export("adda.bz2", True)
-

@@ -108,11 +108,17 @@ class MSTM4Manager:
         if self.parallel == 1:
             command = [self.binary, self.input_file]
         elif self.parallel % 4 == 0:
-            command = ["mpiexec", "-n", str(self.parallel), self.binary, self.input_file]
+            command = [
+                "mpiexec",
+                "-n",
+                str(self.parallel),
+                self.binary,
+                self.input_file,
+            ]
         else:
             raise Exception("parallel parameter needs to be divisble by 4!")
-                
-        if runner is  None:
+
+        if runner is None:
             os.system(" ".join(command))
         else:
             runner.bench_command(f"mstm4_exec_{self.parallel}", command)
