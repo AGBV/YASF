@@ -5,6 +5,7 @@ requirements.txt
 # Ignore wheel files
 /*.whl
 yasfpy/data
+yasfpy/functions/data
 # Ignore current project files
 src/optics.py
 
