@@ -4,7 +4,14 @@ site_url: https://agbv.github.io/yasf
 repo_url: https://github.com/AGBV/YASF
 
 nav:
-  - Home: index.md
+  - Home:
+      - index.md
+      - "vs. CELES": home/celes.md
+      - "vs. MSTM": home/mstm.md
+  - "Getting Started":
+      - "Install": getting-started/install.md
+      - "Usage": getting-started/usage.md
+      - "Examples": getting-started/examples.md
   - Code Reference: reference/
   - Testing:
       - testing/index.md
