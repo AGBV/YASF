@@ -1,0 +1,52 @@
+{
+  "particles": {
+    "geometry": {
+      "file": "N_256_FD_20.dat",
+      "delimiter": "whitespace",
+      "scale": 1e-9
+    },
+    "material": [
+      {
+        "url": "https://refractiveindex.info/database/data-nk/main/C/Querry-DixonKS2.yml",
+        "scale": 1e-6
+      }
+    ]
+  },
+  "initial_field": {
+    "beam_width": 0,
+    "focal_point": [0, 0, 0],
+    "polar_angle": 0,
+    "azimuthal_angle": 0,
+    "polarization": "UNP"
+  },
+  "parameters": {
+    "wavelength": {
+      "data": {
+        "start": 1,
+        "stop": 3.001,
+        "step": 0.5
+      },
+      "scale": 1e-6
+    },
+    "medium": {
+      "url": "https://eodg.atm.ox.ac.uk/ARIA/data_files/Minerals/Enstatite/Parallel_to_c-axis_(Jager_et_al._1998)/enstatite_p_jager_1998.ri",
+      "scale": 1e-6
+    }
+  },
+  "solver": {
+    "type": "lgmres",
+    "tolerance": 5e-5,
+    "max_iter": 10000,
+    "restart": 5000
+  },
+  "numerics": {
+    "lmax": 5,
+    "sampling_points": [60, 120],
+    "particle_distance_resolution": 1,
+    "gpu": true
+  },
+  "output": {
+    "folder": "out",
+    "extension": "pbz2"
+  }
+}
