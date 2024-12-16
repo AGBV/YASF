@@ -1263,7 +1263,7 @@ wheels = [
 
 [[package]]
 name = "refidxdb"
-version = "0.0.4"
+version = "0.0.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1271,12 +1271,15 @@ dependencies = [
     { name = "plotext" },
     { name = "plotly" },
     { name = "polars" },
+    { name = "pydantic" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "streamlit" },
+    { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9c/a6/127a2a6f4c23a92e67d2254b6fb260ce85a5828df30ac0c5f729ff3705c6/refidxdb-0.0.4.tar.gz", hash = "sha256:9cb41981e7c7f5d29e44ecdd3e724dd5776724a6b80a23c2a7c9b595b80f73e0", size = 58312 }
+sdist = { url = "https://files.pythonhosted.org/packages/70/fe/599965d079e21eddea183c41c9b0d860121c87b7deca337d1c66582a98f3/refidxdb-0.0.8.tar.gz", hash = "sha256:843b897a2a92a15661333fea2d4323aa50914a820d16f630973d8813bf174f08", size = 379796 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/11/f7d0badeda57defcdbf20ef956fd89b62e29b12a7534ea6f6cc6d41bd583/refidxdb-0.0.4-py3-none-any.whl", hash = "sha256:12fe7772efe85770f11bd4ce27e1ca340068e9ebf8560c62c669f9d0f6049731", size = 9885 },
+    { url = "https://files.pythonhosted.org/packages/8e/ac/642a036c3e9a5b9e23272d805e072534c21a32b7fda10911c36488510510/refidxdb-0.0.8-py3-none-any.whl", hash = "sha256:7044dfa66f2d4912897f4d54ed4d1003045cf38d020b3b897c3b81a252b7ebd8", size = 13053 },
 ]
 
 [[package]]
@@ -1570,6 +1573,18 @@ wheels = [
 ]
 
 [[package]]
+name = "tqdm"
+version = "4.67.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "platform_system == 'Windows'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/29b4ef32e036bb34e4ab51796dd745cdba7ed47ad142a9f4a1eb8e0c744d/tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2", size = 169737 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl", hash = "sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2", size = 78540 },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.12.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1646,6 +1661,14 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+test = [
+    { name = "astropy" },
+    { name = "coverage" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
+[package.dev-dependencies]
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-autorefs" },
@@ -1658,40 +1681,38 @@ docs = [
     { name = "mkdocstrings-python" },
     { name = "pymdown-extensions" },
 ]
-test = [
-    { name = "astropy" },
-    { name = "coverage" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "astropy", marker = "extra == 'test'", specifier = ">=6.0.0" },
     { name = "click", specifier = ">=8.1.7" },
     { name = "coverage", marker = "extra == 'test'", specifier = ">=7.4.1" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.3" },
-    { name = "mkdocs-autorefs", marker = "extra == 'docs'", specifier = ">=0.5.0" },
-    { name = "mkdocs-coverage", marker = "extra == 'docs'", specifier = ">=1.0.0" },
-    { name = "mkdocs-gen-files", marker = "extra == 'docs'", specifier = ">=0.5.0" },
-    { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = ">=0.6.1" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.6" },
-    { name = "mkdocs-section-index", marker = "extra == 'docs'", specifier = ">=0.3.8" },
-    { name = "mkdocstrings", marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "mkdocstrings-python", marker = "extra == 'docs'", specifier = ">=1.8.0" },
     { name = "numba", specifier = ">=0.59.0" },
     { name = "numpy", specifier = ">=1.26.3,<2.0.0" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic", specifier = ">=2.9.2" },
     { name = "pyinstrument", specifier = ">=4.7.3" },
-    { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.7" },
     { name = "pyperf", specifier = ">=2.7.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.1.0" },
     { name = "pywigxjpf", specifier = ">=1.11" },
     { name = "pyyaml", specifier = ">=6.0.1" },
-    { name = "refidxdb", specifier = ">=0.0.4" },
+    { name = "refidxdb", specifier = ">=0.0.6" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "rich", specifier = ">=13.8.1" },
     { name = "scipy", specifier = ">=1.13.0" },
+]
+
+[package.metadata.requires-dev]
+docs = [
+    { name = "mkdocs", specifier = ">=1.5.3" },
+    { name = "mkdocs-autorefs", specifier = ">=0.5.0" },
+    { name = "mkdocs-coverage", specifier = ">=1.0.0" },
+    { name = "mkdocs-gen-files", specifier = ">=0.5.0" },
+    { name = "mkdocs-literate-nav", specifier = ">=0.6.1" },
+    { name = "mkdocs-material", specifier = ">=9.5.6" },
+    { name = "mkdocs-section-index", specifier = ">=0.3.8" },
+    { name = "mkdocstrings", specifier = ">=0.24.0" },
+    { name = "mkdocstrings-python", specifier = ">=1.8.0" },
+    { name = "pymdown-extensions", specifier = ">=10.7" },
 ]
