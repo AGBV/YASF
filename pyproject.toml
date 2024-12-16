@@ -1,45 +1,52 @@
-[tool.poetry]
+[project]
 name = "yasfpy"
 version = "0.0.13"
 description = "Light scattering code using T-Matrix"
-authors = ["Mirza Arnaut <mirza.arnaut@tu-dortmund.de>"]
-license = "MIT"
 readme = "README.md"
+authors = [{ name = "Mirza Arnaut", email = "mirza.arnaut@tu-dortmund.de" }]
+license = { file = "LICENSE" }
+requires-python = "<3.13,>=3.10"
+dependencies = [
+  "pydantic>=2.9.2",
+  "rich>=13.8.1",
+  "numpy<2.0.0,>=1.26.3",
+  "scipy>=1.13.0",
+  "numba>=0.59.0",
+  "pyyaml>=6.0.1",
+  "pandas>=2.2",
+  "requests>=2.31.0",
+  "pywigxjpf>=1.11",
+  # "refractiveindex>=0.0.3",
+  "pyperf>=2.7.0",
+  "pyinstrument>=4.7.3",
+  # "speedscope>=1.0",
+  "click>=8.1.7",
+  "refidxdb>=0.0.6",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-numpy = "^1.26.3"
-scipy = "^1.13.0"
-numba = "^0.58.0"
-icc-rt = {version = "^2020.0.133", optional = true}
-pyyaml = "^6.0.1"
-pandas = "^1.3.5"
-requests = "^2.31.0"
-pywigxjpf = "^1.11"
-refractiveindex = "^0.0.3"
+[project.optional-dependencies]
+test = [
+  "astropy>=6.0.0",
+  "coverage>=7.4.1",
+  "pytest>=8.0.0",
+  "pytest-cov>=4.1.0",
+]
+docs = [
+  "mkdocs>=1.5.3",
+  "mkdocs-autorefs>=0.5.0",
+  "mkdocs-coverage>=1.0.0",
+  "mkdocs-gen-files>=0.5.0",
+  "mkdocs-literate-nav>=0.6.1",
+  "mkdocs-material>=9.5.6",
+  "mkdocs-section-index>=0.3.8",
+  "mkdocstrings>=0.24.0",
+  "mkdocstrings-python>=1.8.0",
+  "pymdown-extensions>=10.7",
+]
 
-[tool.poetry.group.tests]
-optional = true
-[tool.poetry.group.tests.dependencies]
-astropy = "^6.0.0"
-coverage = "^7.4.1"
-pytest = "^8.0.0"
-pytest-cov = "^4.1.0"
-
-[tool.poetry.group.docs]
-optional = true
-[tool.poetry.group.docs.dependencies]
-mkdocs = "^1.5.3"
-mkdocs-autorefs = "^0.5.0"
-mkdocs-coverage = "^1.0.0"
-mkdocs-gen-files = "^0.5.0"
-mkdocs-literate-nav = "^0.6.1"
-mkdocs-material = "^9.5.6"
-mkdocs-section-index = "^0.3.8"
-mkdocstrings = "^0.24.0"
-mkdocstrings-python = "^1.8.0"
-pymdown-extensions = "^10.7"
+[project.scripts]
+yasf = "yasfpy.cli:cli"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
