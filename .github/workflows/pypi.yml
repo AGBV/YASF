@@ -1,16 +1,40 @@
 name: Python package
 on:
+  # workflow_run:
+  #   workflows: ["Testing"]
+  #   branches: [main]
+  #   types:
+  #     - completed
+  workflow_dispatch:
   push:
     tags:
       - "v*.*.*"
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  testing:
+    uses: ./.github/workflows/test.yml
+  pypi-publish:
+    name: Upload release to PyPI
+    needs:
+      - testing
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/yasfpy
+    permissions:
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Build and publish to pypi
-        uses: JRubics/poetry-publish@v1.17
-        with:
-          pypi_token: ${{ secrets.PYPI_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build
+        run: uv build --no-sources
+
+      - name: Publish to PyPI
+        run: uv publish
