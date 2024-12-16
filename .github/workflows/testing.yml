@@ -17,39 +17,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  requirements:
-    runs-on: ubuntu-latest
-    name: Poetry dependencies to requirements.txt
-    steps:
-      - name: Set up Git repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: false
-
-      - name: Install poetry
-        uses: abatilo/actions-poetry@v2
-
-      - name: Install python and pip
-        uses: actions/setup-python@v5
-        # with:
-        #   python-version: '3.10'
-
-      - name: Install poetry-plugin-export
-        run: pip install poetry-plugin-export
-
-      - name: Export dependencies
-        run: |
-          poetry export --with tests -f requirements.txt -o requirements.txt --without-hashes
-          cat requirements.txt
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: requirements-file
-          path: requirements.txt
-          retention-days: 1
-
   unittest:
     name: Unit tests
     runs-on:
@@ -60,50 +27,38 @@ jobs:
       run:
         shell: bash -l {0}
 
-    needs: requirements
-
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: false
-
-      - name: Download requirements file
-        uses: actions/download-artifact@v3
+      - name: Install uv
+        id: setup-python
+        uses: astral-sh/setup-uv@v4
+        # with:
+        #   enable-cache: true
+      - uses: actions/cache@v4
+        id: cache-env
         with:
-          name: requirements-file
-
-      - name: Cache conda
-        uses: actions/cache@v2
-        env:
-          CACHE_NUMBER: 0
-        with:
-          path: ~/conda_pkgs_dir
-          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('**/poetry.lock') }}
-
-      - uses: conda-incubator/setup-miniconda@v2
-        with:
-          miniconda-version: "latest"
-          activate-environment: yasf-env
-          environment-file: yasf-env-test.yml
-          use-only-tar-bz2: true
-          auto-activate-base: false
-
-      - name: List installed packages with their versions
-        run: conda list
-
-      - name: Running pytest
+          path: .venv
+          key: ${{ runner.os }}-uv-${{ steps.setup-python.outputs.uv-version }}-env-${{ hashFiles('uv.lock') }}
+      - name: Setup venv for testing & Install dependencies
+        if: steps.cache-env.outputs.cache-hit != 'true'
         run: |
-          pytest -v --cov=yasfpy --cov-report=xml --cov-report=html
-          coverage xml -i
-
+          uv venv
+          uv sync --extra test
+      - name: Running pytest
+        run: uv run pytest -v --cov=yasfpy --cov-report=xml --cov-report=html --junitxml=junit.xml -o junit_family=legacy
+      - name: Coverage in XML
+        run: uv run coverage xml -i
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: |
             coverage.xml
+            junit.xml
             htmlcov/
           retention-days: 7
 
@@ -118,7 +73,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: coverage-report
       - name: Run codacy-coverage-reporter
@@ -138,7 +93,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: coverage-report
       - name: Report test coverage to DeepSource
@@ -147,3 +102,22 @@ jobs:
           key: python
           coverage-file: coverage.xml
           dsn: ${{ secrets.DEEPSOURCE_DSN }}
+
+  codecov-coverage-reporter:
+    runs-on: ubuntu-latest
+    name: CodeCov coverage reporter
+    needs: unittest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

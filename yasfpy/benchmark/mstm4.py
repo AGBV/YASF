@@ -3,18 +3,18 @@
 # os.system("./MSTM/code/mstm ./mstm4.inp")
 # os.system("python mstm4-read.py")
 
+import bz2
+import copy
+import json
 import os
 import re
-import bz2
-import json
-import yaml
-import copy
-import pyperf
-import _pickle
 from io import StringIO
 
+import _pickle
 import numpy as np
 import pandas as pd
+import pyperf
+import yaml
 
 from yasfpy.config import Config
 
@@ -126,13 +126,13 @@ class MSTM4Manager:
     @staticmethod
     def __parse_input(input):
         # Get id of run
-        p = re.compile("\s+input variables for run\s+(\d+)")
+        p = re.compile(r"\s+input variables for run\s+(\d+)")
         r = p.search(input)
         id = r.group(1)
         id = int(id)
 
         # lengths scale factor
-        p = re.compile("\s+length, ref index scale factors\s+(.+?)\s+(.+?)\s+(.+?)")
+        p = re.compile(r"\s+length, ref index scale factors\s+(.+?)\s+(.+?)\s+(.+?)")
         r = p.search(input)
         length_scale_factor = r.group(1)
         length_scale_factor = float(length_scale_factor)
