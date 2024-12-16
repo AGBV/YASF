@@ -5,25 +5,37 @@ import logging
 import os
 from datetime import datetime
 from numbers import Number
+from pathlib import Path
 
 import _pickle
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import yaml
+from refidxdb import Handler
+
 from yasfpy.functions.misc import generate_refractive_index_table
 
 
 class Config:
-    config: dict = None
+    config: dict = {}
+    path_cluster: str = ""
     preprocess: bool = True
 
-    def __init__(self, path_config: str, preprocess: bool = True):
-        self.file_type = path_config.split(".")[-1]
+    def __init__(
+        self, path_config: str, preprocess: bool = True, path_cluster: str = ""
+    ):
+        # if type(path_config) != str:
+        if not isinstance(path_config, str):
+            raise Exception("The config file path needs to be a string!")
+        _path_config = Path(path_config)
+        # self.file_type = path_config.split(".")[-1]
+        self.file_type = _path_config.suffix
         match self.file_type:
-            case "json":
+            case ".json":
                 with open(path_config) as data:
                     self.config = json.load(data)
-            case "yaml" | "yml":
+            case ".yaml" | ".yml":
                 with open(path_config) as data:
                     self.config = yaml.safe_load(data)
             case _:
@@ -34,6 +46,13 @@ class Config:
             raise Exception(
                 f"Could not read config file {path_config}. Check if the file exists."
             )
+        self.path_cluster = (
+            self.config["particles"]["geometry"]["file"]
+            if path_cluster == ""
+            else path_cluster
+        )
+        if not self.path_cluster.startswith("/"):
+            self.path_cluster = str(_path_config.parent / self.path_cluster)
 
         self.log = logging.getLogger(self.__class__.__module__)
         self.__read()
@@ -78,12 +97,13 @@ class Config:
             if "url" in self.config["parameters"]["medium"]
             else self.config["parameters"]["medium"]
         )
-        self.medium = generate_refractive_index_table([medium_url])
-        self.medium_scale = (
-            self.config["parameters"]["medium"]["scale"]
-            if "scale" in self.config["parameters"]["medium"]
-            else 1
-        )
+        self.medium = Handler(url=medium_url)
+        # self.medium = generate_refractive_index_table([medium_url])
+        # self.medium_scale = (
+        #     self.config["parameters"]["medium"]["scale"]
+        #     if "scale" in self.config["parameters"]["medium"]
+        #     else 1
+        # )
 
         # particle geometry
         delim = (
@@ -93,7 +113,10 @@ class Config:
         )
         delim = r"\s+" if delim == "whitespace" else delim
         spheres = pd.read_csv(
-            self.config["particles"]["geometry"]["file"], header=None, sep=delim
+            # self.config["particles"]["geometry"]["file"],
+            self.path_cluster,
+            header=None,
+            sep=delim,
         )
         if spheres.shape[1] < 4:
             raise Exception(
@@ -166,10 +189,13 @@ class Config:
             if "extension" in self.config["output"]
             else "pbz2"
         )
-        filename = None
-        if "file" in self.config["particles"]["geometry"]:
-            filename = self.config["particles"]["geometry"]["file"].split(os.sep)[-1]
-            filename = filename.split(".")[0]
+        # filename = ""
+        # if "file" in self.config["particles"]["geometry"]:
+        #     filename = self.config["particles"]["geometry"]["file"].split(os.sep)[-1]
+        #     filename = filename.split(".")[0]
+        filename = self.path_cluster.split(os.sep)[-1]
+        # filename = filename.split(".")[0]
+        filename = ".".join(filename.split(".")[:-1])
         filename = (
             self.config["output"]["filename"]
             if "filename" in self.config["output"]
@@ -203,21 +229,33 @@ class Config:
             )
         self.refractive_index_interpolated = refractive_index_interpolated
 
-        self.medium_refractive_index = np.interp(
-            self.wavelength * self.wavelength_scale,
-            self.medium[0]["ref_idx"]["wavelength"] * self.medium_scale,
-            self.medium[0]["ref_idx"]["n"] + 1j * self.medium[0]["ref_idx"]["k"],
+        self.medium_refractive_index = np.array(
+            self.medium.interpolate(
+                target=self.wavelength,
+                scale=self.wavelength_scale,
+                complex=True,
+            )
         )
+        # self.medium_refractive_index = np.interp(
+        #     self.wavelength * self.wavelength_scale,
+        #     self.medium.nk["w"],
+        #     self.medium.nk["n"].to_numpy() + 1j * self.medium.nk["k"].to_numpy(),
+        # )
+        # self.medium_refractive_index = np.interp(
+        #     self.wavelength * self.wavelength_scale,
+        #     self.medium[0]["ref_idx"]["wavelength"] * self.medium_scale,
+        #     self.medium[0]["ref_idx"]["n"] + 1j * self.medium[0]["ref_idx"]["k"],
+        # )
         self.medium_refractive_index.imag = 0
         # self.medium_refractive_index = np.real(self.medium_refractive_index)
         # print(self.medium_refractive_index)
 
-    def process(self, output_path: str = None) -> None:
+    def process(self, output_path: str = "") -> None:
         self.export(output_path)
 
-    def export(self, output_path: str = None) -> None:
+    def export(self, output_path: str = "") -> None:
         config = copy.deepcopy(self.config)
-        if output_path is None:
+        if output_path == "":
             output_path = (
                 f"{datetime.now().strftime('%Y-%m-%d_%H_%M_%S')}.{config.file_type}"
             )

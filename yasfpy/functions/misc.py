@@ -1,10 +1,10 @@
-from yasfpy.functions.material_handler import material_handler
-from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
-
 import numba as nb
 import numpy as np
-from scipy.special import spherical_jn
-from scipy.special import hankel1, lpmv
+from refidxdb import Handler
+from scipy.special import hankel1, lpmv, spherical_jn
+
+from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
+from yasfpy.functions.material_handler import material_handler
 
 
 def jmult_max(num_part, lmax):
@@ -264,47 +264,51 @@ def generate_refractive_index_table(urls: list) -> list:
             and the data is obtained by calling the `material_handler` function on each URL.
 
     """
-    data = [None] * len(urls)
-    for k, url in enumerate(urls):
-        data[k] = material_handler(url)
+    # data = [None] * len(urls)
+    # for k, url in enumerate(urls):
+    # data[k] = material_handler(url)
+    data = []
+    for url in urls:
+        handle = Handler(url=url)
+        data.append(dict(ref_idx=handle.nk))
 
     return data
 
 
-def interpolate_refractive_index_from_table(
-    wavelengths: np.ndarray, materials: list, species_idx: np.ndarray
-) -> np.ndarray:
-    """Interpolates the refractive index values from a table for different wavelengths.
+# def interpolate_refractive_index_from_table(
+#     wavelengths: np.ndarray, materials: list, species_idx: np.ndarray
+# ) -> np.ndarray:
+#     """Interpolates the refractive index values from a table for different wavelengths.
 
-    Returns:
-        refractive_index_interpolated (np.array): An array that contains the interpolated refractive index values for the particles
-            at different wavelengths.
-    """
+#     Returns:
+#         refractive_index_interpolated (np.array): An array that contains the interpolated refractive index values for the particles
+#             at different wavelengths.
+#     """
 
-    refractive_index_table = generate_refractive_index_table(materials)
+#     refractive_index_table = generate_refractive_index_table(materials)
 
-    unique_refractive_indices, _ = np.unique(species_idx, return_inverse=True, axis=0)
-    num_unique_refractive_indices = unique_refractive_indices.shape[0]
+#     unique_refractive_indices, _ = np.unique(species_idx, return_inverse=True, axis=0)
+#     num_unique_refractive_indices = unique_refractive_indices.shape[0]
 
-    refractive_index_interpolated = np.zeros(
-        (num_unique_refractive_indices, wavelengths.size),
-        dtype=complex,
-    )
-    for idx, data in enumerate(refractive_index_table):
-        table = data["ref_idx"].to_numpy().astype(float)
-        n = np.interp(
-            wavelengths,
-            table[:, 0],
-            table[:, 1],
-            left=table[0, 1],
-            right=table[-1, 1],
-        )
-        k = np.interp(
-            wavelengths,
-            table[:, 0],
-            table[:, 2],
-            left=table[0, 2],
-            right=table[-1, 2],
-        )
-        refractive_index_interpolated[idx, :] = n + 1j * k
-    return refractive_index_interpolated
+#     refractive_index_interpolated = np.zeros(
+#         (num_unique_refractive_indices, wavelengths.size),
+#         dtype=complex,
+#     )
+#     for idx, data in enumerate(refractive_index_table):
+#         table = data["ref_idx"].to_numpy().astype(float)
+#         n = np.interp(
+#             wavelengths,
+#             table[:, 0],
+#             table[:, 1],
+#             left=table[0, 1],
+#             right=table[-1, 1],
+#         )
+#         k = np.interp(
+#             wavelengths,
+#             table[:, 0],
+#             table[:, 2],
+#             left=table[0, 2],
+#             right=table[-1, 2],
+#         )
+#         refractive_index_interpolated[idx, :] = n + 1j * k
+#     return refractive_index_interpolated

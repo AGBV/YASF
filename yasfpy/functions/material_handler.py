@@ -1,17 +1,17 @@
-import re
+import hashlib
 import io
 import os
-import hashlib
-import yaml
-import pandas as pd
+import re
+from importlib.resources import files
 
 # import urllib.request
 from pathlib import Path
-from importlib.resources import files
 from urllib.parse import unquote
-import requests as req
 
 import numpy as np
+import pandas as pd
+import requests as req
+import yaml
 
 HASH_TYPE = "sha256"
 
