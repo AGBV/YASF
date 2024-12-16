@@ -1,31 +1,45 @@
-import pyperf
-import logging
-
-import pstats
 import cProfile
-from pyinstrument import Profiler
-from pyinstrument.renderers import SpeedscopeRenderer
-import speedscope
+import logging
+import pstats
 
 import numpy as np
 import pandas as pd
+import pyperf
+from pydantic import BaseModel
 
 from yasfpy.config import Config
-from yasfpy.particles import Particles
 from yasfpy.initial_field import InitialField
-from yasfpy.parameters import Parameters
-from yasfpy.solver import Solver
 from yasfpy.numerics import Numerics
-from yasfpy.simulation import Simulation
 from yasfpy.optics import Optics
+from yasfpy.parameters import Parameters
+from yasfpy.particles import Particles
+from yasfpy.simulation import Simulation
+from yasfpy.solver import Solver
+
+# from pyinstrument import Profiler
+# from pyinstrument.renderers import SpeedscopeRenderer
+# import speedscope
 
 
+# class YASF(BaseModel):
 class YASF:
-    config: dict = None
+    config: dict
+    path_config: str
+    path_cluster: str
 
-    def __init__(self, path_config: str, preprocess: bool = True):
+    def __init__(
+        self,
+        path_config: str,
+        preprocess: bool = True,
+        path_cluster: str = "",
+    ):
+        # super().__init__(
+        #     path_config=path_config,
+        #     preprocess=preprocess,
+        #     path_cluster=path_cluster,
+        # )
         self.path_config = path_config
-        self.config = Config(path_config, preprocess)
+        self.config = Config(path_config, preprocess, path_cluster)
 
         self.particles = Particles(
             self.config.spheres[:, 0:3],

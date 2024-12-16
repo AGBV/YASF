@@ -1,18 +1,16 @@
 import logging
-import yasfpy.log as log
+import os
+import pickle
+from importlib.resources import files
+from pathlib import Path
+from typing import Callable, Union
 
-from typing import Union, Callable
 import numpy as np
 import pywigxjpf as wig
 
-from pathlib import Path
-import pickle, os
-from importlib.resources import files
-
-
-from yasfpy.functions.misc import jmult_max
-from yasfpy.functions.misc import single_index2multi
+# import yasfpy.log as log
 from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
+from yasfpy.functions.misc import jmult_max, single_index2multi
 
 
 class Numerics:
@@ -163,7 +161,8 @@ class Numerics:
         numpy array.
         """
 
-        dpath = Path(f"{files(__package__) / 'data'}")
+        # dpath = Path(f"{files(__package__) / 'data'}")
+        dpath = Path.home() / ".cache" / "yasfpy" / self.__class__.__name__
         if not os.path.exists(dpath):
             os.makedirs(dpath)
 
