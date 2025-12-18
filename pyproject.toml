@@ -5,7 +5,7 @@ description = "Light scattering code using T-Matrix"
 readme = "README.md"
 authors = [{ name = "Mirza Arnaut", email = "mirza.arnaut@tu-dortmund.de" }]
 license = { file = "LICENSE" }
-requires-python = "<3.13,>=3.10"
+requires-python = ">=3.10"
 dependencies = [
   "pydantic>=2.9.2",
   "rich>=13.8.1",
@@ -20,16 +20,18 @@ dependencies = [
   "pyperf>=2.7.0",
   "pyinstrument>=4.7.3",
   # "speedscope>=1.0",
+  "refidxdb>=0.4.0",
   "click>=8.1.7",
-  "refidxdb>=0.0.6",
+  "intel-cmplr-lib-rt>=2025.3.1",
 ]
 
 [project.optional-dependencies]
-test = [
-  "astropy>=6.0.0",
-  "coverage>=7.4.1",
-  "pytest>=8.0.0",
-  "pytest-cov>=4.1.0",
+cuda = ["cuda-python>=12.6.0", "pynvjitlink-cu12>=0.2.3"]
+explore = [
+  "streamlit>=1.40.1",
+  "plotly>=5.24.1",
+  "pyvista<0.45.0",
+  "stpyvista>=0.1.4",
 ]
 
 [dependency-groups]
@@ -45,10 +47,27 @@ docs = [
   "mkdocstrings-python>=1.8.0",
   "pymdown-extensions>=10.7",
 ]
+test = [
+  "astropy>=6.0.0",
+  "coverage>=7.4.1",
+  "pytest>=8.0.0",
+  "pytest-cov>=4.1.0",
+]
 
 [project.scripts]
 yasf = "yasfpy.cli:cli"
 
+[tool.uv.sources]
+pynvjitlink-cu12 = { index = "nvidia" }
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+
+[tool.uv.build-backend]
+module-name = "yasfpy"
+module-root = ""
+
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build >= 0.8.0, <0.10.0"]
+build-backend = "uv_build"
