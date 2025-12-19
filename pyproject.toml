@@ -12,6 +12,8 @@ dependencies = [
   "numpy<2.0.0,>=1.26.3",
   "scipy>=1.13.0",
   "numba>=0.59.0",
+  # "numba-cuda[cu12]>=0.23.0",
+  # "numba-cuda>=0.23.0",
   "pyyaml>=6.0.1",
   "pandas>=2.2",
   "requests>=2.31.0",
@@ -68,6 +70,31 @@ url = "https://pypi.nvidia.com"
 module-name = "yasfpy"
 module-root = ""
 
+[tool.pyright]
+exclude = [".venv"]
+venvPath = ".venv"
+venv = "."
+
+[tool.ty.environment]
+python = "./.venv"
+
+[tool.ruff]
+lint.ignore = ["F722"]
+
+[tool.pytest.ini_options]
+python_files = "tests/test_*.py"
+log_cli = false
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
 [build-system]
 requires = ["uv_build >= 0.8.0, <0.10.0"]
 build-backend = "uv_build"
+
+[semantic_release]
+version_variable = ["yasfpy/__init__.py:__version__"]
+version_toml = ["pyproject.toml:project.version:nf"]
+major_on_zero = false
+branch = "main"
+build_command = "curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env && uv build"

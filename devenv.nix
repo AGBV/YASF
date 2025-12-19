@@ -2,27 +2,27 @@
   pkgs,
   lib,
   config,
-  inputs,
   ...
 }:
-
+let
+  cuda = lib.getDev (
+    pkgs.symlinkJoin {
+      name = "cudatoolkit";
+      paths = with pkgs.cudaPackages_12; [
+        cudatoolkit
+        "${cuda_nvcc}/nvvm"
+        (lib.getStatic cuda_cudart)
+      ];
+      postBuild = ''
+        ln -s $out/lib $out/lib64
+      '';
+    }
+  );
+in
 {
   env = {
-    GREET = "devenv";
-    # CUDA_PATH = pkgs.cudaPackages.cudatoolkit;
-    # CUDA_HOME = pkgs.cudaPackages.cudatoolkit;
-    CUDA_HOME = lib.getDev (
-      pkgs.symlinkJoin {
-        name = "cudatoolkit";
-        paths = with pkgs.cudaPackages; [
-          cudatoolkit
-          (lib.getStatic cuda_cudart)
-        ];
-        postBuild = ''
-          ln -s $out/lib $out/lib64
-        '';
-      }
-    );
+    UV_PYTHON = toString config.languages.python.package.interpreter;
+    CUDA_HOME = cuda;
     NUMBA_CUDA_DRIVER = "/run/opengl-driver/lib/libcuda.so";
     NUMBA_DISABLE_INTEL_SVML = true;
   };
@@ -47,18 +47,13 @@
     numba.exec = ''uv run numba "$@"'';
   };
 
-  # enterShell = ''
-  #   hello         # Run scripts directly
-  #   git --version # Use packages
-  # '';
+  enterShell = ''
+    git --version
+    if [ ! -L "$DEVENV_ROOT/.venv" ]; then
+        ln -s "$DEVENV_STATE/venv/" "$DEVENV_ROOT/.venv"
+    fi
+  '';
 
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
-
-  # https://devenv.sh/tests/
   enterTest = ''
     echo "Running tests"
     git --version | grep --color=auto "${pkgs.git.version}"
@@ -79,6 +74,10 @@
       };
     };
 
-    libraries = [ pkgs.zlib ];
+    libraries = [
+      pkgs.zlib
+      cuda
+      "/run/opengl-driver/lib/libcuda.so"
+    ];
   };
 }
