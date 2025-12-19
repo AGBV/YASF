@@ -328,9 +328,9 @@ class Optics:
         )
         if check_phase_function:
             res = self.__check_phase_function()
-            assert (
-                res is True
-            ), "The phase function does have the desired precision. Please increase the amount of angles used."
+            assert res is True, (
+                "The phase function does have the desired precision. Please increase the amount of angles used."
+            )
 
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
             np.cos(self.scattering_angles),
@@ -815,9 +815,9 @@ class Optics:
         )
         if check_phase_function:
             res = self.__check_phase_function()
-            assert (
-                res is True
-            ), "The phase function does have the desired precision. Please increase the amount of angles used."
+            assert res is True, (
+                "The phase function does have the desired precision. Please increase the amount of angles used."
+            )
 
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
             np.cos(self.scattering_angles),
@@ -951,7 +951,7 @@ class Optics:
             needed_shape = tuple(needed_shape)
             res.append(np.empty(needed_shape, float))
 
-        print(f"Need to process {total_bytes*1e-9} GB of data")
+        print(f"Need to process {total_bytes * 1e-9} GB of data")
 
         while not done:
             split_idx = self.__compute_data_split(
@@ -980,7 +980,7 @@ class Optics:
             for array in split_data:
                 used_bytes += array.size * array.itemsize
             total_bytes -= used_bytes
-            print(f"{total_bytes*1e-9} GB of data remaining")
+            print(f"{total_bytes * 1e-9} GB of data remaining")
 
             # modify number of blocks per grid needed for kernel with current split
             sizes2 = list(sizes)
@@ -1047,8 +1047,8 @@ class Optics:
                 new_data_bytes += temp_size * item.itemsize
             total_data_bytes = new_data_bytes
 
-        print(f"{free_bytes*1e-9} GB of data available on GPU")
-        print(f"Unused GPU memory: {(free_bytes-total_data_bytes)*1e-6} MB")
+        print(f"{free_bytes * 1e-9} GB of data available on GPU")
+        print(f"Unused GPU memory: {(free_bytes - total_data_bytes) * 1e-6} MB")
 
         if num // threads_per_block > 2**16 - 1:
             num = (2**16 - 1) * threads_per_block
