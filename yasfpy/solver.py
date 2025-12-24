@@ -29,6 +29,7 @@ class Solver:
         tolerance: float = 1e-4,
         max_iter: float = 1e4,
         restart: float = 1e2,
+        preconditioner=None,
     ):
         """Initializes a solver object with specified parameters and creates a logger object.
 
@@ -37,11 +38,14 @@ class Solver:
             tolerance (float): The desired accuracy of the solver.
             max_iter (int): The maximum number of iterations that the solver will perform.
             restart (int): The number of iterations after which the solver will restart.
+            preconditioner (optional): Preconditioner object with an apply(rhs) method.
+                                      If provided, will be used to accelerate convergence.
         """
         self.type = solver_type.lower()
         self.tolerance = tolerance
         self.max_iter = int(max_iter)
         self.restart = int(restart)
+        self.preconditioner = preconditioner
 
         # self.log = log.scattering_logger(__name__)
         self.log = logging.getLogger(self.__class__.__module__)
@@ -68,6 +72,17 @@ class Solver:
         if np.any(np.isnan(b)):
             print(b)
 
+        # Create preconditioner LinearOperator if available
+        M = None
+        if self.preconditioner is not None:
+            n = len(b)
+            M = LinearOperator(
+                (n, n),
+                matvec=self.preconditioner.apply,
+                dtype=b.dtype
+            )
+            self.log.info("Using preconditioner")
+
         if self.type == "bicgstab":
             # Add your code here for the bicgstab solver
             pass
@@ -76,6 +91,7 @@ class Solver:
                 a,
                 b,
                 x0,
+                M=M,
                 tol=self.tolerance,
                 atol=0,
                 maxiter=self.max_iter,
@@ -87,6 +103,7 @@ class Solver:
                 a,
                 b,
                 x0,
+                M=M,
                 restart=self.restart,
                 rtol=self.tolerance,
                 atol=0,
@@ -100,6 +117,7 @@ class Solver:
                 a,
                 b,
                 x0,
+                M=M,
                 rtol=self.tolerance,
                 atol=0,
                 maxiter=self.max_iter,
