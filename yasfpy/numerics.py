@@ -23,7 +23,7 @@ class Numerics:
     def __init__(
         self,
         lmax: int,
-        sampling_points_number: Union[int, np.ndarray] = 100,
+        sampling_points_number: Union[int, np.ndarray] = np.array([100]),
         polar_angles: np.ndarray = None,
         polar_weight_func: Callable = lambda x: x,
         azimuthal_angles: np.ndarray = None,

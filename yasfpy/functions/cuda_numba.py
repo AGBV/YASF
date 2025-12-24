@@ -1,6 +1,7 @@
 import numpy as np
 from numba import cuda
 from cmath import exp, sqrt
+from math import cos, sin
 
 
 # TODO: Implement data batching for GPUs with smaller memory
@@ -345,6 +346,81 @@ def compute_polarization_components_gpu(
     degree_of_linear_polarization_q[a_idx, w_idx] = -Q.real / I
     degree_of_linear_polarization_u[a_idx, w_idx] = U.real / I
     degree_of_circular_polarization[a_idx, w_idx] = V / I
+
+
+@cuda.jit(fastmath=True)
+def compute_plane_wave_field_gpu(
+    points: np.ndarray,
+    focal_point: np.ndarray,
+    direction: np.ndarray,
+    k_medium: np.ndarray,
+    n_medium_real: np.ndarray,
+    n_medium_imag: np.ndarray,
+    pol: int,
+    amplitude: float,
+    sin_alpha: float,
+    cos_alpha: float,
+    sin_beta: float,
+    cos_beta: float,
+    E_real: np.ndarray,
+    E_imag: np.ndarray,
+    H_real: np.ndarray,
+    H_imag: np.ndarray,
+):
+    """Compute incident plane-wave E/H fields at points (CELES PVWF_components)."""
+    p_idx, w_idx = cuda.grid(2)
+    if (p_idx >= points.shape[0]) or (w_idx >= k_medium.size):
+        return
+
+    rx = points[p_idx, 0] - focal_point[0]
+    ry = points[p_idx, 1] - focal_point[1]
+    rz = points[p_idx, 2] - focal_point[2]
+    phase = k_medium[w_idx] * (rx * direction[0] + ry * direction[1] + rz * direction[2])
+
+    c = cos(phase)
+    s = sin(phase)
+    e_re = amplitude * c
+    e_im = amplitude * s
+
+    # H = -1i * n * E
+    nre = n_medium_real[w_idx]
+    nim = n_medium_imag[w_idx]
+    h_re = nre * e_im + nim * e_re
+    h_im = -nre * e_re + nim * e_im
+
+    if pol == 1:  # TE
+        ex_fac = -sin_alpha
+        ey_fac = cos_alpha
+        ez_fac = 0.0
+
+        hx_fac = -cos_alpha * cos_beta
+        hy_fac = -sin_alpha * cos_beta
+        hz_fac = sin_beta
+    else:  # TM
+        ex_fac = cos_alpha * cos_beta
+        ey_fac = sin_alpha * cos_beta
+        ez_fac = -sin_beta
+
+        hx_fac = -sin_alpha
+        hy_fac = cos_alpha
+        hz_fac = 0.0
+
+    # E components
+    E_real[w_idx, p_idx, 0] = ex_fac * e_re
+    E_imag[w_idx, p_idx, 0] = ex_fac * e_im
+    E_real[w_idx, p_idx, 1] = ey_fac * e_re
+    E_imag[w_idx, p_idx, 1] = ey_fac * e_im
+    E_real[w_idx, p_idx, 2] = ez_fac * e_re
+    E_imag[w_idx, p_idx, 2] = ez_fac * e_im
+
+    # H components are multiplied by 1j*fac (as in CELES PVWF_components)
+    # (1j*fac)*(h_re + 1j*h_im) => real=-fac*h_im, imag=fac*h_re
+    H_real[w_idx, p_idx, 0] = -hx_fac * h_im
+    H_imag[w_idx, p_idx, 0] = hx_fac * h_re
+    H_real[w_idx, p_idx, 1] = -hy_fac * h_im
+    H_imag[w_idx, p_idx, 1] = hy_fac * h_re
+    H_real[w_idx, p_idx, 2] = -hz_fac * h_im
+    H_imag[w_idx, p_idx, 2] = hz_fac * h_re
 
 
 @cuda.jit(fastmath=True)

@@ -1,9 +1,15 @@
 import logging
-# import yasfpy.log as log
 
 import numpy as np
+import numpy.typing as npt
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import pdist
+
+# from abc import abstractmethod
+
+
+# import yasfpy.log as log
+
 
 # from yasfpy.functions.material_handler import material_handler
 
@@ -19,7 +25,7 @@ class Particles:
         position: np.ndarray,
         r: np.ndarray,
         refractive_index: np.ndarray,
-        refractive_index_table: list = None,
+        refractive_index_table: list | None = None,
         shape_type: str = "sphere",
     ):
         """Initializes an object with position, radius, refractive index, refractive index table, and shape type attributes.
@@ -45,16 +51,17 @@ class Particles:
 
         # TODO: Keep it for now, remove later...
         self.refractive_index_table = refractive_index_table
+        print("refractive_index_table", refractive_index_table)
 
         if refractive_index_table is None:
             if len(refractive_index.shape) > 2:
-                raise Exception(
+                raise ValueError(
                     "Refractive index should be either an integer array, complex array, or a two column float matrix!"
                 )
             elif (len(refractive_index.shape) == 2) and (
                 self.refractive_index.shape[1] > 2
             ):
-                raise Exception(
+                raise ValueError(
                     "Refractive index should be either an integer array, complex array, or a two column float matrix!"
                 )
 
@@ -156,6 +163,9 @@ class Particles:
         r3 = np.power(self.r, 3)
         self.geometric_projection = np.pi * np.power(np.sum(r3), 2 / 3)
 
+    def radius_of_gyration(self):
+        return radius_of_gyration(self.position, self.r)
+
     def __setup_impl(self):
         """The function sets up various computations related to refractive indices, radii, and particle
         distances.
@@ -167,3 +177,28 @@ class Particles:
         self.compute_single_unique_idx()
         self.compute_maximal_particle_distance()
         self.compute_volume_equivalent_area()
+
+
+def radius_of_gyration(positions: npt.NDArray, radii: npt.NDArray) -> float:
+    if positions.shape[0] != radii.shape[0]:
+        raise ValueError(
+            f"Number of particles {positions.shape[0]} does not match with number of radii {radii.shape[0]}"
+        )
+    if positions.shape[1] != 3:
+        raise ValueError(
+            f"Positions should be 3D coordinates. Found {positions.shape[1]}D."
+        )
+    if len(radii.shape) != 1:
+        raise ValueError(f"Radii should be a 1D array. Found {len(radii.shape)}D.")
+
+    # Mass of particles. Density is assumed to be 1. Equivalent to volume.
+    m = 4 / 3 * np.pi * np.power(radii, 3)
+    # Total mass
+    m_a = np.sum(m)
+    # Center of mass of the cluster
+    r_c = np.sum(positions * m[:, np.newaxis], axis=0) / m_a
+    # Radius of gyration of a particle squared
+    r_g_2 = np.sqrt(3 / 5) * np.power(radii, 2)
+    # Radius of gyration of the cluster squared
+    r_g_2_cluster = np.sum(m * (np.sum((positions - r_c) ** 2, axis=1) + r_g_2)) / m_a
+    return float(np.sqrt(r_g_2_cluster))

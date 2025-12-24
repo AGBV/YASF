@@ -1,7 +1,6 @@
-from numba import jit, prange, complex128, float64, int64
-
 import numpy as np
-from scipy.special import spherical_jn, hankel1, lpmv
+from numba import complex128, float64, int64, jit, prange
+from scipy.special import hankel1, lpmv, spherical_jn
 
 from yasfpy.functions.misc import single_index2multi
 
@@ -487,7 +486,7 @@ def compute_lookup_tables(
     return spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm
 
 
-@jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
+@jit(nopython=True, parallel=False, nogil=True, fastmath=True, cache=True)
 def compute_field(
     lmax: int,
     idx: np.ndarray,
@@ -501,9 +500,9 @@ def compute_field(
     e_r: np.ndarray,
     e_theta: np.ndarray,
     e_phi: np.ndarray,
-    scattered_field_coefficients: np.ndarray = None,
-    initial_field_coefficients: np.ndarray = None,
-    scatter_to_internal: np.ndarray = None,
+    scattered_field_coefficients: np.ndarray | None = None,
+    initial_field_coefficients: np.ndarray | None = None,
+    scatter_to_internal: np.ndarray | None = None,
 ):
     """
     Compute the field using the given parameters and coefficients.
@@ -531,9 +530,7 @@ def compute_field(
     jmax = sph_h.shape[1] * 2 * lmax * (lmax + 2)
     channels = sph_h.shape[-1]
 
-    field = np.zeros(channels * sph_h.shape[2] * 3, dtype=complex128).reshape(
-        (channels, sph_h.shape[2], 3)
-    )
+    field = np.zeros((channels, sph_h.shape[2], 3), dtype=np.complex128)
 
     if (scattered_field_coefficients is None) and (initial_field_coefficients is None):
         print(
@@ -542,7 +539,7 @@ def compute_field(
         print("Returning a zero array")
         return field
 
-    for w_idx in prange(2 * lmax * (lmax + 2) * np.prod(np.array(sph_h.shape[1:]))):
+    for w_idx in range(2 * lmax * (lmax + 2) * np.prod(np.array(sph_h.shape[1:]))):
         w = w_idx % channels
         j_idx = w_idx // channels
         sampling_idx = j_idx // jmax

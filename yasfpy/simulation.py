@@ -560,8 +560,119 @@ class Simulation:
         # scatter_to_internal_table = np.sum((self.parameters.particles.position[:, np.newaxis, :] - sampling_points[np.newaxis, :, :])**2, axis = 2)
         # scatter_to_internal_table = scatter_to_internal_table < self.parameters.particles.r[:, np.newaxis]**2
 
+        # Initial (incident) field at sampling points (plane wave)
+        # This matches CELES postprocessing/compute_initial_field.m for the plane-wave branch.
+        self.initial_field_electric = None
+        self.initial_field_magnetic = None
+        if (self.parameters.initial_field.beam_width == 0) or np.isinf(
+            self.parameters.initial_field.beam_width
+        ):
+            alpha = float(self.parameters.initial_field.azimuthal_angle)
+            beta = float(self.parameters.initial_field.polar_angle)
+            cb = np.cos(beta)
+            sb = np.sin(beta)
+            ca = np.cos(alpha)
+            sa = np.sin(alpha)
+            direction = np.array([sb * ca, sb * sa, cb], dtype=float)
+
+            channels = self.parameters.k_medium.size
+            npts = sampling_points.shape[0]
+            self.initial_field_electric = np.zeros((channels, npts, 3), dtype=complex)
+            self.initial_field_magnetic = np.zeros_like(self.initial_field_electric)
+
+            if self.numerics.gpu:
+                from yasfpy.functions.cuda_numba import compute_plane_wave_field_gpu
+
+                E_real = np.zeros((channels, npts, 3), dtype=float)
+                E_imag = np.zeros_like(E_real)
+                H_real = np.zeros_like(E_real)
+                H_imag = np.zeros_like(E_real)
+
+                points_device = cuda.to_device(np.ascontiguousarray(sampling_points))
+                focal_device = cuda.to_device(
+                    np.ascontiguousarray(self.parameters.initial_field.focal_point.astype(float))
+                )
+                direction_device = cuda.to_device(np.ascontiguousarray(direction))
+                k_device = cuda.to_device(np.ascontiguousarray(self.parameters.k_medium.astype(float)))
+                n_m = np.asarray(self.parameters.medium_refractive_index)
+                n_real_device = cuda.to_device(np.ascontiguousarray(n_m.real.astype(float)))
+                n_imag_device = cuda.to_device(np.ascontiguousarray(n_m.imag.astype(float)))
+
+                E_real_device = cuda.to_device(E_real)
+                E_imag_device = cuda.to_device(E_imag)
+                H_real_device = cuda.to_device(H_real)
+                H_imag_device = cuda.to_device(H_imag)
+
+                threads = (16, 16)
+                blocks = (
+                    ceil(npts / threads[0]),
+                    ceil(channels / threads[1]),
+                )
+                compute_plane_wave_field_gpu[blocks, threads](
+                    points_device,
+                    focal_device,
+                    direction_device,
+                    k_device,
+                    n_real_device,
+                    n_imag_device,
+                    int(self.parameters.initial_field.pol),
+                    float(self.parameters.initial_field.amplitude),
+                    float(sa),
+                    float(ca),
+                    float(sb),
+                    float(cb),
+                    E_real_device,
+                    E_imag_device,
+                    H_real_device,
+                    H_imag_device,
+                )
+
+                self.initial_field_electric = E_real_device.copy_to_host() + 1j * E_imag_device.copy_to_host()
+                self.initial_field_magnetic = H_real_device.copy_to_host() + 1j * H_imag_device.copy_to_host()
+
+            else:
+                R = sampling_points - self.parameters.initial_field.focal_point
+                phase = R @ direction
+                E = (
+                    self.parameters.initial_field.amplitude
+                    * np.exp(
+                        1j
+                        * phase[:, np.newaxis]
+                        * self.parameters.k_medium[np.newaxis, :]
+                    )
+                ).T  # (channels, N)
+
+                n_medium = np.asarray(self.parameters.medium_refractive_index)
+                H = (-1j * n_medium[:, np.newaxis]) * E
+
+                if self.parameters.initial_field.pol == 1:  # TE
+                    self.initial_field_electric[:, :, 0] = -sa * E
+                    self.initial_field_electric[:, :, 1] = ca * E
+                    # Ez = 0
+
+                    hx_fac = -ca * cb
+                    hy_fac = -sa * cb
+                    hz_fac = sb
+                    self.initial_field_magnetic[:, :, 0] = 1j * hx_fac * H
+                    self.initial_field_magnetic[:, :, 1] = 1j * hy_fac * H
+                    self.initial_field_magnetic[:, :, 2] = 1j * hz_fac * H
+                else:  # TM
+                    self.initial_field_electric[:, :, 0] = ca * cb * E
+                    self.initial_field_electric[:, :, 1] = sa * cb * E
+                    self.initial_field_electric[:, :, 2] = -sb * E
+
+                    hx_fac = -sa
+                    hy_fac = ca
+                    self.initial_field_magnetic[:, :, 0] = 1j * hx_fac * H
+                    self.initial_field_magnetic[:, :, 1] = 1j * hy_fac * H
+                    # Hz = 0
+
         self.log.info("Computing mutual lookup")
         lookup_computation_time_start = time()
+
+        # IMPORTANT: For near-field evaluation CELES uses R = fieldPoints - particlePos.
+        # mutual_lookup() internally computes positions_1 - positions_2, so we pass
+        # (sampling_points, particle_positions) and then transpose back to (particles, points).
         (
             _,
             sph_h,
@@ -576,12 +687,75 @@ class Simulation:
             sph_h_derivative,
         ) = mutual_lookup(
             self.numerics.lmax,
-            self.parameters.particles.position,
             sampling_points,
+            self.parameters.particles.position,
             self.parameters.k_medium,
             derivatives=True,
             parallel=False,
         )
+
+        # transpose (points, particles) -> (particles, points)
+        sph_h = np.swapaxes(sph_h, 1, 2)
+        sph_h_derivative = np.swapaxes(sph_h_derivative, 1, 2)
+        e_j_dm_phi = np.swapaxes(e_j_dm_phi, 1, 2)
+        if p_lm.ndim == 4:
+            p_lm = np.swapaxes(p_lm, 2, 3)
+        e_r = np.swapaxes(e_r, 0, 1)
+        e_theta = np.swapaxes(e_theta, 0, 1)
+        e_phi = np.swapaxes(e_phi, 0, 1)
+        cosine_theta = cosine_theta.T
+        sine_theta = sine_theta.T
+        size_parameter = np.swapaxes(size_parameter, 0, 1)
+
+        # Match CELES' compute_scattered_field.m which interpolates SVWF radial functions
+        # on a uniform r-grid with step `particleDistanceResolution`.
+        resol = float(self.numerics.particle_distance_resolution)
+        if resol > 0:
+            # distances r (particles x points)
+            diffs = sampling_points[np.newaxis, :, :] - self.parameters.particles.position[:, np.newaxis, :]
+            r = np.sqrt(np.sum(diffs**2, axis=2))
+            rmax = float(np.max(r))
+            ri = np.arange(0.0, rmax + resol, resol)
+            if ri.size < 2:
+                ri = np.array([0.0, resol])
+
+            # precompute h_l(kr) and dx_xz(3,l,kr) on ri for all wavelengths
+            kr = ri[:, np.newaxis] * self.parameters.k_medium[np.newaxis, :]
+            kr[0, :] = 1e-30  # avoid singularities at 0
+
+            channels = self.parameters.k_medium.size
+            sph_h_i = np.zeros((self.numerics.lmax + 1, ri.size, channels), dtype=complex)
+            sph_d_i = np.zeros_like(sph_h_i)
+            for l in range(1, self.numerics.lmax + 1):
+                h_l = spherical_jn(l, kr) + 1j * spherical_yn(l, kr)
+                h_lm1 = spherical_jn(l - 1, kr) + 1j * spherical_yn(l - 1, kr)
+                sph_h_i[l, :, :] = h_l
+                sph_d_i[l, :, :] = kr * h_lm1 - l * h_l
+
+            # interpolate along ri (uniform grid -> fast indexing)
+            idx0 = np.floor(r / resol).astype(int)
+            idx0 = np.clip(idx0, 0, ri.size - 2)
+            frac = (r / resol) - idx0
+
+            sph_h_interp = np.zeros(
+                (self.numerics.lmax + 1, r.shape[0], r.shape[1], channels), dtype=complex
+            )
+            sph_d_interp = np.zeros_like(sph_h_interp)
+            for l in range(1, self.numerics.lmax + 1):
+                for w in range(channels):
+                    h_w = sph_h_i[l, :, w]
+                    d_w = sph_d_i[l, :, w]
+                    h0 = h_w[idx0]
+                    h1 = h_w[idx0 + 1]
+                    d0 = d_w[idx0]
+                    d1 = d_w[idx0 + 1]
+                    sph_h_interp[l, :, :, w] = h0 + frac * (h1 - h0)
+                    sph_d_interp[l, :, :, w] = d0 + frac * (d1 - d0)
+
+            sph_h = sph_h_interp
+            sph_h_derivative = sph_d_interp
+            size_parameter = r[:, :, np.newaxis] * self.parameters.k_medium[np.newaxis, np.newaxis, :]
+
         lookup_computation_time_stop = time()
         self.log.info(
             "Computing lookup tables took %f s",
@@ -594,7 +768,7 @@ class Simulation:
         self.log.info("Computing field...")
         field_time_start = time()
         self.sampling_points = sampling_points
-        if not self.numerics.gpu:
+        if self.numerics.gpu:
             self.log.info("\t...using GPU")
             field_real = np.zeros(
                 (self.parameters.k_medium.size, sampling_points.shape[0], 3),
@@ -678,6 +852,11 @@ class Simulation:
                 e_phi,
                 scattered_field_coefficients=self.scattered_field_coefficients,
             )
+
+        if self.initial_field_electric is not None:
+            self.total_field_electric = self.initial_field_electric + self.scattered_field
+        else:
+            self.total_field_electric = self.scattered_field
 
         field_time_stop = time()
         self.log.info(

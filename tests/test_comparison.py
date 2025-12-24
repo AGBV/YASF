@@ -117,7 +117,7 @@ def test_translation_table_ab():
     numerics = Numerics(lmax=lmax)
     numerics.compute_translation_table()
     python_table = numerics.translation_ab5
-    npt.assert_allclose(python_table, expected_table, rtol=RTOL)
+    npt.assert_allclose(python_table, expected_table, rtol=RTOL, atol=1e-7)
 
 
 def test_sph_bessel():

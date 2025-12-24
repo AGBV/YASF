@@ -1,7 +1,7 @@
 import numba as nb
 import numpy as np
-from refidxdb import Handler
-from scipy.special import hankel1, lpmv, spherical_jn
+from refidxdb.handler import Handler
+from scipy.special import hankel1, lpmv, spherical_jn, spherical_yn
 
 from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
 from yasfpy.functions.material_handler import material_handler
@@ -179,58 +179,45 @@ def mutual_lookup(
             lmax, size_parameter, phi, cosine_theta
         )
     else:
-        p_range = np.arange(2 * lmax + 1)
-        p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
-        size_parameter_extended = size_parameter[np.newaxis, :, :, :]
-        spherical_hankel = np.sqrt(
-            np.divide(
-                np.pi / 2,
-                size_parameter_extended,
-                out=np.zeros_like(size_parameter_extended),
-                where=size_parameter_extended != 0,
-            )
-        ) * hankel1(p_range + 1 / 2, size_parameter_extended)
-        spherical_bessel = spherical_jn(p_range, size_parameter_extended)
+        # SciPy's spherical_yn does not reliably broadcast over an array of orders,
+        # so compute per-order (matches CELES sph_bessel for nu=3).
+        spherical_hankel = np.zeros((2 * lmax + 1,) + size_parameter.shape, dtype=complex)
+        spherical_bessel = np.zeros_like(spherical_hankel)
+        nz = size_parameter != 0
+        for p in range(2 * lmax + 1):
+            spherical_bessel[p, :, :, :] = spherical_jn(p, size_parameter)
+            # Avoid spherical_yn(p, 0) -> inf/NaN (field at r=0 is not used).
+            y = np.zeros_like(size_parameter, dtype=complex)
+            y[nz] = spherical_yn(p, size_parameter[nz])
+            spherical_hankel[p, :, :, :] = spherical_bessel[p, :, :, :] + 1j * y
 
         if derivatives:
-            spherical_hankel_lower = np.sqrt(
-                np.divide(
-                    np.pi / 2,
-                    size_parameter_extended,
-                    out=np.zeros_like(size_parameter_extended),
-                    where=size_parameter_extended != 0,
+            # dx_xz(3,l,z) = z*h_{l-1}(z) - l*h_l(z)
+            spherical_hankel_derivative = np.zeros_like(spherical_hankel)
+            for p in range(2 * lmax + 1):
+                if p == 0:
+                    continue
+                spherical_hankel_derivative[p, :, :, :] = (
+                    size_parameter * spherical_hankel[p - 1, :, :, :] - p * spherical_hankel[p, :, :, :]
                 )
-            ) * hankel1(-1 / 2, size_parameter_extended)
-            spherical_hankel_lower = np.vstack(
-                (spherical_hankel_lower, spherical_hankel[:-1, :, :, :])
-            )
-            spherical_hankel_derivative = (
-                size_parameter_extended * spherical_hankel_lower
-                - p_range * spherical_hankel
-            )
-
-            # p_range = np.arange(2 * lmax + 2) - 1
-            # p_range = p_range[:, np.newaxis, np.newaxis, np.newaxis]
-            # spherical_hankel = np.sqrt(np.divide(np.pi / 2, size_parameter_extended, out = np.zeros_like(size_parameter_extended), where = size_parameter_extended != 0)) * hankel1(p_range + 1/2, size_parameter_extended)
-            # spherical_hankel_derivative = size_parameter_extended * spherical_hankel[:-1, :, :, :] - p_range[1:, :, :, :] * spherical_hankel[1:, :, :, :]
 
             p_lm = legendre_normalized_trigon(lmax, cosine_theta, sine_theta)
         else:
             spherical_hankel_derivative = None
 
+            # The lpmv-based implementation has a bug in the normalization/phase.
+            # Replace it with the trusted legendre_normalized_trigon function,
+            # computed up to the required order of 2*lmax.
+            plm_unflattened = legendre_normalized_trigon(2 * lmax, cosine_theta, sine_theta)
+
+            # Flatten the result to match the format expected by particle_interaction
             p_lm = np.zeros(
-                (lmax + 1) * (2 * lmax + 1) * np.prod(size_parameter.shape[:2])
-            ).reshape(((lmax + 1) * (2 * lmax + 1),) + size_parameter.shape[:2])
+                ((2 * lmax + 1) * (2 * lmax + 2) // 2,) + size_parameter.shape[:2]
+            )
             for p in range(2 * lmax + 1):
                 for absdm in range(p + 1):
-                    cml = np.sqrt(
-                        (2 * p + 1)
-                        / 2
-                        * np.prod(1 / np.arange(p - absdm + 1, p + absdm + 1))
-                    )
-                    p_lm[p * (p + 1) // 2 + absdm, :, :] = (
-                        cml * np.power(-1.0, absdm) * lpmv(absdm, p, cosine_theta)
-                    )
+                    idx = p * (p + 1) // 2 + absdm
+                    p_lm[idx, :, :] = plm_unflattened[p, absdm, :, :]
 
         phi = phi[np.newaxis, :, :]
         p_range = np.arange(-2 * lmax, 2 * lmax + 1)
@@ -252,27 +239,27 @@ def mutual_lookup(
     )
 
 
-def generate_refractive_index_table(urls: list) -> list:
-    """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
-    URL using the `material_handler` function, and returns a list of the retrieved data.
+# def generate_refractive_index_table(urls: list) -> list:
+#     """The function `generate_refractive_index_table` takes a list of URLs, retrieves data from each
+#     URL using the `material_handler` function, and returns a list of the retrieved data.
 
-    Args:
-        urls (list): A list of URLs representing different materials.
+#     Args:
+#         urls (list): A list of URLs representing different materials.
 
-    Returns:
-        data (list): A list of data. Each element in the list corresponds to a URL in the input list,
-            and the data is obtained by calling the `material_handler` function on each URL.
+#     Returns:
+#         data (list): A list of data. Each element in the list corresponds to a URL in the input list,
+#             and the data is obtained by calling the `material_handler` function on each URL.
 
-    """
-    # data = [None] * len(urls)
-    # for k, url in enumerate(urls):
-    # data[k] = material_handler(url)
-    data = []
-    for url in urls:
-        handle = Handler(url=url)
-        data.append(dict(ref_idx=handle.nk))
+#     """
+#     # data = [None] * len(urls)
+#     # for k, url in enumerate(urls):
+#     # data[k] = material_handler(url)
+#     data = []
+#     for url in urls:
+#         handle = Handler(url=url)
+#         data.append(dict(ref_idx=handle.nk))
 
-    return data
+#     return data
 
 
 # def interpolate_refractive_index_from_table(

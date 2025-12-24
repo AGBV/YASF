@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 # https://github.com/disordered-photonics/celes/blob/master/src/mathematics/legendre_normalized_trigon.m
 
@@ -50,7 +51,7 @@ def legendre_normalized_trigon(lmax, x: np.ndarray, y: np.ndarray = None):
         ct = x.ravel()
         st = y.ravel()
 
-    plm = np.zeros((lmax + 1, lmax + 1, ct.size)) * np.nan
+    plm = np.zeros((lmax + 1, lmax + 1, ct.size))
 
     plm[0, 0, :] = np.sqrt(1 / 2) * np.ones_like(ct)
     plm[1, 0, :] = np.sqrt(3 / 2) * ct
@@ -64,7 +65,7 @@ def legendre_normalized_trigon(lmax, x: np.ndarray, y: np.ndarray = None):
     for m in range(1, lmax + 1):
         plm[m - 1, m, :] = np.zeros_like(ct)
         plm[m, m, :] = (
-            np.sqrt((2 * m + 1) / 2 / np.math.factorial(2 * m))
+            np.sqrt((2 * m + 1) / 2 / math.factorial(2 * m))
             * np.prod(np.arange(1, 2 * m, 2))
             * np.power(st, m)
         )
@@ -129,7 +130,7 @@ def legendre_normalized_trigon_legacy(x, y=None, lmax=4):
     for m in range(1, lmax + 1):
         plm[m - 1, m] = np.zeros_like(ct)
         plm[m, m] = (
-            np.sqrt((2 * m + 1) / 2 / np.math.factorial(2 * m))
+            np.sqrt((2 * m + 1) / 2 / math.factorial(2 * m))
             * np.prod(np.arange(1, 2 * m, 2))
             * st**m
         )

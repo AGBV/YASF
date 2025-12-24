@@ -30,10 +30,10 @@ def spherical_functions_trigon(lmax, theta, st=None):
     ct = ct.ravel()
     st = st.ravel()
 
-    plm = np.zeros((lmax + 1, lmax + 1, ct.shape[0])) * np.nan
-    pilm = np.zeros(plm.shape) * np.nan
-    taulm = np.zeros(plm.shape) * np.nan
-    pprimel0 = np.zeros((lmax + 1, ct.shape[0])) * np.nan
+    plm = np.zeros((lmax + 1, lmax + 1, ct.shape[0]))
+    pilm = np.zeros(plm.shape)
+    taulm = np.zeros(plm.shape)
+    pprimel0 = np.zeros((lmax + 1, ct.shape[0]))
 
     plm[0, 0, :] = np.sqrt(1 / 2) * np.ones_like(ct)
     plm[1, 0, :] = np.sqrt(3 / 2) * ct
