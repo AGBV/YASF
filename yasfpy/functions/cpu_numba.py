@@ -486,7 +486,7 @@ def compute_lookup_tables(
     return spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm
 
 
-@jit(nopython=True, parallel=False, nogil=True, fastmath=True, cache=True)
+@jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
 def compute_field(
     lmax: int,
     idx: np.ndarray,
@@ -504,96 +504,73 @@ def compute_field(
     initial_field_coefficients: np.ndarray | None = None,
     scatter_to_internal: np.ndarray | None = None,
 ):
-    """
-    Compute the field using the given parameters and coefficients.
+    """Compute the field using the given parameters and coefficients.
 
-    Parameters:
-        lmax (int): The maximum degree of the spherical harmonics.
-        idx (np.ndarray): The index array containing the values of s, n, tau, l, and m.
-        size_parameter (np.ndarray): The size parameter array.
-        sph_h (np.ndarray): The spherical harmonics array.
-        derivative (np.ndarray): The derivative array.
-        e_j_dm_phi (np.ndarray): The e_j_dm_phi array.
-        p_lm (np.ndarray): The p_lm array.
-        pi_lm (np.ndarray): The pi_lm array.
-        tau_lm (np.ndarray): The tau_lm array.
-        e_r (np.ndarray): The e_r array.
-        e_theta (np.ndarray): The e_theta array.
-        e_phi (np.ndarray): The e_phi array.
-        scattered_field_coefficients (np.ndarray, optional): The scattered field coefficients array. Defaults to None.
-        initial_field_coefficients (np.ndarray, optional): The initial field coefficients array. Defaults to None.
-        scatter_to_internal (np.ndarray, optional): The scatter to internal array. Defaults to None.
-
-    Returns:
-        field (np.ndarray): The computed field array.
+    Parallelization is safe because we parallelize over output elements (w, point)
+    and accumulate locally before writing once.
     """
     jmax = sph_h.shape[1] * 2 * lmax * (lmax + 2)
     channels = sph_h.shape[-1]
+    n_points = sph_h.shape[2]
 
-    field = np.zeros((channels, sph_h.shape[2], 3), dtype=np.complex128)
+    field = np.zeros((channels, n_points, 3), dtype=np.complex128)
 
     if (scattered_field_coefficients is None) and (initial_field_coefficients is None):
-        print(
-            "At least one, scattered field or initial field coefficients, need to be given."
-        )
-        print("Returning a zero array")
         return field
 
-    for w_idx in range(2 * lmax * (lmax + 2) * np.prod(np.array(sph_h.shape[1:]))):
-        w = w_idx % channels
-        j_idx = w_idx // channels
-        sampling_idx = j_idx // jmax
-        j_idx = j_idx % jmax
-        s, n, tau, l, m = idx[j_idx, :]
+    for out_idx in prange(channels * n_points):
+        w = out_idx % channels
+        sampling_idx = out_idx // channels
 
-        invariant = (
-            1 / np.sqrt(2 * (l + 1) * l) * e_j_dm_phi[m + 2 * lmax, s, sampling_idx]
-        )
-        # Calculate M
-        if tau == 1:
-            c_term_1 = (
-                1j
-                * m
-                * pi_lm[l, np.abs(m), s, sampling_idx]
-                * e_theta[s, sampling_idx, :]
-            )
-            c_term_2 = tau_lm[l, np.abs(m), s, sampling_idx] * e_phi[s, sampling_idx, :]
-            c_term = sph_h[l, s, sampling_idx, w] * (c_term_1 - c_term_2)
+        fx = 0j
+        fy = 0j
+        fz = 0j
 
-            field[w, sampling_idx, :] += (
-                scattered_field_coefficients[s, n, w] * invariant * c_term
-            )
-        # Calculate N
-        else:
-            p_term = (
-                l
-                * (l + 1)
-                / size_parameter[s, sampling_idx, w]
-                * sph_h[l, s, sampling_idx, w]
-                * p_lm[l, np.abs(m), s, sampling_idx]
-                * e_r[s, sampling_idx, :]
-            )
-            #   p_term = l * (l + 1) / size_parameter[s, sampling_idx, w]
-            #   p_term *= sph_h[l, s, sampling_idx, w]
-            #   p_term *= p_lm[l, np.abs(m), s, sampling_idx]
-            #   p_term *= e_r[s, sampling_idx, :]
+        for j_idx in range(jmax):
+            s, n, tau, l, m = idx[j_idx, :]
+            absm = np.abs(m)
 
-            b_term_1 = (
-                derivative[l, s, sampling_idx, w] / size_parameter[s, sampling_idx, w]
+            inv = (
+                1.0
+                / np.sqrt(2.0 * (l + 1) * l)
+                * e_j_dm_phi[m + 2 * lmax, s, sampling_idx]
             )
-            b_term_2 = (
-                tau_lm[l, np.abs(m), s, sampling_idx] * e_theta[s, sampling_idx, :]
-            )
-            b_term_3 = (
-                1j
-                * m
-                * pi_lm[l, np.abs(m), s, sampling_idx]
-                * e_phi[s, sampling_idx, :]
-            )
-            b_term = b_term_1 * (b_term_2 + b_term_3)
+            coeff = scattered_field_coefficients[s, n, w]
 
-            field[w, sampling_idx, :] += (
-                scattered_field_coefficients[s, n, w] * invariant * (p_term + b_term)
-            )
+            h = sph_h[l, s, sampling_idx, w]
+            pi_val = pi_lm[l, absm, s, sampling_idx]
+            tau_val = tau_lm[l, absm, s, sampling_idx]
+
+            c1 = 1j * m * pi_val
+
+            if tau == 1:
+                tx = h * (c1 * e_theta[s, sampling_idx, 0] - tau_val * e_phi[s, sampling_idx, 0])
+                ty = h * (c1 * e_theta[s, sampling_idx, 1] - tau_val * e_phi[s, sampling_idx, 1])
+                tz = h * (c1 * e_theta[s, sampling_idx, 2] - tau_val * e_phi[s, sampling_idx, 2])
+
+                fx += coeff * inv * tx
+                fy += coeff * inv * ty
+                fz += coeff * inv * tz
+            else:
+                sp = size_parameter[s, sampling_idx, w]
+                pref = (l * (l + 1)) / sp * h * p_lm[l, absm, s, sampling_idx]
+
+                ptx = pref * e_r[s, sampling_idx, 0]
+                pty = pref * e_r[s, sampling_idx, 1]
+                ptz = pref * e_r[s, sampling_idx, 2]
+
+                d = derivative[l, s, sampling_idx, w] / sp
+
+                btx = d * (tau_val * e_theta[s, sampling_idx, 0] + c1 * e_phi[s, sampling_idx, 0])
+                bty = d * (tau_val * e_theta[s, sampling_idx, 1] + c1 * e_phi[s, sampling_idx, 1])
+                btz = d * (tau_val * e_theta[s, sampling_idx, 2] + c1 * e_phi[s, sampling_idx, 2])
+
+                fx += coeff * inv * (ptx + btx)
+                fy += coeff * inv * (pty + bty)
+                fz += coeff * inv * (ptz + btz)
+
+        field[w, sampling_idx, 0] = fx
+        field[w, sampling_idx, 1] = fy
+        field[w, sampling_idx, 2] = fz
 
     return field
