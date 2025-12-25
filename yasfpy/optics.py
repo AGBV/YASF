@@ -147,6 +147,87 @@ class Optics:
         self.q_ext *= np.abs(self.simulation.parameters.medium_refractive_index)
         self.q_sca *= np.abs(self.simulation.parameters.medium_refractive_index)
 
+    def compute_scattered_e_field_angle_components(self):
+        pilm, taulm = spherical_functions_trigon(
+            self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
+        )
+
+        if self.simulation.numerics.gpu:
+            jmax = (
+                self.simulation.parameters.particles.number
+                * self.simulation.numerics.nmax
+            )
+            angles = self.simulation.numerics.azimuthal_angles.size
+            wavelengths = self.simulation.parameters.k_medium.size
+            e_field_theta_real = np.zeros((angles, wavelengths), dtype=float)
+            e_field_theta_imag = np.zeros_like(e_field_theta_real)
+            e_field_phi_real = np.zeros_like(e_field_theta_real)
+            e_field_phi_imag = np.zeros_like(e_field_theta_real)
+
+            particles_position_device = cuda.to_device(
+                self.simulation.parameters.particles.position
+            )
+            idx_device = cuda.to_device(self.simulation.idx_lookup)
+            sfc_device = cuda.to_device(self.simulation.scattered_field_coefficients)
+            k_medium_device = cuda.to_device(self.simulation.parameters.k_medium)
+            azimuthal_angles_device = cuda.to_device(
+                self.simulation.numerics.azimuthal_angles
+            )
+            e_r_device = cuda.to_device(self.simulation.numerics.e_r)
+            pilm_device = cuda.to_device(pilm)
+            taulm_device = cuda.to_device(taulm)
+
+            e_field_theta_real_device = cuda.to_device(e_field_theta_real)
+            e_field_theta_imag_device = cuda.to_device(e_field_theta_imag)
+            e_field_phi_real_device = cuda.to_device(e_field_phi_real)
+            e_field_phi_imag_device = cuda.to_device(e_field_phi_imag)
+
+            sizes = (jmax, angles, wavelengths)
+            threads_per_block = (16, 16, 2)
+            blocks_per_grid = tuple(
+                ceil(sizes[k] / threads_per_block[k])
+                for k in range(len(threads_per_block))
+            )
+
+            compute_electric_field_angle_components_gpu[
+                blocks_per_grid, threads_per_block
+            ](
+                self.simulation.numerics.lmax,
+                particles_position_device,
+                idx_device,
+                sfc_device,
+                k_medium_device,
+                azimuthal_angles_device,
+                e_r_device,
+                pilm_device,
+                taulm_device,
+                e_field_theta_real_device,
+                e_field_theta_imag_device,
+                e_field_phi_real_device,
+                e_field_phi_imag_device,
+            )
+
+            e_field_theta_real = e_field_theta_real_device.copy_to_host()
+            e_field_theta_imag = e_field_theta_imag_device.copy_to_host()
+            e_field_phi_real = e_field_phi_real_device.copy_to_host()
+            e_field_phi_imag = e_field_phi_imag_device.copy_to_host()
+            e_field_theta = e_field_theta_real + 1j * e_field_theta_imag
+            e_field_phi = e_field_phi_real + 1j * e_field_phi_imag
+        else:
+            e_field_theta, e_field_phi = compute_electric_field_angle_components(
+                self.simulation.numerics.lmax,
+                self.simulation.parameters.particles.position,
+                self.simulation.idx_lookup,
+                self.simulation.scattered_field_coefficients,
+                self.simulation.parameters.k_medium,
+                self.simulation.numerics.azimuthal_angles,
+                self.simulation.numerics.e_r,
+                pilm,
+                taulm,
+            )
+
+        return e_field_theta, e_field_phi
+
     def compute_phase_funcition(
         self,
         legendre_coefficients_number: int = 15,
@@ -328,9 +409,9 @@ class Optics:
         )
         if check_phase_function:
             res = self.__check_phase_function()
-            assert (
-                res is True
-            ), "The phase function does have the desired precision. Please increase the amount of angles used."
+            assert res is True, (
+                "The phase function does have the desired precision. Please increase the amount of angles used."
+            )
 
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
             np.cos(self.scattering_angles),
@@ -815,9 +896,9 @@ class Optics:
         )
         if check_phase_function:
             res = self.__check_phase_function()
-            assert (
-                res is True
-            ), "The phase function does have the desired precision. Please increase the amount of angles used."
+            assert res is True, (
+                "The phase function does have the desired precision. Please increase the amount of angles used."
+            )
 
         self.phase_function_legendre_coefficients = np.polynomial.legendre.legfit(
             np.cos(self.scattering_angles),
@@ -951,7 +1032,7 @@ class Optics:
             needed_shape = tuple(needed_shape)
             res.append(np.empty(needed_shape, float))
 
-        print(f"Need to process {total_bytes*1e-9} GB of data")
+        print(f"Need to process {total_bytes * 1e-9} GB of data")
 
         while not done:
             split_idx = self.__compute_data_split(
@@ -980,7 +1061,7 @@ class Optics:
             for array in split_data:
                 used_bytes += array.size * array.itemsize
             total_bytes -= used_bytes
-            print(f"{total_bytes*1e-9} GB of data remaining")
+            print(f"{total_bytes * 1e-9} GB of data remaining")
 
             # modify number of blocks per grid needed for kernel with current split
             sizes2 = list(sizes)
@@ -1047,8 +1128,8 @@ class Optics:
                 new_data_bytes += temp_size * item.itemsize
             total_data_bytes = new_data_bytes
 
-        print(f"{free_bytes*1e-9} GB of data available on GPU")
-        print(f"Unused GPU memory: {(free_bytes-total_data_bytes)*1e-6} MB")
+        print(f"{free_bytes * 1e-9} GB of data available on GPU")
+        print(f"Unused GPU memory: {(free_bytes - total_data_bytes) * 1e-6} MB")
 
         if num // threads_per_block > 2**16 - 1:
             num = (2**16 - 1) * threads_per_block
