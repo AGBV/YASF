@@ -356,22 +356,144 @@ class Simulation:
                     )
 
     def __compute_initial_field_coefficients_wavebundle_normal_incidence(self):
-        """The function initializes the field coefficients for a wave bundle incident at normal incidence.
+        """Computes initial field coefficients for a Gaussian beam (wavebundle) at normal incidence.
 
-        TODO:
-            Implement this function using the celes function [initial_field_coefficients_wavebundle_normal_incidence.m](https://github.com/disordered-photonics/celes/blob/master/src/initial/initial_field_coefficients_wavebundle_normal_incidence.m)
+        This implements the algorithm from CELES initial_field_coefficients_wavebundle_normal_incidence.m
+        The Gaussian beam is expanded in spherical vector wave functions and integrated over
+        the angular spectrum.
+
+        References:
+            CELES: https://github.com/disordered-photonics/celes/blob/master/src/initial/initial_field_coefficients_wavebundle_normal_incidence.m
         """
-        self.initial_field_coefficients = (
-            np.zeros(
-                (
-                    self.parameters.particles.number,
-                    self.numerics.nmax,
-                    self.parameters.k_medium.size,
-                ),
-                dtype=complex,
-            )
-            * np.nan
+        from scipy.special import jv as besselj
+
+        # Extract parameters
+        lmax = self.numerics.lmax
+        E0 = self.parameters.initial_field.amplitude
+        k = self.parameters.k_medium[0]  # Assuming single wavelength for now
+        w = self.parameters.initial_field.beam_width
+        prefac = E0 * k**2 * w**2 / np.pi
+
+        # Adjust azimuthal angle for polarization
+        pol_lower = self.parameters.initial_field.polarization.lower()
+        if pol_lower == 'te':
+            alphaG = self.parameters.initial_field.azimuthal_angle
+        elif pol_lower == 'tm':
+            alphaG = self.parameters.initial_field.azimuthal_angle - np.pi / 2
+        else:
+            raise ValueError(f"Unsupported polarization: {self.parameters.initial_field.polarization}")
+
+        # Get polar angle grid from numerics
+        full_beta_array = self.numerics.polar_angles
+        if full_beta_array is None:
+            raise ValueError("numerics.polar_angles not initialized. Set sampling_points_number in Numerics.")
+
+        # Filter angles by direction (same hemisphere as incident beam)
+        incident_polar = self.parameters.initial_field.polar_angle
+        direction_idcs = (
+            np.sign(np.cos(full_beta_array)) == np.sign(np.cos(incident_polar))
         )
+        beta_array = full_beta_array[direction_idcs]
+
+        # Compute angular grid spacing (for integration)
+        if len(beta_array) < 2:
+            raise ValueError("Need at least 2 polar angles for wavebundle integration")
+        dBeta = np.mean(np.diff(np.sort(beta_array)))
+
+        # Compute cos/sin for integration points
+        cb = np.cos(beta_array)
+        sb = np.sin(beta_array)
+
+        # Gaussian weighting factors
+        gaussfac = np.exp(-w**2 / 4 * k**2 * sb**2)
+        gaussfacSincos = gaussfac * cb * sb
+
+        # Compute spherical functions (pilm, taulm)
+        pilm, taulm = spherical_functions_trigon(lmax, cb, sb)
+
+        # Particle positions relative to focal point
+        relative_particle_positions = (
+            self.parameters.particles.position
+            - self.parameters.initial_field.focal_point
+        )
+
+        # Convert to cylindrical coordinates
+        rhoGi = np.sqrt(
+            relative_particle_positions[:, 0]**2
+            + relative_particle_positions[:, 1]**2
+        )
+        phiGi = np.arctan2(
+            relative_particle_positions[:, 1],
+            relative_particle_positions[:, 0]
+        )
+        zGi = relative_particle_positions[:, 2]
+
+        # Initialize coefficient array
+        self.initial_field_coefficients = np.zeros(
+            (
+                self.parameters.particles.number,
+                self.numerics.nmax,
+                self.parameters.k_medium.size,
+            ),
+            dtype=complex,
+        )
+
+        # Main computation loop over azimuthal orders and multipole indices
+        for m in range(-lmax, lmax + 1):
+            # Compute two integral expressions for each m
+            # These involve Bessel functions and phase factors
+
+            # Phase factors for m±1
+            phase_m_minus_1 = np.exp(-1j * (m - 1) * phiGi)
+            phase_m_plus_1 = np.exp(-1j * (m + 1) * phiGi)
+
+            # Vertical propagation: exp(i z k cos(beta))
+            # Shape: (num_particles, num_beta)
+            exp_ikz = np.exp(1j * zGi[:, np.newaxis] * k * cb[np.newaxis, :])
+
+            # Bessel functions: J_{|m±1|}(rho * k * sin(beta))
+            # Shape: (num_particles, num_beta)
+            bessel_m_minus_1 = besselj(np.abs(m - 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :])
+            bessel_m_plus_1 = besselj(np.abs(m + 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :])
+
+            # Combine into radial integrands
+            radial_m_minus_1 = phase_m_minus_1[:, np.newaxis] * exp_ikz * bessel_m_minus_1
+            radial_m_plus_1 = phase_m_plus_1[:, np.newaxis] * exp_ikz * bessel_m_plus_1
+
+            # Two integral expressions (eikzI1 and eikzI2) with different polarization weightings
+            eikzI1 = np.pi * (
+                np.exp(-1j * alphaG) * (1j ** np.abs(m - 1)) * radial_m_minus_1
+                + np.exp(1j * alphaG) * (1j ** np.abs(m + 1)) * radial_m_plus_1
+            )
+
+            eikzI2 = np.pi * 1j * (
+                -np.exp(-1j * alphaG) * (1j ** np.abs(m - 1)) * radial_m_minus_1
+                + np.exp(1j * alphaG) * (1j ** np.abs(m + 1)) * radial_m_plus_1
+            )
+
+            # Integrate over tau and l
+            for tau in range(1, 3):
+                for l in range(max(1, abs(m)), lmax + 1):
+                    n = multi2single_index(0, tau, l, m, lmax)
+
+                    # Gaussian weighting times transformation coefficients
+                    gaussSincosBDag1 = gaussfacSincos * transformation_coefficients(
+                        pilm, taulm, tau, l, m, 1, dagger=True
+                    )
+                    gaussSincosBDag2 = gaussfacSincos * transformation_coefficients(
+                        pilm, taulm, tau, l, m, 2, dagger=True
+                    )
+
+                    # Trapezoidal integration over beta grid
+                    # Average neighboring points and sum
+                    integral = (
+                        np.dot(eikzI1[:, 1:], gaussSincosBDag1[1:])
+                        + np.dot(eikzI1[:, :-1], gaussSincosBDag1[:-1])
+                        + np.dot(eikzI2[:, 1:], gaussSincosBDag2[1:])
+                        + np.dot(eikzI2[:, :-1], gaussSincosBDag2[:-1])
+                    ) * dBeta / 2
+
+                    self.initial_field_coefficients[:, n, 0] = prefac * integral
 
     def coupling_matrix_multiply(self, x: np.ndarray, idx: int = None):
         """Computes the coupling matrix `wx` based on the input parameters.

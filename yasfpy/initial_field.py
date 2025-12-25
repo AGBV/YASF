@@ -90,6 +90,10 @@ class InitialField:
         """
         self.normal_incidence = np.abs(np.sin(self.polar_angle)) < 1e-5
 
+    def set_polarization(self, polarization: str | int) -> None:
+        self.polarization = polarization
+        self.__setup()
+
     def __setup(self):
         """
         Performs the initial setup of the field.
