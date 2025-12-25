@@ -1,11 +1,13 @@
 import cProfile
 import logging
 import pstats
+from functools import cached_property
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import pyperf
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, PrivateAttr
 
 from yasfpy.config import Config
 from yasfpy.initial_field import InitialField
@@ -23,9 +25,13 @@ from yasfpy.solver import Solver
 
 # class YASF(BaseModel):
 class YASF:
-    config: dict
     path_config: str
     path_cluster: str
+    preprocess: bool
+    _config: Config | None
+    # preprocess: bool = Field(default=True)
+    # path_cluster: str = Field(default="")
+    # _config: Config | None = PrivateAttr(default=None)
 
     def __init__(
         self,
@@ -33,13 +39,16 @@ class YASF:
         preprocess: bool = True,
         path_cluster: str = "",
     ):
-        # super().__init__(
-        #     path_config=path_config,
-        #     preprocess=preprocess,
-        #     path_cluster=path_cluster,
-        # )
+        # def model_post_init(self, __context: Any) -> None:
         self.path_config = path_config
-        self.config = Config(path_config, preprocess, path_cluster)
+        self.preprocess = preprocess
+        self.path_cluster = path_cluster
+        # self.config = Config(path_config, preprocess, path_cluster)
+        self._config = Config(
+            path_config=self.path_config,
+            path_cluster=self.path_cluster,
+            preprocess=self.preprocess,
+        )
 
         self.particles = Particles(
             self.config.spheres[:, 0:3],
@@ -79,7 +88,17 @@ class YASF:
         self.simulation = Simulation(self.parameters, self.numerics)
         self.optics = Optics(self.simulation)
 
-    def run(self, points: np.ndarray = None):
+    @cached_property
+    def config(self) -> Config:
+        if self._config is None:
+            self._config = Config(
+                path_config=self.path_config,
+                path_cluster=self.path_cluster,
+                preprocess=self.preprocess,
+            )
+        return self._config
+
+    def run(self, points: np.ndarray | None = None):
         self.particles.compute_volume_equivalent_area()
         self.numerics.compute_spherical_unity_vectors()
         self.numerics.compute_translation_table()
@@ -107,8 +126,13 @@ class YASF:
             )
             self.optics.simulation.compute_fields(points)
 
+    def export(self):
+        raise NotImplementedError(
+            "Export needs to be implemented yet using the Export class!"
+        )
+
     @staticmethod
-    def benchmark(config_path: str = None, runner: pyperf.Runner = None):
+    def benchmark(config_path: str | None = None, runner: pyperf.Runner | None = None):
         if config_path is None:
             raise Exception("Plase provide a config file!")
         if runner is None:
@@ -118,7 +142,7 @@ class YASF:
         runner.bench_func("yasf_run", lambda: yasf_instance.run())
 
     @staticmethod
-    def profiler(config_path: str = None, output: str = None):
+    def profiler(config_path: str | None = None, output: str | None = None):
         if config_path is None:
             raise Exception("Plase provide a config file!")
         with cProfile.Profile() as pr:
