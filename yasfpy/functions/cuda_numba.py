@@ -375,7 +375,9 @@ def compute_plane_wave_field_gpu(
     rx = points[p_idx, 0] - focal_point[0]
     ry = points[p_idx, 1] - focal_point[1]
     rz = points[p_idx, 2] - focal_point[2]
-    phase = k_medium[w_idx] * (rx * direction[0] + ry * direction[1] + rz * direction[2])
+    phase = k_medium[w_idx] * (
+        rx * direction[0] + ry * direction[1] + rz * direction[2]
+    )
 
     c = cos(phase)
     s = sin(phase)

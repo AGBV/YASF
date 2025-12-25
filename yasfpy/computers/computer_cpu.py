@@ -40,9 +40,9 @@ class ComputerCPU(Computer):
                         * plm[p * (p + 1) // 2 + delta_m, s1, s2]
                         * sph_h[p, s1, s2, :]
                     )
-                
+
                 val *= e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2, :]
-                
+
                 wx[j1, :] += val
         return wx
 
@@ -163,7 +163,6 @@ class ComputerCPU(Computer):
 
         return e_1_sca
 
-
     @jit(nopython=True, parallel=True, nogil=True, fastmath=True)
     def compute_electric_field_angle_components(
         lmax: int,
@@ -215,7 +214,6 @@ class ComputerCPU(Computer):
 
         return e_field_theta, e_field_phi
 
-
     @jit(nopython=True, parallel=True, nogil=True, fastmath=True)
     def compute_polarization_components(
         number_of_wavelengths: int,
@@ -240,7 +238,8 @@ class ComputerCPU(Computer):
                 + e_field_theta[a_idx, w_idx].imag ** 2
             )
             e_field_phi_abs = (
-                e_field_phi[a_idx, w_idx].real ** 2 + e_field_phi[a_idx, w_idx].imag ** 2
+                e_field_phi[a_idx, w_idx].real ** 2
+                + e_field_phi[a_idx, w_idx].imag ** 2
             )
             e_field_angle_interaction = (
                 e_field_theta[a_idx, w_idx] * e_field_phi[a_idx, w_idx].conjugate()
@@ -266,7 +265,6 @@ class ComputerCPU(Computer):
             degree_of_circular_polarization,
         )
 
-
     @jit(nopython=True, parallel=True, nogil=True, fastmath=True)
     def compute_radial_independent_scattered_field(
         number_of_wavelengths: int,
@@ -289,7 +287,6 @@ class ComputerCPU(Computer):
             )
 
         return e_1_sca
-
 
     @jit(parallel=True, forceobj=True)
     def compute_lookup_tables(
@@ -328,7 +325,6 @@ class ComputerCPU(Computer):
 
         return spherical_bessel, spherical_hankel, e_j_dm_phi, p_lm
 
-
     @jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
     def compute_field(
         lmax: int,
@@ -354,7 +350,9 @@ class ComputerCPU(Computer):
             (channels, sph_h.shape[2], 3)
         )
 
-        if (scattered_field_coefficients is None) and (initial_field_coefficients is None):
+        if (scattered_field_coefficients is None) and (
+            initial_field_coefficients is None
+        ):
             print(
                 "At least one, scattered field or initial field coefficients, need to be given."
             )
@@ -379,7 +377,9 @@ class ComputerCPU(Computer):
                     * pi_lm[l, np.abs(m), s, sampling_idx]
                     * e_theta[s, sampling_idx, :]
                 )
-                c_term_2 = tau_lm[l, np.abs(m), s, sampling_idx] * e_phi[s, sampling_idx, :]
+                c_term_2 = (
+                    tau_lm[l, np.abs(m), s, sampling_idx] * e_phi[s, sampling_idx, :]
+                )
                 c_term = sph_h[l, s, sampling_idx, w] * (c_term_1 - c_term_2)
 
                 field[w, sampling_idx, :] += (
@@ -397,7 +397,8 @@ class ComputerCPU(Computer):
                 )
 
                 b_term_1 = (
-                    derivative[l, s, sampling_idx, w] / size_parameter[s, sampling_idx, w]
+                    derivative[l, s, sampling_idx, w]
+                    / size_parameter[s, sampling_idx, w]
                 )
                 b_term_2 = (
                     tau_lm[l, np.abs(m), s, sampling_idx] * e_theta[s, sampling_idx, :]
@@ -411,7 +412,9 @@ class ComputerCPU(Computer):
                 b_term = b_term_1 * (b_term_2 + b_term_3)
 
                 field[w, sampling_idx, :] += (
-                    scattered_field_coefficients[s, n, w] * invariant * (p_term + b_term)
+                    scattered_field_coefficients[s, n, w]
+                    * invariant
+                    * (p_term + b_term)
                 )
 
         return field
