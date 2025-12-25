@@ -1,5 +1,3 @@
-from rich.traceback import install
-
 from .config import Config
 from .initial_field import InitialField
 from .numerics import Numerics
@@ -10,4 +8,4 @@ from .simulation import Simulation
 from .solver import Solver
 from .yasf import YASF
 
-install(show_locals=True)
+__version__ = "0.0.13"

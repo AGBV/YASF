@@ -958,6 +958,21 @@ wheels = [
 ]
 
 [[package]]
+name = "miepython"
+version = "3.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/60/f0eb53fa2bc9c27de4281480a483ac17bcdce1e52d6ee7e6d0eb65607c8a/miepython-3.0.2.tar.gz", hash = "sha256:208ecea25d42241650e6947173871695fc67e4493260545e5199ca85ffd7bc9a", size = 72634, upload-time = "2025-05-25T22:32:59.369Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/ee/b58be2b4669f8b9b3d00b0b024b60cf12cd4b77e7413ca4846fcbd6aa179/miepython-3.0.2-py3-none-any.whl", hash = "sha256:bd552ae5cbe4c6af374ad7551505dc9b2f256ada5774b5e48cbce1a8c0e597ea", size = 48212, upload-time = "2025-05-25T22:32:57.996Z" },
+]
+
+[[package]]
 name = "mkdocs"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2462,6 +2477,7 @@ docs = [
 test = [
     { name = "astropy" },
     { name = "coverage" },
+    { name = "miepython" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -2507,6 +2523,7 @@ docs = [
 test = [
     { name = "astropy", specifier = ">=6.0.0" },
     { name = "coverage", specifier = ">=7.4.1" },
+    { name = "miepython", specifier = ">=3.0.2" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-cov", specifier = ">=4.1.0" },
 ]
