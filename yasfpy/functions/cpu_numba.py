@@ -544,9 +544,18 @@ def compute_field(
             c1 = 1j * m * pi_val
 
             if tau == 1:
-                tx = h * (c1 * e_theta[s, sampling_idx, 0] - tau_val * e_phi[s, sampling_idx, 0])
-                ty = h * (c1 * e_theta[s, sampling_idx, 1] - tau_val * e_phi[s, sampling_idx, 1])
-                tz = h * (c1 * e_theta[s, sampling_idx, 2] - tau_val * e_phi[s, sampling_idx, 2])
+                tx = h * (
+                    c1 * e_theta[s, sampling_idx, 0]
+                    - tau_val * e_phi[s, sampling_idx, 0]
+                )
+                ty = h * (
+                    c1 * e_theta[s, sampling_idx, 1]
+                    - tau_val * e_phi[s, sampling_idx, 1]
+                )
+                tz = h * (
+                    c1 * e_theta[s, sampling_idx, 2]
+                    - tau_val * e_phi[s, sampling_idx, 2]
+                )
 
                 fx += coeff * inv * tx
                 fy += coeff * inv * ty
@@ -561,9 +570,18 @@ def compute_field(
 
                 d = derivative[l, s, sampling_idx, w] / sp
 
-                btx = d * (tau_val * e_theta[s, sampling_idx, 0] + c1 * e_phi[s, sampling_idx, 0])
-                bty = d * (tau_val * e_theta[s, sampling_idx, 1] + c1 * e_phi[s, sampling_idx, 1])
-                btz = d * (tau_val * e_theta[s, sampling_idx, 2] + c1 * e_phi[s, sampling_idx, 2])
+                btx = d * (
+                    tau_val * e_theta[s, sampling_idx, 0]
+                    + c1 * e_phi[s, sampling_idx, 0]
+                )
+                bty = d * (
+                    tau_val * e_theta[s, sampling_idx, 1]
+                    + c1 * e_phi[s, sampling_idx, 1]
+                )
+                btz = d * (
+                    tau_val * e_theta[s, sampling_idx, 2]
+                    + c1 * e_phi[s, sampling_idx, 2]
+                )
 
                 fx += coeff * inv * (ptx + btx)
                 fy += coeff * inv * (pty + bty)

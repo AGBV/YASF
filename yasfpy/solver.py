@@ -76,11 +76,7 @@ class Solver:
         M = None
         if self.preconditioner is not None:
             n = len(b)
-            M = LinearOperator(
-                (n, n),
-                matvec=self.preconditioner.apply,
-                dtype=b.dtype
-            )
+            M = LinearOperator((n, n), matvec=self.preconditioner.apply, dtype=b.dtype)
             self.log.info("Using preconditioner")
 
         if self.type == "bicgstab":

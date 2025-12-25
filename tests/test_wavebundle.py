@@ -24,11 +24,13 @@ def test_wavebundle_normal_incidence_basic():
     and produces valid output.
     """
     # Create a simple particle system
-    positions = np.array([
-        [0.0, 0.0, 0.0],
-        [100.0, 0.0, 0.0],
-        [0.0, 100.0, 100.0],
-    ])
+    positions = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [100.0, 0.0, 0.0],
+            [0.0, 100.0, 100.0],
+        ]
+    )
     radii = np.array([50.0, 50.0, 50.0])
     refractive_indices = np.array([1.5 + 0.01j, 1.5 + 0.01j, 1.5 + 0.01j])
 
@@ -88,7 +90,9 @@ def test_wavebundle_normal_incidence_basic():
     assert np.any(np.abs(simulation.initial_field_coefficients) > 0)
 
     print(f"✓ Gaussian beam coefficients computed successfully")
-    print(f"  Max coefficient magnitude: {np.max(np.abs(simulation.initial_field_coefficients)):.3e}")
+    print(
+        f"  Max coefficient magnitude: {np.max(np.abs(simulation.initial_field_coefficients)):.3e}"
+    )
 
 
 def test_wavebundle_beam_focusing():
@@ -99,10 +103,12 @@ def test_wavebundle_beam_focusing():
     the focal point compared to those far from it.
     """
     # Create particles at different positions relative to focal point
-    positions = np.array([
-        [0.0, 0.0, 0.0],      # At focal point
-        [0.0, 0.0, 500.0],    # Far from focal point
-    ])
+    positions = np.array(
+        [
+            [0.0, 0.0, 0.0],  # At focal point
+            [0.0, 0.0, 500.0],  # Far from focal point
+        ]
+    )
     radii = np.array([50.0, 50.0])
     refractive_indices = np.array([1.5 + 0.01j, 1.5 + 0.01j])
 
@@ -234,9 +240,9 @@ def test_wavebundle_polarization():
 
 
 if __name__ == "__main__":
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("WAVEBUNDLE (GAUSSIAN BEAM) TESTS")
-    print("="*70)
+    print("=" * 70)
 
     test_wavebundle_normal_incidence_basic()
     print()
@@ -244,6 +250,6 @@ if __name__ == "__main__":
     print()
     test_wavebundle_polarization()
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("ALL TESTS PASSED!")
-    print("="*70)
+    print("=" * 70)

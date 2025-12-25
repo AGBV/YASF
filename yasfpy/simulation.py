@@ -376,22 +376,26 @@ class Simulation:
 
         # Adjust azimuthal angle for polarization
         pol_lower = self.parameters.initial_field.polarization.lower()
-        if pol_lower == 'te':
+        if pol_lower == "te":
             alphaG = self.parameters.initial_field.azimuthal_angle
-        elif pol_lower == 'tm':
+        elif pol_lower == "tm":
             alphaG = self.parameters.initial_field.azimuthal_angle - np.pi / 2
         else:
-            raise ValueError(f"Unsupported polarization: {self.parameters.initial_field.polarization}")
+            raise ValueError(
+                f"Unsupported polarization: {self.parameters.initial_field.polarization}"
+            )
 
         # Get polar angle grid from numerics
         full_beta_array = self.numerics.polar_angles
         if full_beta_array is None:
-            raise ValueError("numerics.polar_angles not initialized. Set sampling_points_number in Numerics.")
+            raise ValueError(
+                "numerics.polar_angles not initialized. Set sampling_points_number in Numerics."
+            )
 
         # Filter angles by direction (same hemisphere as incident beam)
         incident_polar = self.parameters.initial_field.polar_angle
-        direction_idcs = (
-            np.sign(np.cos(full_beta_array)) == np.sign(np.cos(incident_polar))
+        direction_idcs = np.sign(np.cos(full_beta_array)) == np.sign(
+            np.cos(incident_polar)
         )
         beta_array = full_beta_array[direction_idcs]
 
@@ -405,7 +409,7 @@ class Simulation:
         sb = np.sin(beta_array)
 
         # Gaussian weighting factors
-        gaussfac = np.exp(-w**2 / 4 * k**2 * sb**2)
+        gaussfac = np.exp(-(w**2) / 4 * k**2 * sb**2)
         gaussfacSincos = gaussfac * cb * sb
 
         # Compute spherical functions (pilm, taulm)
@@ -419,12 +423,11 @@ class Simulation:
 
         # Convert to cylindrical coordinates
         rhoGi = np.sqrt(
-            relative_particle_positions[:, 0]**2
-            + relative_particle_positions[:, 1]**2
+            relative_particle_positions[:, 0] ** 2
+            + relative_particle_positions[:, 1] ** 2
         )
         phiGi = np.arctan2(
-            relative_particle_positions[:, 1],
-            relative_particle_positions[:, 0]
+            relative_particle_positions[:, 1], relative_particle_positions[:, 0]
         )
         zGi = relative_particle_positions[:, 2]
 
@@ -453,11 +456,17 @@ class Simulation:
 
             # Bessel functions: J_{|m±1|}(rho * k * sin(beta))
             # Shape: (num_particles, num_beta)
-            bessel_m_minus_1 = besselj(np.abs(m - 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :])
-            bessel_m_plus_1 = besselj(np.abs(m + 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :])
+            bessel_m_minus_1 = besselj(
+                np.abs(m - 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :]
+            )
+            bessel_m_plus_1 = besselj(
+                np.abs(m + 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :]
+            )
 
             # Combine into radial integrands
-            radial_m_minus_1 = phase_m_minus_1[:, np.newaxis] * exp_ikz * bessel_m_minus_1
+            radial_m_minus_1 = (
+                phase_m_minus_1[:, np.newaxis] * exp_ikz * bessel_m_minus_1
+            )
             radial_m_plus_1 = phase_m_plus_1[:, np.newaxis] * exp_ikz * bessel_m_plus_1
 
             # Two integral expressions (eikzI1 and eikzI2) with different polarization weightings
@@ -466,9 +475,13 @@ class Simulation:
                 + np.exp(1j * alphaG) * (1j ** np.abs(m + 1)) * radial_m_plus_1
             )
 
-            eikzI2 = np.pi * 1j * (
-                -np.exp(-1j * alphaG) * (1j ** np.abs(m - 1)) * radial_m_minus_1
-                + np.exp(1j * alphaG) * (1j ** np.abs(m + 1)) * radial_m_plus_1
+            eikzI2 = (
+                np.pi
+                * 1j
+                * (
+                    -np.exp(-1j * alphaG) * (1j ** np.abs(m - 1)) * radial_m_minus_1
+                    + np.exp(1j * alphaG) * (1j ** np.abs(m + 1)) * radial_m_plus_1
+                )
             )
 
             # Integrate over tau and l
@@ -487,11 +500,15 @@ class Simulation:
                     # Trapezoidal integration over beta grid
                     # Average neighboring points and sum
                     integral = (
-                        np.dot(eikzI1[:, 1:], gaussSincosBDag1[1:])
-                        + np.dot(eikzI1[:, :-1], gaussSincosBDag1[:-1])
-                        + np.dot(eikzI2[:, 1:], gaussSincosBDag2[1:])
-                        + np.dot(eikzI2[:, :-1], gaussSincosBDag2[:-1])
-                    ) * dBeta / 2
+                        (
+                            np.dot(eikzI1[:, 1:], gaussSincosBDag1[1:])
+                            + np.dot(eikzI1[:, :-1], gaussSincosBDag1[:-1])
+                            + np.dot(eikzI2[:, 1:], gaussSincosBDag2[1:])
+                            + np.dot(eikzI2[:, :-1], gaussSincosBDag2[:-1])
+                        )
+                        * dBeta
+                        / 2
+                    )
 
                     self.initial_field_coefficients[:, n, 0] = prefac * integral
 
@@ -712,13 +729,21 @@ class Simulation:
 
                 points_device = cuda.to_device(np.ascontiguousarray(sampling_points))
                 focal_device = cuda.to_device(
-                    np.ascontiguousarray(self.parameters.initial_field.focal_point.astype(float))
+                    np.ascontiguousarray(
+                        self.parameters.initial_field.focal_point.astype(float)
+                    )
                 )
                 direction_device = cuda.to_device(np.ascontiguousarray(direction))
-                k_device = cuda.to_device(np.ascontiguousarray(self.parameters.k_medium.astype(float)))
+                k_device = cuda.to_device(
+                    np.ascontiguousarray(self.parameters.k_medium.astype(float))
+                )
                 n_m = np.asarray(self.parameters.medium_refractive_index)
-                n_real_device = cuda.to_device(np.ascontiguousarray(n_m.real.astype(float)))
-                n_imag_device = cuda.to_device(np.ascontiguousarray(n_m.imag.astype(float)))
+                n_real_device = cuda.to_device(
+                    np.ascontiguousarray(n_m.real.astype(float))
+                )
+                n_imag_device = cuda.to_device(
+                    np.ascontiguousarray(n_m.imag.astype(float))
+                )
 
                 E_real_device = cuda.to_device(E_real)
                 E_imag_device = cuda.to_device(E_imag)
@@ -749,8 +774,12 @@ class Simulation:
                     H_imag_device,
                 )
 
-                self.initial_field_electric = E_real_device.copy_to_host() + 1j * E_imag_device.copy_to_host()
-                self.initial_field_magnetic = H_real_device.copy_to_host() + 1j * H_imag_device.copy_to_host()
+                self.initial_field_electric = (
+                    E_real_device.copy_to_host() + 1j * E_imag_device.copy_to_host()
+                )
+                self.initial_field_magnetic = (
+                    H_real_device.copy_to_host() + 1j * H_imag_device.copy_to_host()
+                )
 
             else:
                 R = sampling_points - self.parameters.initial_field.focal_point
@@ -834,7 +863,10 @@ class Simulation:
         resol = float(self.numerics.particle_distance_resolution)
         if resol > 0:
             # distances r (particles x points)
-            diffs = sampling_points[np.newaxis, :, :] - self.parameters.particles.position[:, np.newaxis, :]
+            diffs = (
+                sampling_points[np.newaxis, :, :]
+                - self.parameters.particles.position[:, np.newaxis, :]
+            )
             r = np.sqrt(np.sum(diffs**2, axis=2))
             rmax = float(np.max(r))
             ri = np.arange(0.0, rmax + resol, resol)
@@ -846,7 +878,9 @@ class Simulation:
             kr[0, :] = 1e-30  # avoid singularities at 0
 
             channels = self.parameters.k_medium.size
-            sph_h_i = np.zeros((self.numerics.lmax + 1, ri.size, channels), dtype=complex)
+            sph_h_i = np.zeros(
+                (self.numerics.lmax + 1, ri.size, channels), dtype=complex
+            )
             sph_d_i = np.zeros_like(sph_h_i)
             for l in range(1, self.numerics.lmax + 1):
                 h_l = spherical_jn(l, kr) + 1j * spherical_yn(l, kr)
@@ -860,7 +894,8 @@ class Simulation:
             frac = (r / resol) - idx0
 
             sph_h_interp = np.zeros(
-                (self.numerics.lmax + 1, r.shape[0], r.shape[1], channels), dtype=complex
+                (self.numerics.lmax + 1, r.shape[0], r.shape[1], channels),
+                dtype=complex,
             )
             sph_d_interp = np.zeros_like(sph_h_interp)
             for l in range(1, self.numerics.lmax + 1):
@@ -876,7 +911,10 @@ class Simulation:
 
             sph_h = sph_h_interp
             sph_h_derivative = sph_d_interp
-            size_parameter = r[:, :, np.newaxis] * self.parameters.k_medium[np.newaxis, np.newaxis, :]
+            size_parameter = (
+                r[:, :, np.newaxis]
+                * self.parameters.k_medium[np.newaxis, np.newaxis, :]
+            )
 
         lookup_computation_time_stop = time()
         self.log.info(
@@ -976,7 +1014,9 @@ class Simulation:
             )
 
         if self.initial_field_electric is not None:
-            self.total_field_electric = self.initial_field_electric + self.scattered_field
+            self.total_field_electric = (
+                self.initial_field_electric + self.scattered_field
+            )
         else:
             self.total_field_electric = self.scattered_field
 
