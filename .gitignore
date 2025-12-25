@@ -186,3 +186,14 @@ devenv.local.yaml
 
 # pre-commit
 .pre-commit-config.yaml
+
+# Local scratch / tooling
+.tmp_compare/
+
+# Keep CELES around locally but not in git
+celes/
+
+# Ignore generated MATLAB outputs under examples only
+examples/**/*.mat
+examples/**/*.zip
+

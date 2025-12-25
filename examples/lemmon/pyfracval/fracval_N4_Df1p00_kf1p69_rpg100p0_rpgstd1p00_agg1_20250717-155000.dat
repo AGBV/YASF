@@ -1,0 +1,25 @@
+# generation_info:
+#   script_name: PyFracVAL
+#   timestamp: '2025-07-17T15:50:00.0'
+#   iteration: 1
+# simulation_parameters:
+#   N: 4
+#   Df: 1.0
+#   kf: 1.69
+#   rp_g: 100.0
+#   rp_gstd: 1.0
+#   tol_ov: 1.0e-06
+#   n_subcl_percentage: 0.1
+#   ext_case: 0
+#   seed: 822286906
+# aggregate_properties:
+#   N_particles_actual: 1
+#   radius_of_gyration: 236.64
+#   center_of_mass:
+#   - 0.0
+#   - 0.0
+#   - 0.0
+  3.0e+02  0.0   0.0   1.0e+02
+  1.0e+02  0.0   0.0   1.0e+02
+ -1.0e+02  0.0   0.0   1.0e+02
+ -3.0e+02  0.0   0.0   1.0e+02

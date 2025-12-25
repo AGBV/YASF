@@ -1,13 +1,13 @@
 {
   "particles": {
     "geometry": {
-      "file": "N_256_FD_20.dat",
-      "delimiter": "whitespace",
-      "scale": 1e-9
+      "file": "N_256_FD_17.dat",
+      "scale": 1e-9,
+      "dimensional_scale": 1.5
     },
     "material": [
       {
-        "url": "https://refractiveindex.info/database/data-nk/main/C/Querry-DixonKS2.yml",
+        "url": "https://eodg.atm.ox.ac.uk/ARIA/data_files/Minerals/Olivine/non-oriented_(Fabian_et_al._2001)/olivine_Fabian_2001.ri",
         "scale": 1e-6
       }
     ]
@@ -21,17 +21,10 @@
   },
   "parameters": {
     "wavelength": {
-      "data": {
-        "start": 1,
-        "stop": 3.001,
-        "step": 0.5
-      },
+      "data": [0.6],
       "scale": 1e-6
     },
-    "medium": {
-      "url": "https://eodg.atm.ox.ac.uk/ARIA/data_files/Minerals/Enstatite/Parallel_to_c-axis_(Jager_et_al._1998)/enstatite_p_jager_1998.ri",
-      "scale": 1e-6
-    }
+    "medium": 1.0
   },
   "solver": {
     "type": "lgmres",
@@ -47,6 +40,6 @@
   },
   "output": {
     "folder": "out",
-    "extension": "bz2"
+    "extension": "mat"
   }
 }
