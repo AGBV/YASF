@@ -1,5 +1,0 @@
-mkdocs-autorefs
-mkdocs-coverage
-mkdocs-material
-mkdocstrings[python]
-pymdown-extensions

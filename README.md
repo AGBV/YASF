@@ -1,17 +1,17 @@
 <p align="center" width="100%">
-<img height="400" width="49%" src="docs/assets/img/logo_white.svg#gh-dark-mode-only">
-<img height="400" width="49%" src="docs/assets/img/yasf_white.svg#gh-dark-mode-only">
+<img height="400" width="49%" src="docs_sphinx/source/_static/logo_white.svg#gh-dark-mode-only">
+<img height="400" width="49%" src="docs_sphinx/source/_static/yasf_white.svg#gh-dark-mode-only">
 </p>
 <p align="center" width="100%">
-<img height="400" width="49%" src="docs/assets/img/logo_black.svg#gh-light-mode-only">
-<img height="400" width="49%" src="docs/assets/img/yasf_black.svg#gh-light-mode-only">
+<img height="400" width="49%" src="docs_sphinx/source/_static/logo_black.svg#gh-light-mode-only">
+<img height="400" width="49%" src="docs_sphinx/source/_static/yasf_black.svg#gh-light-mode-only">
 </p>
 
 [![PyPI version](https://badge.fury.io/py/yasfpy.svg)](https://badge.fury.io/py/yasfpy)
 [![DOI](https://zenodo.org/badge/636196317.svg)](https://zenodo.org/doi/10.5281/zenodo.11193987)
 [![License: MIT](https://img.shields.io/badge/License-MIT-success.svg)](https://opensource.org/licenses/MIT)
 [![Unit tests](https://github.com/AGBV/YASF/actions/workflows/testing.yml/badge.svg)](https://github.com/AGBV/YASF/actions/workflows/testing.yml)
-![Docs](https://github.com/AGBV/YASF/actions/workflows/mkdocs.yml/badge.svg)
+![Docs](https://github.com/AGBV/YASF/actions/workflows/docs.yml/badge.svg)
 ![PYPI](https://github.com/AGBV/YASF/actions/workflows/pypi.yml/badge.svg)
 [![codecov](https://codecov.io/gh/AGBV/YASF/graph/badge.svg?token=QUDBKGSDDB)](https://codecov.io/gh/AGBV/YASF)
 [![DeepSource](https://app.deepsource.com/gh/AGBV/YASF.svg/?label=code+coverage&show_trend=true&token=qvVGCeQ5niqoLdaj12vk1hIU)](https://app.deepsource.com/gh/AGBV/YASF/)
@@ -23,22 +23,34 @@ YASF is a T-Matrix implementation in Python based on the Matlab framework [CELES
 
 # Install
 
-## [pip](https://pypi.org/project/yasfpy/)
+YASF is published on PyPI as `yasfpy` (sadly `yasf` was already taken).
 
 ```sh
-pip install yasfpy
+uv pip install yasfpy
 ```
 
-Sadly [`yasf`](https://pypi.org/project/yasf/) was already taken, so the package is called `yasfpy` for the Python version and can be found on [pypi](https://pypi.org/project/yasfpy/).
+(Alternatively: `pip install yasfpy`.)
 
-## conda
 
-To run code on the GPU, the [cudetoolkit](https://developer.nvidia.com/cuda-toolkit) is needed. This can be installed using a provided package by nvidia, or by using the conda package as described by [the numba docs](https://numba.pydata.org/numba-doc/dev/cuda/overview.html#software). The repository provides a yaml environment file. To spin an environment up (and update it later on), use:
+## Optional extras
+
+- GPU (CUDA): `uv pip install "yasfpy[cuda]"`
+- Interactive exploration (Streamlit dashboard) dependencies: `uv pip install "yasfpy[explore]"`
+
+## GPU (CUDA)
+
+YASF can optionally run on NVIDIA GPUs.
+
+- Install the NVIDIA CUDA toolkit + driver for your system.
+- Install the package with the CUDA extras:
 
 ```sh
-conda env create -f yasf-env.yml # install
-conda env update -f yasf-env.yml # update the environment (deactivate and activate again for changes to apply)
+uv pip install "yasfpy[cuda]"
 ```
+
+Then run your code with `uv run ...` (or inside the same `uv` environment).
+
+Note: If you prefer `pip`, the same extras work: `pip install "yasfpy[cuda]"`.
 
 # Examples
 
@@ -46,11 +58,21 @@ conda env update -f yasf-env.yml # update the environment (deactivate and activa
 
 # Development
 
-This repository is still under development!
+## Quickstart (uv)
 
-# Documentation
+```sh
+uv sync --group test --group docs
+uv run pytest
+uv run yasf --help
+```
 
-The code is documented using [MkDocs](https://www.mkdocs.org/). If you discover mistakes, feel free to create a pull request or open up an issue.
+## Documentation
+
+```sh
+uv run --group docs sphinx-build -b html docs_sphinx/source docs_sphinx/_build/html -W --keep-going
+```
+
+The project documentation is built with Sphinx (needed for BibTeX citations).
 
 # TODO
 
