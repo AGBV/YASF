@@ -14,7 +14,10 @@ jobs:
   report:
     name: Upload coverage reports
     runs-on: ubuntu-latest
-    if: ${{ secrets.CODACY_PROJECT_TOKEN != '' || secrets.DEEPSOURCE_DSN != '' || secrets.CODECOV_TOKEN != '' }}
+    env:
+      CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+      DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v4
@@ -28,28 +31,28 @@ jobs:
           name: coverage-report
 
       - name: Run codacy-coverage-reporter
-        if: ${{ secrets.CODACY_PROJECT_TOKEN != '' }}
+        if: ${{ env.CODACY_PROJECT_TOKEN != '' }}
         uses: codacy/codacy-coverage-reporter-action@v1
         with:
-          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          project-token: ${{ env.CODACY_PROJECT_TOKEN }}
           coverage-reports: ./coverage.xml
 
       - name: Report test coverage to DeepSource
-        if: ${{ secrets.DEEPSOURCE_DSN != '' }}
+        if: ${{ env.DEEPSOURCE_DSN != '' }}
         uses: deepsourcelabs/test-coverage-action@master
         with:
           key: python
           coverage-file: coverage.xml
-          dsn: ${{ secrets.DEEPSOURCE_DSN }}
+          dsn: ${{ env.DEEPSOURCE_DSN }}
 
       - name: Upload coverage reports to Codecov
-        if: ${{ secrets.CODECOV_TOKEN != '' }}
+        if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ env.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
-        if: ${{ secrets.CODECOV_TOKEN != '' && !cancelled() }}
+        if: ${{ env.CODECOV_TOKEN != '' && !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ env.CODECOV_TOKEN }}
