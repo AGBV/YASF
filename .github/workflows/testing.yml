@@ -21,8 +21,8 @@ jobs:
       - name: Install uv
         id: setup-python
         uses: astral-sh/setup-uv@v4
-        # with:
-        #   enable-cache: true
+        with:
+          python-version: "3.12"
       - uses: actions/cache@v4
         id: cache-env
         with:
