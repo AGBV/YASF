@@ -3,4 +3,3 @@
 This subpackage contains performance-critical routines (often Numba-accelerated)
 used by the scattering pipeline.
 """
-
