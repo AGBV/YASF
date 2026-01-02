@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   testing:
-    uses: ./.github/workflows/test.yml
+    uses: ./.github/workflows/testing.yml
+    secrets: inherit
   pypi-publish:
     name: Upload release to PyPI
     needs:
