@@ -1,8 +1,15 @@
+"""Comparison utilities for MSTM4 reference results.
+
+Contains helpers/data structures to compare YASF output to MSTM4 and summarize
+error metrics.
+"""
+
 from __future__ import annotations
 
 import json
 import shutil
 from dataclasses import dataclass
+from typing import Any
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +34,19 @@ def _as_radians(theta: np.ndarray) -> np.ndarray:
 
 
 def _as_2d(x: np.ndarray) -> np.ndarray:
+    """Return an array with at least two dimensions.
+
+    Parameters
+    ----------
+    x
+        Input array.
+
+    Returns
+    -------
+    numpy.ndarray
+        If ``x`` is 1D, returns ``x[:, np.newaxis]``. Otherwise returns ``x``.
+    """
+
     x = np.asarray(x, dtype=float)
     if x.ndim == 1:
         return x[:, np.newaxis]
@@ -95,6 +115,12 @@ def _normalize_phase_function_to_4pi(
 
 @dataclass(frozen=True)
 class CompareResult:
+    """Container for comparison outputs.
+
+    This data structure groups the key arrays extracted from YASF and MSTM4
+    runs (efficiencies, phase function, and polarization diagnostics).
+    """
+
     wavelength: np.ndarray
 
     yasf_q_ext: np.ndarray
@@ -140,6 +166,15 @@ def _write_constant_nk_csv(path: Path, wavelength: np.ndarray, n: complex) -> No
 
 
 def _write_single_sphere_geometry(path: Path, radius: float) -> None:
+    """Write a single-sphere CSV geometry file.
+
+    Parameters
+    ----------
+    path
+        Output CSV path.
+    radius
+        Sphere radius (in the same units as the config particle scale).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     # x,y,z,r (material index inferred via distribution)
     path.write_text(f"0,0,0,{radius:.16e}\n")
@@ -166,10 +201,11 @@ def compare_single_sphere(
     refractive-index sources by creating local constant `w,n,k` CSV tables that
     `refidxdb.Handler` can load.
 
-    Notes:
-    - YASF "UNP" is a single combined polarization state (not a TE/TM average).
-      MSTM provides explicit unpolarized incidence efficiencies. For an apples-to-
-      apples comparison, use MSTM's `q_*_unp` outputs.
+    Notes
+    -----
+    YASF ``"UNP"`` corresponds to a single combined polarization state (not a
+    TE/TM average). MSTM provides explicit unpolarized-incidence efficiencies.
+    For an apples-to-apples comparison, use MSTM's ``q_*_unp`` outputs.
     """
 
     tmp_dir = Path(tmp_dir).resolve()
@@ -205,7 +241,7 @@ def compare_single_sphere(
     wavelength_scale = 1e-6
     particles_scale = 1e-6
 
-    config = {
+    config: dict[str, Any] = {
         "particles": {
             "geometry": {
                 "file": geometry_path.name,

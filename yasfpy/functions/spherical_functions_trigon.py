@@ -1,3 +1,9 @@
+"""Spherical special functions (trigonometric form).
+
+Provides spherical Bessel/Hankel-related building blocks and derived quantities
+used by field computations.
+"""
+
 import numpy as np
 import math
 

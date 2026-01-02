@@ -1,3 +1,11 @@
+# pyright: reportGeneralTypeIssues=false
+
+"""Iterative linear solvers used by YASF.
+
+The :class:`~yasfpy.solver.Solver` class wraps SciPy's iterative sparse solvers
+and provides a unified interface for use inside :class:`~yasfpy.simulation.Simulation`.
+"""
+
 import logging
 # import yasfpy.log as log
 
@@ -13,6 +21,7 @@ from scipy.sparse.linalg import (
     gcrotmk,
     tfqmr,
 )
+from scipy.sparse.linalg._interface import _CustomLinearOperator
 
 
 class Solver:
@@ -30,6 +39,8 @@ class Solver:
         max_iter: float = 1e4,
         restart: float = 1e2,
         preconditioner=None,
+        *,
+        warm_start: bool = True,
     ):
         """Initializes a solver object with specified parameters and creates a logger object.
 
@@ -46,11 +57,12 @@ class Solver:
         self.max_iter = int(max_iter)
         self.restart = int(restart)
         self.preconditioner = preconditioner
+        self.warm_start = bool(warm_start)
 
         # self.log = log.scattering_logger(__name__)
         self.log = logging.getLogger(self.__class__.__module__)
 
-    def run(self, a: LinearOperator, b: np.ndarray, x0: np.ndarray = None):
+    def run(self, a: LinearOperator, b: np.ndarray, x0: np.ndarray | None = None):
         """
         Runs the solver on the given linear system of equations.
 
@@ -67,8 +79,6 @@ class Solver:
         if x0 is None:
             x0 = np.copy(b)
 
-        x0 = np.zeros_like(b)
-
         if np.any(np.isnan(b)):
             print(b)
 
@@ -76,10 +86,8 @@ class Solver:
         M = None
         if self.preconditioner is not None:
             n = len(b)
-            M = LinearOperator(
-                (n, n),
-                matvec=self.preconditioner.apply,
-                dtype=b.dtype
+            M = _CustomLinearOperator(
+                (n, n), matvec=self.preconditioner.apply, dtype=b.dtype
             )
             self.log.info("Using preconditioner")
 
@@ -92,7 +100,7 @@ class Solver:
                 b,
                 x0,
                 M=M,
-                tol=self.tolerance,
+                rtol=self.tolerance,
                 atol=0,
                 maxiter=self.max_iter,
                 callback=counter,

@@ -1,3 +1,9 @@
+"""Wrapper for ADDA-based benchmarks.
+
+This module provides a manager/helper to run ADDA (if available) and collect
+results for comparison/benchmarking.
+"""
+
 import os, json, yaml, copy, bz2, re, shutil
 import _pickle
 import pyperf
@@ -8,17 +14,42 @@ DEFAULT_CONF_PATH = ""
 
 
 class ADDAManager:
+    """Manage and run ADDA benchmarks.
+
+    This is a lightweight wrapper that:
+
+    - reads a YASF configuration via :class:`yasfpy.config.Config`
+    - runs the external ADDA binary (if present)
+    - parses basic cross sections/efficiencies from ADDA output
+
+    Notes
+    -----
+    This module is primarily used for benchmarking and comparisons; it does not
+    attempt to expose the full ADDA feature set.
+    """
+
     def __init__(
         self,
         config_path: str = DEFAULT_CONF_PATH,
         binary: str = DEFAULT_BIN_PATH,
         output_file: str = "wow",
     ):
+        """Initialize the ADDA manager.
+
+        Parameters
+        ----------
+        config_path:
+            Path to a YASF configuration file.
+        binary:
+            Path to the ADDA executable.
+        output_file:
+            Identifier used for exported results.
+        """
         self.config = Config(config_path)
         self.binary = binary
         self.output_file = output_file
 
-    def __exec(self, runner: pyperf.Runner = None):
+    def __exec(self, runner: pyperf.Runner | None = None):
         # command = [self.binary, self.input_args]
         if self.config.spheres.shape[0] > 1:
             print(
@@ -85,13 +116,30 @@ class ADDAManager:
         self.output = adda
 
     def clean(self):
+        """Remove ADDA run directories.
+
+        Notes
+        -----
+        This deletes directories matching ``run_sphere*`` in the current working
+        directory.
+        """
         # TODO: clean folders
         res_dirs = [i for i in os.listdir() if len(re.findall("run_sphere", i)) > 0]
         for dir in res_dirs:
             shutil.rmtree(dir)
         pass
 
-    def run(self, runner: pyperf.Runner = None, cleanup: bool = True):
+    def run(self, runner: pyperf.Runner | None = None, cleanup: bool = True):
+        """Run ADDA and optionally parse output.
+
+        Parameters
+        ----------
+        runner:
+            Optional :class:`pyperf.Runner` to benchmark the command. When omitted,
+            the external binary is executed directly and outputs are parsed.
+        cleanup:
+            If True, delete ADDA output directories after the run.
+        """
         self.__exec(runner)
         if runner is None:
             self.__read()
@@ -99,7 +147,17 @@ class ADDAManager:
         if cleanup:
             self.clean()
 
-    def export(self, file: str = None, cleanup: bool = False):
+    def export(self, file: str | None = None, cleanup: bool = False):
+        """Run ADDA and export results to a file.
+
+        Parameters
+        ----------
+        file:
+            Output filename. Supported extensions are ``.json``, ``.yaml``/``.yml``,
+            and ``.bz2``.
+        cleanup:
+            If True, delete ADDA output directories after exporting.
+        """
         if file is None:
             raise Exception("Please provide a filename")
         self.run(cleanup=False)

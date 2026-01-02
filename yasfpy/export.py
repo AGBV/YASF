@@ -1,91 +1,153 @@
+"""Export container models.
+
+This module defines lightweight Pydantic models used to serialize simulation
+inputs/outputs (particles, wavelengths, angular phase functions) to common file
+formats.
+
+Notes
+-----
+The models are intentionally permissive (``arbitrary_types_allowed=True``) and
+are primarily used as an interchange format rather than as strict validation of
+scientific inputs.
+"""
+
 import _pickle
 import bz2
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from scipy.io import savemat
-from typing_extensions import Self
 
 
 @dataclass
 class Particles:
+    """Particle geometry and material inputs for export.
+
+    Attributes
+    ----------
+    position:
+        Particle center positions ``(N, 3)``.
+    radii:
+        Particle radii (length ``N``).
+    refractive_index:
+        Per-particle complex refractive index. For multi-wavelength simulations,
+        each particle may store a list of values.
+    radius_of_gyration:
+        Radius of gyration of the particle ensemble.
+    metadata:
+        Optional free-form metadata.
+    """
+
     position: list[list[float]] = Field()
     radii: list[float] = Field()
     refractive_index: list[list[complex]] = Field()
     radius_of_gyration: float = Field()
-    metadata: dict = Field(default={})
-
-    @model_validator(mode="after")
-    def number_of_elements(self) -> Self:
-        if len(self.position) != len(self.radii):
-            raise ValueError(
-                f"Number of elements in position ({len(self.position)}) and radii ({len(self.radii)}) are not compatible"
-            )
-        return self
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 @dataclass
 class Wavelength:
-    value: list[float] = Field(default=[])
+    """Wavelength-dependent scalar outputs for export."""
+
+    value: list[float] = Field(default_factory=list)
     geometric_cross_section: float = Field(default=0.0)
-    extinction_cross_section: list[float] = Field(default=[])
-    scattering_cross_section: list[float] = Field(default=[])
-    extinction_efficiency: list[float] = Field(default=[])
-    scattering_efficiency: list[float] = Field(default=[])
-    single_scattering_albedo: list[float] = Field(default=[])
-    medium_refractive_index: list[float] | list[complex] = Field(default=[])
+    extinction_cross_section: list[float] = Field(default_factory=list)
+    scattering_cross_section: list[float] = Field(default_factory=list)
+    extinction_efficiency: list[float] = Field(default_factory=list)
+    scattering_efficiency: list[float] = Field(default_factory=list)
+    single_scattering_albedo: list[float] = Field(default_factory=list)
+    medium_refractive_index: list[float] | list[complex] = Field(default_factory=list)
 
 
 @dataclass
 class Angle:
-    theta: list[float] = Field(default=[])
-    phase_function: list[list[float]] = Field(default=[])
-    degree_of_linear_polarization: list[list[float]] = Field(default=[])
-    degree_of_linear_polarization_q: list[list[float]] = Field(default=[])
-    degree_of_linear_polarization_u: list[list[float]] = Field(default=[])
-    degree_of_circular_polarization: list[list[float]] = Field(default=[])
-    depolarization_ratio: list[list[float]] = Field(default=[])
-    anisotropy_parameter: list[list[float]] = Field(default=[])
+    """Angle-resolved outputs for export."""
+
+    theta: list[float] = Field(default_factory=list)
+    phase_function: list[list[float]] = Field(default_factory=list)
+    degree_of_linear_polarization: list[list[float]] = Field(default_factory=list)
+    degree_of_linear_polarization_q: list[list[float]] = Field(default_factory=list)
+    degree_of_linear_polarization_u: list[list[float]] = Field(default_factory=list)
+    degree_of_circular_polarization: list[list[float]] = Field(default_factory=list)
+    depolarization_ratio: list[list[float]] = Field(default_factory=list)
+    anisotropy_parameter: list[list[float]] = Field(default_factory=list)
 
 
 @dataclass
 class Spatial:
-    polar: list[float] = Field(default=[])
-    azimuthal: list[float] = Field(default=[])
-    phase_function: list[list[list[float]]] = Field(default=[])
-    degree_of_linear_polarization: list[list[list[float]]] = Field(default=[])
-    degree_of_linear_polarization_q: list[list[list[float]]] = Field(default=[])
-    degree_of_linear_polarization_u: list[list[list[float]]] = Field(default=[])
-    degree_of_circular_polarization: list[list[list[float]]] = Field(default=[])
-    depolarization_ratio: list[list[list[float]]] = Field(default=[])
-    anisotropy_parameter: list[list[list[float]]] = Field(default=[])
+    """Spatially resolved outputs for export."""
+
+    polar: list[float] = Field(default_factory=list)
+    azimuthal: list[float] = Field(default_factory=list)
+    phase_function: list[list[list[float]]] = Field(default_factory=list)
+    degree_of_linear_polarization: list[list[list[float]]] = Field(default_factory=list)
+    degree_of_linear_polarization_q: list[list[list[float]]] = Field(
+        default_factory=list
+    )
+    degree_of_linear_polarization_u: list[list[list[float]]] = Field(
+        default_factory=list
+    )
+    degree_of_circular_polarization: list[list[list[float]]] = Field(
+        default_factory=list
+    )
+    depolarization_ratio: list[list[list[float]]] = Field(default_factory=list)
+    anisotropy_parameter: list[list[list[float]]] = Field(default_factory=list)
 
 
 class Export(BaseModel):
+    """Serializable export record.
+
+    This is a convenience wrapper that collects all exportable sections.
+
+    Notes
+    -----
+    The section fields accept either validated dataclass instances or raw Python
+    mappings; :meth:`model_post_init` coerces mappings to the corresponding model.
+    """
+
     source: str = Field(default="yasf", pattern=r"yasf|mstm")
     scale: float = Field(default=1e-6)
-    particles: Particles | dict = Field(default={})
-    wavelength: Wavelength | dict = Field(default={})
-    angle: Angle | dict = Field(default={})
-    spatial: Spatial | dict = Field(default={})
+
+    particles: Particles | dict[str, Any] = Field(default_factory=dict)
+    wavelength: Wavelength | dict[str, Any] = Field(default_factory=dict)
+    angle: Angle | dict[str, Any] = Field(default_factory=dict)
+    spatial: Spatial | dict[str, Any] = Field(default_factory=dict)
 
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
 
     def model_post_init(self, __context: Any) -> None:
+        """Coerce mapping sections to their dataclass models."""
+
         if isinstance(self.particles, dict):
-            self.particles = Particles(**self.particles)
+            particles_data = cast(dict[str, Any], self.particles)
+            self.particles = Particles(**particles_data)
+
         if isinstance(self.wavelength, dict):
-            self.wavelength = Wavelength(**self.wavelength)
+            wavelength_data = cast(dict[str, Any], self.wavelength)
+            self.wavelength = Wavelength(**wavelength_data)
+
         if isinstance(self.angle, dict):
-            self.angle = Angle(**self.angle)
+            angle_data = cast(dict[str, Any], self.angle)
+            self.angle = Angle(**angle_data)
+
         if isinstance(self.spatial, dict):
-            self.spatial = Spatial(**self.spatial)
+            spatial_data = cast(dict[str, Any], self.spatial)
+            self.spatial = Spatial(**spatial_data)
 
     def save(self, filename: str | Path) -> None:
+        """Write the export record to disk.
+
+        Parameters
+        ----------
+        filename:
+            Output file path. The extension determines the serialization format
+            (``.json``, ``.yml``/``.yaml``, ``.pkl``, ``.bz2``, ``.mat``).
+        """
+
         if isinstance(filename, str):
             filename = Path(filename)
 

@@ -1,3 +1,8 @@
+"""Convenience wrapper around the MSTM3 binary.
+
+Provides a small manager used in benchmarks and regression comparisons.
+"""
+
 import os
 import re
 import bz2
@@ -15,17 +20,42 @@ from yasfpy.config import Config
 
 
 class MSTM3Manager:
+    """Manage MSTM3 benchmark runs.
+
+    The manager can generate an MSTM3 input file from a YASF configuration, run
+    the external MSTM3 binary, and parse the resulting output file into basic
+    scattering quantities.
+
+    Notes
+    -----
+    This helper is intended for benchmarking/regression comparisons rather than
+    production simulations.
+    """
+
     binary: str = "./mstm"
     input_file: str = "mstm3.inp"
     output_file: str = "mstm3.dat"
 
     def __init__(
         self,
-        config_path: str = None,
-        binary: str = None,
+        config_path: str | None = None,
+        binary: str | None = None,
         input_file: str = "mstm3.inp",
         output_file: str = "mstm3.dat",
     ):
+        """Initialize the MSTM3 manager.
+
+        Parameters
+        ----------
+        config_path:
+            Path to a YASF configuration file.
+        binary:
+            Path to the MSTM3 executable.
+        input_file:
+            Filename for the generated MSTM3 input.
+        output_file:
+            Filename for the MSTM3 output.
+        """
         self.config = Config(config_path)
         self.binary = binary
 
@@ -114,7 +144,7 @@ class MSTM3Manager:
 
         return mstm_config
 
-    def __exec(self, runner: pyperf.Runner = None):
+    def __exec(self, runner: pyperf.Runner | None = None):
         command = [self.binary, self.input_file]
         if runner is None:
             os.system(" ".join(command))
@@ -155,7 +185,7 @@ class MSTM3Manager:
                 "Qabs(V)",
             ],
             header=None,
-            sep="\s+",
+            sep=r"\s+",
         )
 
         efficiencies = {}
@@ -215,7 +245,7 @@ class MSTM3Manager:
                 "44",
             ],
             header=None,
-            sep="\s+",
+            sep=r"\s+",
         )
 
         return dict(
@@ -287,9 +317,20 @@ class MSTM3Manager:
         self.output = mstm
 
     def clean(self):
+        """Delete generated MSTM3 files."""
         os.system(f"rm -f {self.input_file} {self.output_file} mstm3.coef")
 
-    def run(self, runner: pyperf.Runner = None, cleanup: bool = True):
+    def run(self, runner: pyperf.Runner | None = None, cleanup: bool = True):
+        """Run MSTM3 and parse output.
+
+        Parameters
+        ----------
+        runner:
+            Optional :class:`pyperf.Runner` to benchmark the command. When omitted,
+            the binary is executed directly and outputs are parsed.
+        cleanup:
+            If True, remove generated input/output files afterwards.
+        """
         self.__write()
         self.__exec(runner)
         if runner is None:
@@ -298,7 +339,17 @@ class MSTM3Manager:
         if cleanup:
             self.clean()
 
-    def export(self, file: str = None, cleanup: bool = False):
+    def export(self, file: str | None = None, cleanup: bool = False):
+        """Run MSTM3 and export parsed results.
+
+        Parameters
+        ----------
+        file:
+            Output filename. Supported extensions are ``.json``, ``.yaml``/``.yml``,
+            and ``.bz2``.
+        cleanup:
+            If True, also remove generated MSTM3 files afterwards.
+        """
         if file is None:
             raise Exception("Please provide a filename")
         self.run(cleanup=False)

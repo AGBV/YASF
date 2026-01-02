@@ -1,9 +1,17 @@
+"""Optical post-processing for a :class:`~yasfpy.simulation.Simulation`.
+
+This module computes derived optical quantities such as total scattering/extinction
+cross sections and angular-resolved polarization components.
+"""
+
 import logging
-from typing import Union, Callable
 from math import ceil
-import pandas as pd
+from typing import Callable, Union
+
 import numpy as np
+import pandas as pd
 from numba import cuda
+
 from yasfpy.functions.misc import single_index2multi
 from yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
 
@@ -70,6 +78,16 @@ class Optics:
         spherical_bessel_lookup = self.simulation.sph_j
         e_j_dm_phi_loopup = self.simulation.e_j_dm_phi
 
+        if (
+            associated_legendre_lookup is None
+            or spherical_bessel_lookup is None
+            or e_j_dm_phi_loopup is None
+        ):
+            raise NotImplementedError(
+                "Cross sections require dense pairwise lookup tables. "
+                "Use numerics.coupling_backend='dense'."
+            )
+
         idx_lookup = self.simulation.idx_lookup
 
         if self.simulation.numerics.gpu:
@@ -130,13 +148,23 @@ class Optics:
         c_sca /= k_medium_abs_squared
         c_ext /= k_medium_abs_squared
 
-        # TODO: No idea why the pi is needed! Check with other frameworks. Else move to efficiency below.
+        # YASF reports cross sections using a π/k²-type convention consistent with
+        # the historical CELES/YASF normalization of VSWFs.
         self.c_ext = np.real(c_ext) * np.pi
         self.c_sca = np.abs(c_sca) * np.pi
 
         self.albedo = self.c_sca / self.c_ext
 
     def compute_efficiencies(self):
+        """Compute dimensionless scattering/extinction efficiencies.
+
+        Notes
+        -----
+        Efficiencies are computed by dividing the cross sections by the geometric
+        projection of the particle cluster and applying the medium refractive
+        index scaling used by the project.
+        """
+
         self.q_sca = (
             self.c_sca / self.simulation.parameters.particles.geometric_projection
         )
@@ -148,6 +176,16 @@ class Optics:
         self.q_sca *= np.abs(self.simulation.parameters.medium_refractive_index)
 
     def compute_scattered_e_field_angle_components(self):
+        """Compute scattered E-field components in spherical-angle coordinates.
+
+        Returns
+        -------
+        e_field_theta, e_field_phi
+            Arrays holding the complex scattered electric field components
+            along theta and phi directions on the
+            simulation sampling grid.
+        """
+
         pilm, taulm = spherical_functions_trigon(
             self.simulation.numerics.lmax, self.simulation.numerics.polar_angles
         )

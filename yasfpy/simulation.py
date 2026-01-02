@@ -1,34 +1,74 @@
+# pyright: reportGeneralTypeIssues=false
+
+"""Simulation orchestration.
+
+This module defines :class:`~yasfpy.simulation.Simulation`, which orchestrates
+the major steps of a YASF run: lookup-table generation, Mie/incident-field
+coefficient computation, linear-system solve for scattering coefficients, and
+optional field evaluation.
+"""
+
 import logging
 
 # import yasfpy.log as log
 from time import time
 
 import numpy as np
-from math import ceil
-from numba import cuda
-from scipy.sparse.linalg import LinearOperator
+import os
 
 # from scipy.spatial.distance import pdist, squareform
-from scipy.special import spherical_jn, spherical_yn
-
 # from scipy.special import hankel1
 # from scipy.special import lpmv
 
 from yasfpy.parameters import Parameters
 from yasfpy.numerics import Numerics
-from yasfpy.functions.spherical_functions_trigon import spherical_functions_trigon
-from yasfpy.functions.t_entry import t_entry
 
-from yasfpy.functions.misc import transformation_coefficients
-from yasfpy.functions.misc import multi2single_index
-from yasfpy.functions.misc import mutual_lookup
-
-from yasfpy.functions.cpu_numba import compute_idx_lookups
-from yasfpy.functions.cpu_numba import particle_interaction, compute_field
-from yasfpy.functions.cuda_numba import particle_interaction_gpu, compute_field_gpu
+from yasfpy.coupling.backends import (
+    DenseCouplingBackend,
+    NearFarCouplingBackend,
+    TiledDenseCouplingBackend,
+)
 
 
 class Simulation:
+    """Run container for the core YASF simulation pipeline.
+
+    Parameters
+    ----------
+    parameters
+        Physical and material parameters for the run.
+    numerics
+        Numerical configuration (truncation, sampling, coupling backend, etc.).
+
+    Notes
+    -----
+    The simulation object owns lookup tables and intermediate arrays that are
+    produced during preprocessing and solver stages.
+    """
+
+    _matvec_detail_enabled: bool
+    _matvec_detail: dict[str, float]
+
+    initial_field_coefficients: np.ndarray
+    mie_coefficients: np.ndarray
+    scatter_to_internal: np.ndarray
+    scattered_field_coefficients: np.ndarray
+    scattered_field_err_codes: np.ndarray
+
+    sampling_points: np.ndarray
+    initial_field_electric: np.ndarray | None
+    initial_field_magnetic: np.ndarray | None
+    scattered_field: np.ndarray
+    total_field_electric: np.ndarray
+
+    lookup_particle_distances: np.ndarray
+    h3_table: np.ndarray
+    idx_lookup: np.ndarray
+    sph_j: np.ndarray | None
+    sph_h: np.ndarray | None
+    e_j_dm_phi: np.ndarray | None
+    plm: np.ndarray | None
+
     """This class represents the simulation of YASF (Yet Another Scattering Framework).
     It contains methods for initializing the simulation, computing lookup tables, and calculating mie coefficients.
     """
@@ -46,140 +86,66 @@ class Simulation:
 
         # self.log = log.infoing_logger(__name__)
         self.log = logging.getLogger(self.__class__.__module__)
+
+        self._matvec_detail_enabled = bool(
+            int(os.environ.get("YASF_MATVEC_DETAIL", "0"))
+        )
+        self._matvec_detail = {}
+
+        backend_name = str(getattr(self.numerics, "coupling_backend", "dense")).lower()
+        if backend_name in {"dense"}:
+            self.coupling_backend = DenseCouplingBackend(self)
+        elif backend_name in {"tiled_dense", "tiled-dense", "tileddense"}:
+            self.coupling_backend = TiledDenseCouplingBackend(self)
+        elif backend_name in {"nearfar", "near_far", "near-far"}:
+            self.coupling_backend = NearFarCouplingBackend(self)
+        else:
+            raise ValueError(
+                f"Unsupported coupling backend: {backend_name!r}. "
+                "Expected one of {'dense', 'tiled_dense', 'nearfar'}."
+            )
+
         self.__setup()
 
     def legacy_compute_lookup_particle_distances(self):
-        """
-        The largest distance between two particles is divided into segments provided by `Numerics.particle_distance_resolution`.
-        This array is then used as a lookup for the calculation of the spherical Hankel function.
+        """Compute particle distance lookup for legacy tables.
 
-        Notes
-        -----
-        This function has been ported from the Matlab Celes framework but is not used by YASF!
+        Delegates to `yasfpy.lookups.legacy_compute_lookup_particle_distances`.
         """
-        # add two zeros at the beginning to allow interpolation
-        # also in the first segment
-        step = self.numerics.particle_distance_resolution
-        maxdist = (
-            self.parameters.particles.max_particle_distance
-            + 3 * self.numerics.particle_distance_resolution
-        )
-        self.lookup_particle_distances = np.concatenate(
-            (np.array([0]), np.arange(0, maxdist + np.finfo(float).eps, step))
-        )
+
+        from yasfpy.lookups import legacy_compute_lookup_particle_distances
+
+        legacy_compute_lookup_particle_distances(self)
 
     def legacy_compute_h3_table(self):
+        """Compute the legacy spherical Hankel lookup table.
+
+        Delegates to `yasfpy.lookups.legacy_compute_h3_table`.
         """
-        Computes the spherical hankel function
-        at the points calculated in `Simulation.legacy_compute_lookup_particle_distances()`.
 
-        Attributes:
-            h3_table (np.ndarray): Lookup table of the spherical hankel function values at `self.lookup_particle_distances`
+        from yasfpy.lookups import legacy_compute_h3_table
 
-        Notes:
-            This function has been ported from the Matlab Celes framework but is not used by YASF!
-        """
-        self.h3_table = np.zeros(
-            (
-                2 * self.numerics.lmax + 1,
-                self.lookup_particle_distances.shape[0],
-                self.parameters.medium_refractive_index.shape[0],
-            ),
-            dtype=complex,
-        )
-        size_param = np.outer(self.lookup_particle_distances, self.parameters.k_medium)
-
-        for p in range(2 * self.numerics.lmax + 1):
-            self.h3_table[p, :, :] = spherical_jn(p, size_param) + 1j * spherical_yn(
-                p, size_param
-            )
+        legacy_compute_h3_table(self)
 
     def __compute_idx_lookup(self):
-        """
-        Creates a lookup table with the indices used in further calculations.
-        The lookup table is created using `compute_idx_lookups` function from `yasfpy.functions.cpu_numba`.
+        """Create the index lookup table.
 
-        Attributes:
-            idx_lookup (np.ndarray): Lookup table of the indices to iterate over large arrays.
-
-        Notes:
-            This function utilizes Numba to optimize the computations.
+        Delegates to `yasfpy.lookups.compute_idx_lookup`.
         """
-        self.idx_lookup = compute_idx_lookups(
-            self.numerics.lmax, self.parameters.particles.number
-        )
+
+        from yasfpy.lookups import compute_idx_lookup
+
+        compute_idx_lookup(self)
 
     def __compute_lookups(self):
+        """Compute pairwise lookup tables.
+
+        Delegates to `yasfpy.lookups.compute_lookups`.
         """
-        Computes various lookup tables for each particle.
 
-        Attributes:
-            sph_j (np.ndarray): Spherical Bessel function lookup table calculated for pair-wise particle distances.
-            sph_h (np.ndarray): Spherical Hankel function lookup table calculated for pair-wise particle distances.
-            plm (np.ndarray): Associated Legendre polynomial lookup table calculated for the cosine value of the pairwise particle inclination angles.
-            e_j_dm_phi (np.ndarray): Exponential function lookup table calculated for the pairwise particle azimuthal angles.
+        from yasfpy.lookups import compute_lookups
 
-        Notes:
-            This function uses numba (https://numba.pydata.org/) under the hood to speed up the computations.
-        """
-        lookup_computation_time_start = time()
-        # TODO: new, could be error prone and is not tested yet!
-        self.sph_j, self.sph_h, self.e_j_dm_phi, self.plm = mutual_lookup(
-            self.numerics.lmax,
-            self.parameters.particles.position,
-            self.parameters.particles.position,
-            self.parameters.k_medium,
-        )[:4]
-
-        # lmax = self.numerics.lmax
-        # particle_number = self.parameters.particles.number
-
-        # dists = squareform(pdist(self.parameters.particles.position))
-        # ct = np.divide(
-        #   np.subtract.outer(
-        #     self.parameters.particles.position[:, 2], self.parameters.particles.position[:, 2]),
-        #   dists,
-        #   out = np.zeros((particle_number, particle_number)),
-        #   where = dists != 0)
-        # phi = np.arctan2(
-        #   np.subtract.outer(
-        #     self.parameters.particles.position[:, 1], self.parameters.particles.position[:, 1]),
-        #   np.subtract.outer(self.parameters.particles.position[:, 0], self.parameters.particles.position[:, 0]))
-
-        # size_param = np.outer(dists.ravel(), self.parameters.k_medium).reshape(
-        #   [particle_number, particle_number, self.parameters.k_medium.shape[0]])
-
-        # self.sph_h = np.zeros((2 * lmax + 1, particle_number, particle_number, self.parameters.k_medium.shape[0]), dtype=complex)
-        # self.sph_j = np.zeros_like(self.sph_h)
-        # self.e_j_dm_phi = np.zeros((4 * lmax + 1, particle_number, particle_number), dtype=complex)
-        # self.plm = np.zeros(((lmax + 1) * (2 * lmax + 1),
-        #           particle_number, particle_number))
-
-        # for p in range(2 * lmax + 1):
-        #   self.sph_h[p, :, :, :] = np.sqrt(
-        #     np.divide(
-        #       np.pi / 2,
-        #       size_param,
-        #       out=np.zeros_like(size_param),
-        #       where=size_param != 0)
-        #   ) * hankel1(p + 1/2, size_param)
-        #   self.sph_j[p, :, :, :] = spherical_jn(p, size_param)
-        #   self.e_j_dm_phi[p, :, :] = np.exp(1j * (p - 2 * lmax) * phi)
-        #   self.e_j_dm_phi[p + 2 * lmax, :, :] = np.exp(1j * p * phi)
-        #   for absdm in range(p + 1):
-        #     cml = np.sqrt((2 * p + 1) / 2 /
-        #             np.prod(np.arange(p - absdm + 1, p + absdm + 1)))
-        #     self.plm[p * (p + 1) // 2 + absdm, :, :] = cml * \
-        #       np.power(-1.0, absdm) * lpmv(absdm, p, ct)
-
-        # self.sph_h = np.nan_to_num(
-        #   self.sph_h, nan=0) + np.isnan(self.sph_h) * 1
-
-        lookup_computation_time_stop = time()
-        self.log.info(
-            "Computing lookup tables took %f s"
-            % (lookup_computation_time_stop - lookup_computation_time_start)
-        )
+        compute_lookups(self)
 
     def __setup(self):
         """
@@ -190,96 +156,35 @@ class Simulation:
         - [__compute_lookups][simulation.Simulation.__compute_lookups]
         """
         self.__compute_idx_lookup()
-        self.__compute_lookups()
 
-    def compute_mie_coefficients(self):
-        """
-        Computes the mie coefficients for the unique pair
-        of particle radius and the refractive index of the particle.
-
-        Attributes:
-            mie_coefficients (np.ndarray): Mie coefficients table
-
-        See Also:
-            [t_entry][functions.t_entry.t_entry] : T-Matrix entry function
-
-        Notes:
-            Due to the four nested loops (particles, tau, l, and m),
-            it could be rewritten using `numba` to speed the process up.
-        """
-        self.mie_coefficients = np.zeros(
-            (
-                self.parameters.particles.num_unique_pairs,
-                self.numerics.nmax,
-                self.parameters.wavelength.shape[0],
-            ),
-            dtype=complex,
-        )
-
-        self.scatter_to_internal = np.zeros_like(self.mie_coefficients)
-
-        for u_i in range(self.parameters.particles.num_unique_pairs):
-            for tau in range(1, 3):
-                for l in range(1, self.numerics.lmax + 1):
-                    for m in range(-l, l + 1):
-                        jmult = multi2single_index(0, tau, l, m, self.numerics.lmax)
-                        self.mie_coefficients[u_i, jmult, :] = t_entry(
-                            tau=tau,
-                            l=l,
-                            k_medium=self.parameters.k_medium,
-                            k_sphere=self.parameters.omega
-                            * self.parameters.particles.unique_radius_index_pairs[
-                                u_i, 1:
-                            ],
-                            radius=np.real(
-                                self.parameters.particles.unique_radius_index_pairs[
-                                    u_i, 0
-                                ]
-                            ),
-                        )
-
-                        self.scatter_to_internal[u_i, jmult, :] = t_entry(
-                            tau=tau,
-                            l=l,
-                            k_medium=self.parameters.k_medium,
-                            k_sphere=self.parameters.omega
-                            * self.parameters.particles.unique_radius_index_pairs[
-                                u_i, 1:
-                            ],
-                            radius=np.real(
-                                self.parameters.particles.unique_radius_index_pairs[
-                                    u_i, 0
-                                ]
-                            ),
-                            field_type="ratio",
-                        )
-
-    def compute_initial_field_coefficients(self):
-        r"""
-        Computes initial field coefficients $a_{\\tau ,l,m}$ and $b_{\\tau ,l,m}$.
-        Depending on the `beam_width`, one of two functions is called:
-
-        - [__compute_initial_field_coefficients_wavebundle_normal_incidence][simulation.Simulation.__compute_initial_field_coefficients_wavebundle_normal_incidence], $\\text{beam width} \\in (0, \\infty)$
-        - [__compute_initial_field_coefficients_planewave][simulation.Simulation.__compute_initial_field_coefficients_planewave], $\\text{beam width} = 0$ or $\\text{beam width} = \\infty$
-
-        Attributes:
-            initial_field_coefficients (np.ndarray): Initial field coefficients
-        """
-        self.log.info("compute initial field coefficients ...")
-
-        if np.isfinite(self.parameters.initial_field.beam_width) and (
-            self.parameters.initial_field.beam_width > 0
-        ):
-            self.log.info("\t Gaussian beam ...")
-            if self.parameters.initial_field.normal_incidence:
-                self.__compute_initial_field_coefficients_wavebundle_normal_incidence()
-            else:
-                self.log.error("\t this case is not implemented")
+        if self.coupling_backend.requires_pairwise_lookups:
+            self.__compute_lookups()
         else:
-            self.log.info("\t plane wave ...")
-            self.__compute_initial_field_coefficients_planewave()
+            # Keep attributes defined for downstream code.
+            self.sph_j = None
+            self.sph_h = None
+            self.e_j_dm_phi = None
+            self.plm = None
 
-        self.log.info("done")
+    def compute_mie_coefficients(self) -> None:
+        """Compute Mie coefficients, stored on the simulation.
+
+        Delegates to `yasfpy.mie_coefficients.compute_mie_coefficients`.
+        """
+
+        from yasfpy.mie_coefficients import compute_mie_coefficients
+
+        compute_mie_coefficients(self)
+
+    def compute_initial_field_coefficients(self) -> None:
+        r"""Computes initial field coefficients $a_{\tau ,l,m}$ and $b_{\tau ,l,m}$.
+
+        Delegates to `yasfpy.initial_field_coefficients.compute_initial_field_coefficients`.
+        """
+
+        from yasfpy.initial_field_coefficients import compute_initial_field_coefficients
+
+        compute_initial_field_coefficients(self)
 
     def compute_right_hand_side(self):
         r"""
@@ -299,688 +204,46 @@ class Simulation:
             * self.initial_field_coefficients
         )
 
-    def __compute_initial_field_coefficients_planewave(self):
-        """The function computes the initial field coefficients for a plane wave based on given parameters
-        and spherical coordinates.
+    def coupling_matrix_multiply(self, x: np.ndarray, idx: int | None = None):
+        """Compute Wx = coupling_matrix @ x.
 
+        Delegates to `yasfpy.matrix_apply.coupling_matrix_multiply`.
         """
-        lmax = self.numerics.lmax
-        E0 = self.parameters.initial_field.amplitude
-        k = self.parameters.k_medium
 
-        beta = self.parameters.initial_field.polar_angle
-        cb = np.cos(beta)
-        sb = np.sin(beta)
-        alpha = self.parameters.initial_field.azimuthal_angle
+        from yasfpy.matrix_apply import coupling_matrix_multiply
 
-        # pi and tau symbols for transformation matrix B_dagger
-        pilm, taulm = spherical_functions_trigon(lmax, beta)
-
-        # cylindrical coordinates for relative particle positions
-        relative_particle_positions = (
-            self.parameters.particles.position
-            - self.parameters.initial_field.focal_point
-        )
-        kvec = np.outer(np.array((sb * np.cos(alpha), sb * np.sin(alpha), cb)), k)
-        eikr = np.exp(1j * np.matmul(relative_particle_positions, kvec))
-
-        # clean up some memory?
-        del (k, beta, cb, sb, kvec, relative_particle_positions)
-
-        self.initial_field_coefficients = np.zeros(
-            (
-                self.parameters.particles.number,
-                self.numerics.nmax,
-                self.parameters.k_medium.size,
-            ),
-            dtype=complex,
-        )
-        for m in range(-lmax, lmax + 1):
-            for tau in range(1, 3):
-                for l in range(np.max([1, np.abs(m)]), lmax + 1):
-                    n = multi2single_index(0, tau, l, m, lmax)
-                    self.initial_field_coefficients[:, n, :] = (
-                        4
-                        * E0
-                        * np.exp(-1j * m * alpha)
-                        * eikr
-                        * transformation_coefficients(
-                            pilm,
-                            taulm,
-                            tau,
-                            l,
-                            m,
-                            self.parameters.initial_field.pol,
-                            dagger=True,
-                        )
-                    )
-
-    def __compute_initial_field_coefficients_wavebundle_normal_incidence(self):
-        """Computes initial field coefficients for a Gaussian beam (wavebundle) at normal incidence.
-
-        This implements the algorithm from CELES initial_field_coefficients_wavebundle_normal_incidence.m
-        The Gaussian beam is expanded in spherical vector wave functions and integrated over
-        the angular spectrum.
-
-        References:
-            CELES: https://github.com/disordered-photonics/celes/blob/master/src/initial/initial_field_coefficients_wavebundle_normal_incidence.m
-        """
-        from scipy.special import jv as besselj
-
-        # Extract parameters
-        lmax = self.numerics.lmax
-        E0 = self.parameters.initial_field.amplitude
-        k = self.parameters.k_medium[0]  # Assuming single wavelength for now
-        w = self.parameters.initial_field.beam_width
-        prefac = E0 * k**2 * w**2 / np.pi
-
-        # Adjust azimuthal angle for polarization
-        pol_lower = self.parameters.initial_field.polarization.lower()
-        if pol_lower == 'te':
-            alphaG = self.parameters.initial_field.azimuthal_angle
-        elif pol_lower == 'tm':
-            alphaG = self.parameters.initial_field.azimuthal_angle - np.pi / 2
-        else:
-            raise ValueError(f"Unsupported polarization: {self.parameters.initial_field.polarization}")
-
-        # Get polar angle grid from numerics
-        full_beta_array = self.numerics.polar_angles
-        if full_beta_array is None:
-            raise ValueError("numerics.polar_angles not initialized. Set sampling_points_number in Numerics.")
-
-        # Filter angles by direction (same hemisphere as incident beam)
-        incident_polar = self.parameters.initial_field.polar_angle
-        direction_idcs = (
-            np.sign(np.cos(full_beta_array)) == np.sign(np.cos(incident_polar))
-        )
-        beta_array = full_beta_array[direction_idcs]
-
-        # Compute angular grid spacing (for integration)
-        if len(beta_array) < 2:
-            raise ValueError("Need at least 2 polar angles for wavebundle integration")
-        dBeta = np.mean(np.diff(np.sort(beta_array)))
-
-        # Compute cos/sin for integration points
-        cb = np.cos(beta_array)
-        sb = np.sin(beta_array)
-
-        # Gaussian weighting factors
-        gaussfac = np.exp(-w**2 / 4 * k**2 * sb**2)
-        gaussfacSincos = gaussfac * cb * sb
-
-        # Compute spherical functions (pilm, taulm)
-        pilm, taulm = spherical_functions_trigon(lmax, cb, sb)
-
-        # Particle positions relative to focal point
-        relative_particle_positions = (
-            self.parameters.particles.position
-            - self.parameters.initial_field.focal_point
-        )
-
-        # Convert to cylindrical coordinates
-        rhoGi = np.sqrt(
-            relative_particle_positions[:, 0]**2
-            + relative_particle_positions[:, 1]**2
-        )
-        phiGi = np.arctan2(
-            relative_particle_positions[:, 1],
-            relative_particle_positions[:, 0]
-        )
-        zGi = relative_particle_positions[:, 2]
-
-        # Initialize coefficient array
-        self.initial_field_coefficients = np.zeros(
-            (
-                self.parameters.particles.number,
-                self.numerics.nmax,
-                self.parameters.k_medium.size,
-            ),
-            dtype=complex,
-        )
-
-        # Main computation loop over azimuthal orders and multipole indices
-        for m in range(-lmax, lmax + 1):
-            # Compute two integral expressions for each m
-            # These involve Bessel functions and phase factors
-
-            # Phase factors for m±1
-            phase_m_minus_1 = np.exp(-1j * (m - 1) * phiGi)
-            phase_m_plus_1 = np.exp(-1j * (m + 1) * phiGi)
-
-            # Vertical propagation: exp(i z k cos(beta))
-            # Shape: (num_particles, num_beta)
-            exp_ikz = np.exp(1j * zGi[:, np.newaxis] * k * cb[np.newaxis, :])
-
-            # Bessel functions: J_{|m±1|}(rho * k * sin(beta))
-            # Shape: (num_particles, num_beta)
-            bessel_m_minus_1 = besselj(np.abs(m - 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :])
-            bessel_m_plus_1 = besselj(np.abs(m + 1), rhoGi[:, np.newaxis] * k * sb[np.newaxis, :])
-
-            # Combine into radial integrands
-            radial_m_minus_1 = phase_m_minus_1[:, np.newaxis] * exp_ikz * bessel_m_minus_1
-            radial_m_plus_1 = phase_m_plus_1[:, np.newaxis] * exp_ikz * bessel_m_plus_1
-
-            # Two integral expressions (eikzI1 and eikzI2) with different polarization weightings
-            eikzI1 = np.pi * (
-                np.exp(-1j * alphaG) * (1j ** np.abs(m - 1)) * radial_m_minus_1
-                + np.exp(1j * alphaG) * (1j ** np.abs(m + 1)) * radial_m_plus_1
-            )
-
-            eikzI2 = np.pi * 1j * (
-                -np.exp(-1j * alphaG) * (1j ** np.abs(m - 1)) * radial_m_minus_1
-                + np.exp(1j * alphaG) * (1j ** np.abs(m + 1)) * radial_m_plus_1
-            )
-
-            # Integrate over tau and l
-            for tau in range(1, 3):
-                for l in range(max(1, abs(m)), lmax + 1):
-                    n = multi2single_index(0, tau, l, m, lmax)
-
-                    # Gaussian weighting times transformation coefficients
-                    gaussSincosBDag1 = gaussfacSincos * transformation_coefficients(
-                        pilm, taulm, tau, l, m, 1, dagger=True
-                    )
-                    gaussSincosBDag2 = gaussfacSincos * transformation_coefficients(
-                        pilm, taulm, tau, l, m, 2, dagger=True
-                    )
-
-                    # Trapezoidal integration over beta grid
-                    # Average neighboring points and sum
-                    integral = (
-                        np.dot(eikzI1[:, 1:], gaussSincosBDag1[1:])
-                        + np.dot(eikzI1[:, :-1], gaussSincosBDag1[:-1])
-                        + np.dot(eikzI2[:, 1:], gaussSincosBDag2[1:])
-                        + np.dot(eikzI2[:, :-1], gaussSincosBDag2[:-1])
-                    ) * dBeta / 2
-
-                    self.initial_field_coefficients[:, n, 0] = prefac * integral
-
-    def coupling_matrix_multiply(self, x: np.ndarray, idx: int = None):
-        """Computes the coupling matrix `wx` based on the input parameters.
-
-        Args:
-            x (np.ndarray): An input array of shape (n,) or (n, m), where n is the number of particles and m is the number
-                of features for each particle. This array represents the input data for which the coupling
-                matrix needs to be computed.
-            idx (int): An optional integer that specifies the index of a specific spherical harmonic mode. If `idx` is provided,
-                the computation will only be performed for that specific mode. If `idx` is not provided or set to `None`,
-                the computation will be performed for all spherical harmonic modes.
-
-        Returns:
-            wx (np.ndarray): An array of shape (n, m, p), where n is the number of particles, m is the number of features for each
-                particle, and p is the number of wavelengths. It represents the coupling matrix `wx`.
-        """
-        self.log.debug("prepare particle coupling ... ")
-        preparation_time = time()
-
-        lmax = self.numerics.lmax
-        particle_number = self.parameters.particles.number
-        jmax = particle_number * 2 * lmax * (lmax + 2)
-        wavelengths_size = self.parameters.k_medium.shape[0]
-        translation_table = self.numerics.translation_ab5
-        associated_legendre_lookup = self.plm
-        spherical_hankel_lookup = self.sph_h
-        e_j_dm_phi_loopup = self.e_j_dm_phi
-
-        idx_lookup = self.idx_lookup
-
-        if idx is not None:
-            spherical_hankel_lookup = spherical_hankel_lookup[:, :, :, idx]
-            spherical_hankel_lookup = np.copy(
-                spherical_hankel_lookup[:, :, :, np.newaxis]
-            )
-            wavelengths_size = 1
-
-        self.log.debug("\t Starting Wx computation")
-        if self.numerics.gpu:
-            wx_real = np.zeros(x.shape + (wavelengths_size,), dtype=float)
-            wx_imag = np.zeros_like(wx_real)
-
-            idx_device = cuda.to_device(idx_lookup)
-            x_device = cuda.to_device(x)
-            wx_real_device = cuda.to_device(wx_real)
-            wx_imag_device = cuda.to_device(wx_imag)
-            translation_device = cuda.to_device(translation_table)
-            associated_legendre_device = cuda.to_device(associated_legendre_lookup)
-            spherical_hankel_device = cuda.to_device(spherical_hankel_lookup)
-            e_j_dm_phi_device = cuda.to_device(e_j_dm_phi_loopup)
-
-            threads_per_block = (16, 16, 2)
-            blocks_per_grid_x = ceil(jmax / threads_per_block[0])
-            blocks_per_grid_y = ceil(jmax / threads_per_block[1])
-            blocks_per_grid_z = ceil(wavelengths_size / threads_per_block[2])
-            blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y, blocks_per_grid_z)
-
-            coupling_matrix_time = time()
-            particle_interaction_gpu[blocks_per_grid, threads_per_block](
-                lmax,
-                particle_number,
-                idx_device,
-                x_device,
-                wx_real_device,
-                wx_imag_device,
-                translation_device,
-                associated_legendre_device,
-                spherical_hankel_device,
-                e_j_dm_phi_device,
-            )
-            wx_real = wx_real_device.copy_to_host()
-            wx_imag = wx_imag_device.copy_to_host()
-            wx = wx_real + 1j * wx_imag
-            # particle_interaction.parallel_diagnostics(level=4)
-            time_end = time()
-            self.log.debug(
-                "\t Time taken for preparation: %f"
-                % (coupling_matrix_time - preparation_time)
-            )
-            self.log.debug(
-                "\t Time taken for coupling matrix: %f"
-                % (time_end - coupling_matrix_time)
-            )
-        else:
-            # from numba_progress import ProgressBar
-            # num_iterations = jmax * jmax * wavelengths
-            # progress = ProgressBar(total=num_iterations)
-            # progress = None
-            wx = particle_interaction(
-                lmax,
-                particle_number,
-                idx_lookup,
-                x,
-                translation_table,
-                associated_legendre_lookup,
-                spherical_hankel_lookup,
-                e_j_dm_phi_loopup,
-            )
-            time_end = time()
-            self.log.debug(
-                "\t Time taken for coupling matrix: %f" % (time_end - preparation_time)
-            )
-
-        if idx is not None:
-            wx = np.squeeze(wx)
-
-        return wx
+        return coupling_matrix_multiply(self, x, idx)
 
     def master_matrix_multiply(self, value: np.ndarray, idx: int):
-        """Applies a T-matrix to a given value and returns the result.
+        """Apply master operator.
 
-        Args:
-            value (np.ndarray): The input value for the matrix multiplication operation.
-            idx (int): The index of the matrix to be multiplied.
-
-        Returns:
-            mx (np.ndarray): The result of the matrix multiplication operation.
-
+        Delegates to `yasfpy.matrix_apply.master_matrix_multiply`.
         """
-        wx = self.coupling_matrix_multiply(value, idx)
 
-        self.log.debug("apply T-matrix ...")
-        t_matrix_start = time()
+        from yasfpy.matrix_apply import master_matrix_multiply
 
-        twx = (
-            self.mie_coefficients[
-                self.parameters.particles.single_unique_array_idx, :, idx
-            ].ravel(order="C")
-            * wx
-        )
-        mx = value - twx
+        return master_matrix_multiply(self, value, idx)
 
-        t_matrix_stop = time()
-        self.log.debug(f"\t done in {t_matrix_stop - t_matrix_start} seconds.")
+    def compute_scattered_field_coefficients(
+        self, guess: np.ndarray | None = None
+    ) -> None:
+        """Compute scattered field coefficients.
 
-        return mx
-
-    def compute_scattered_field_coefficients(self, guess: np.ndarray = None):
-        """The function computes the scattered field coefficients using a linear operator and a solver.
-
-        Args:
-            guess (np.ndarray): Optional. The initial guess for the solution of the linear system. If no guess is provided,
-                the `right_hand_side` variable is used as the initial guess.
-
+        Delegates to `yasfpy.scattered_field_coefficients.compute_scattered_field_coefficients`.
         """
-        self.log.info("compute scattered field coefficients ...")
-        jmax = self.parameters.particles.number * self.numerics.nmax
-        self.scattered_field_coefficients = np.zeros_like(
-            self.initial_field_coefficients
+
+        from yasfpy.scattered_field_coefficients import (
+            compute_scattered_field_coefficients,
         )
-        self.scattered_field_err_codes = np.zeros(self.parameters.wavelengths_number)
-        if guess is None:
-            guess = self.right_hand_side
-        # TODO: Look into performing this loop in parallel
-        for w in range(self.parameters.wavelengths_number):
-            A = LinearOperator(
-                shape=(jmax, jmax), matvec=lambda x: self.master_matrix_multiply(x, w)
-            )
-            b = self.right_hand_side[:, :, w].ravel()
-            x0 = guess[:, :, w].ravel()
-            self.log.info(
-                "Solver run %d/%d" % (w + 1, self.parameters.wavelengths_number)
-            )
-            x, err_code = self.numerics.solver.run(A, b, x0)
-            self.scattered_field_coefficients[:, :, w] = x.reshape(
-                self.right_hand_side.shape[:2]
-            )
-            self.scattered_field_err_codes[w] = err_code
 
-    def compute_fields(self, sampling_points: np.ndarray):
-        """The function `compute_fields` calculates the field at given sampling points using either CPU or
-        GPU computation.
+        compute_scattered_field_coefficients(self, guess)
 
-        Args:
-            sampling_points (np.ndarray): The numpy array that represents the coordinates of the sampling points.
-                It should have a shape of `(n, 3)`, where `n` is the number of sampling points and each row
-                represents the `(x, y, z)` coordinates of a point.
+    def compute_fields(self, sampling_points: np.ndarray) -> None:
+        """Compute fields at the given sampling points.
+
+        This method delegates to `yasfpy.fields.compute_fields`.
         """
-        if sampling_points.shape[0] < 1:
-            self.log.error("Number of sampling points must be bigger than zero!")
-            return
-        if sampling_points.shape[1] != 3:
-            self.log.error("The points have to have three coordinates (x,y,z)!")
-            return
 
-        # scatter_to_internal_table = np.sum((self.parameters.particles.position[:, np.newaxis, :] - sampling_points[np.newaxis, :, :])**2, axis = 2)
-        # scatter_to_internal_table = scatter_to_internal_table < self.parameters.particles.r[:, np.newaxis]**2
+        from yasfpy.fields import compute_fields
 
-        # Initial (incident) field at sampling points (plane wave)
-        # This matches CELES postprocessing/compute_initial_field.m for the plane-wave branch.
-        self.initial_field_electric = None
-        self.initial_field_magnetic = None
-        if (self.parameters.initial_field.beam_width == 0) or np.isinf(
-            self.parameters.initial_field.beam_width
-        ):
-            alpha = float(self.parameters.initial_field.azimuthal_angle)
-            beta = float(self.parameters.initial_field.polar_angle)
-            cb = np.cos(beta)
-            sb = np.sin(beta)
-            ca = np.cos(alpha)
-            sa = np.sin(alpha)
-            direction = np.array([sb * ca, sb * sa, cb], dtype=float)
-
-            channels = self.parameters.k_medium.size
-            npts = sampling_points.shape[0]
-            self.initial_field_electric = np.zeros((channels, npts, 3), dtype=complex)
-            self.initial_field_magnetic = np.zeros_like(self.initial_field_electric)
-
-            if self.numerics.gpu:
-                from yasfpy.functions.cuda_numba import compute_plane_wave_field_gpu
-
-                E_real = np.zeros((channels, npts, 3), dtype=float)
-                E_imag = np.zeros_like(E_real)
-                H_real = np.zeros_like(E_real)
-                H_imag = np.zeros_like(E_real)
-
-                points_device = cuda.to_device(np.ascontiguousarray(sampling_points))
-                focal_device = cuda.to_device(
-                    np.ascontiguousarray(self.parameters.initial_field.focal_point.astype(float))
-                )
-                direction_device = cuda.to_device(np.ascontiguousarray(direction))
-                k_device = cuda.to_device(np.ascontiguousarray(self.parameters.k_medium.astype(float)))
-                n_m = np.asarray(self.parameters.medium_refractive_index)
-                n_real_device = cuda.to_device(np.ascontiguousarray(n_m.real.astype(float)))
-                n_imag_device = cuda.to_device(np.ascontiguousarray(n_m.imag.astype(float)))
-
-                E_real_device = cuda.to_device(E_real)
-                E_imag_device = cuda.to_device(E_imag)
-                H_real_device = cuda.to_device(H_real)
-                H_imag_device = cuda.to_device(H_imag)
-
-                threads = (16, 16)
-                blocks = (
-                    ceil(npts / threads[0]),
-                    ceil(channels / threads[1]),
-                )
-                compute_plane_wave_field_gpu[blocks, threads](
-                    points_device,
-                    focal_device,
-                    direction_device,
-                    k_device,
-                    n_real_device,
-                    n_imag_device,
-                    int(self.parameters.initial_field.pol),
-                    float(self.parameters.initial_field.amplitude),
-                    float(sa),
-                    float(ca),
-                    float(sb),
-                    float(cb),
-                    E_real_device,
-                    E_imag_device,
-                    H_real_device,
-                    H_imag_device,
-                )
-
-                self.initial_field_electric = E_real_device.copy_to_host() + 1j * E_imag_device.copy_to_host()
-                self.initial_field_magnetic = H_real_device.copy_to_host() + 1j * H_imag_device.copy_to_host()
-
-            else:
-                R = sampling_points - self.parameters.initial_field.focal_point
-                phase = R @ direction
-                E = (
-                    self.parameters.initial_field.amplitude
-                    * np.exp(
-                        1j
-                        * phase[:, np.newaxis]
-                        * self.parameters.k_medium[np.newaxis, :]
-                    )
-                ).T  # (channels, N)
-
-                n_medium = np.asarray(self.parameters.medium_refractive_index)
-                H = (-1j * n_medium[:, np.newaxis]) * E
-
-                if self.parameters.initial_field.pol == 1:  # TE
-                    self.initial_field_electric[:, :, 0] = -sa * E
-                    self.initial_field_electric[:, :, 1] = ca * E
-                    # Ez = 0
-
-                    hx_fac = -ca * cb
-                    hy_fac = -sa * cb
-                    hz_fac = sb
-                    self.initial_field_magnetic[:, :, 0] = 1j * hx_fac * H
-                    self.initial_field_magnetic[:, :, 1] = 1j * hy_fac * H
-                    self.initial_field_magnetic[:, :, 2] = 1j * hz_fac * H
-                else:  # TM
-                    self.initial_field_electric[:, :, 0] = ca * cb * E
-                    self.initial_field_electric[:, :, 1] = sa * cb * E
-                    self.initial_field_electric[:, :, 2] = -sb * E
-
-                    hx_fac = -sa
-                    hy_fac = ca
-                    self.initial_field_magnetic[:, :, 0] = 1j * hx_fac * H
-                    self.initial_field_magnetic[:, :, 1] = 1j * hy_fac * H
-                    # Hz = 0
-
-        self.log.info("Computing mutual lookup")
-        lookup_computation_time_start = time()
-
-        # IMPORTANT: For near-field evaluation CELES uses R = fieldPoints - particlePos.
-        # mutual_lookup() internally computes positions_1 - positions_2, so we pass
-        # (sampling_points, particle_positions) and then transpose back to (particles, points).
-        (
-            _,
-            sph_h,
-            e_j_dm_phi,
-            p_lm,
-            e_r,
-            e_theta,
-            e_phi,
-            cosine_theta,
-            sine_theta,
-            size_parameter,
-            sph_h_derivative,
-        ) = mutual_lookup(
-            self.numerics.lmax,
-            sampling_points,
-            self.parameters.particles.position,
-            self.parameters.k_medium,
-            derivatives=True,
-            parallel=False,
-        )
-
-        # transpose (points, particles) -> (particles, points)
-        sph_h = np.swapaxes(sph_h, 1, 2)
-        sph_h_derivative = np.swapaxes(sph_h_derivative, 1, 2)
-        e_j_dm_phi = np.swapaxes(e_j_dm_phi, 1, 2)
-        if p_lm.ndim == 4:
-            p_lm = np.swapaxes(p_lm, 2, 3)
-        e_r = np.swapaxes(e_r, 0, 1)
-        e_theta = np.swapaxes(e_theta, 0, 1)
-        e_phi = np.swapaxes(e_phi, 0, 1)
-        cosine_theta = cosine_theta.T
-        sine_theta = sine_theta.T
-        size_parameter = np.swapaxes(size_parameter, 0, 1)
-
-        # Match CELES' compute_scattered_field.m which interpolates SVWF radial functions
-        # on a uniform r-grid with step `particleDistanceResolution`.
-        resol = float(self.numerics.particle_distance_resolution)
-        if resol > 0:
-            # distances r (particles x points)
-            diffs = sampling_points[np.newaxis, :, :] - self.parameters.particles.position[:, np.newaxis, :]
-            r = np.sqrt(np.sum(diffs**2, axis=2))
-            rmax = float(np.max(r))
-            ri = np.arange(0.0, rmax + resol, resol)
-            if ri.size < 2:
-                ri = np.array([0.0, resol])
-
-            # precompute h_l(kr) and dx_xz(3,l,kr) on ri for all wavelengths
-            kr = ri[:, np.newaxis] * self.parameters.k_medium[np.newaxis, :]
-            kr[0, :] = 1e-30  # avoid singularities at 0
-
-            channels = self.parameters.k_medium.size
-            sph_h_i = np.zeros((self.numerics.lmax + 1, ri.size, channels), dtype=complex)
-            sph_d_i = np.zeros_like(sph_h_i)
-            for l in range(1, self.numerics.lmax + 1):
-                h_l = spherical_jn(l, kr) + 1j * spherical_yn(l, kr)
-                h_lm1 = spherical_jn(l - 1, kr) + 1j * spherical_yn(l - 1, kr)
-                sph_h_i[l, :, :] = h_l
-                sph_d_i[l, :, :] = kr * h_lm1 - l * h_l
-
-            # interpolate along ri (uniform grid -> fast indexing)
-            idx0 = np.floor(r / resol).astype(int)
-            idx0 = np.clip(idx0, 0, ri.size - 2)
-            frac = (r / resol) - idx0
-
-            sph_h_interp = np.zeros(
-                (self.numerics.lmax + 1, r.shape[0], r.shape[1], channels), dtype=complex
-            )
-            sph_d_interp = np.zeros_like(sph_h_interp)
-            for l in range(1, self.numerics.lmax + 1):
-                for w in range(channels):
-                    h_w = sph_h_i[l, :, w]
-                    d_w = sph_d_i[l, :, w]
-                    h0 = h_w[idx0]
-                    h1 = h_w[idx0 + 1]
-                    d0 = d_w[idx0]
-                    d1 = d_w[idx0 + 1]
-                    sph_h_interp[l, :, :, w] = h0 + frac * (h1 - h0)
-                    sph_d_interp[l, :, :, w] = d0 + frac * (d1 - d0)
-
-            sph_h = sph_h_interp
-            sph_h_derivative = sph_d_interp
-            size_parameter = r[:, :, np.newaxis] * self.parameters.k_medium[np.newaxis, np.newaxis, :]
-
-        lookup_computation_time_stop = time()
-        self.log.info(
-            "Computing lookup tables took %f s",
-            lookup_computation_time_stop - lookup_computation_time_start,
-        )
-        pi_lm, tau_lm = spherical_functions_trigon(
-            self.numerics.lmax, cosine_theta, sine_theta
-        )
-
-        self.log.info("Computing field...")
-        field_time_start = time()
-        self.sampling_points = sampling_points
-        if self.numerics.gpu:
-            self.log.info("\t...using GPU")
-            field_real = np.zeros(
-                (self.parameters.k_medium.size, sampling_points.shape[0], 3),
-                dtype=float,
-            )
-            field_imag = np.zeros_like(field_real)
-
-            idx_device = cuda.to_device(self.idx_lookup)
-            size_parameter_device = cuda.to_device(np.ascontiguousarray(size_parameter))
-            sph_h_device = cuda.to_device(np.ascontiguousarray(sph_h))
-            sph_h_derivative_device = cuda.to_device(
-                np.ascontiguousarray(sph_h_derivative)
-            )
-            e_j_dm_phi_device = cuda.to_device(np.ascontiguousarray(e_j_dm_phi))
-            p_lm_device = cuda.to_device(np.ascontiguousarray(p_lm))
-            pi_lm_device = cuda.to_device(np.ascontiguousarray(pi_lm))
-            tau_lm_device = cuda.to_device(np.ascontiguousarray(tau_lm))
-            e_r_device = cuda.to_device(np.ascontiguousarray(e_r))
-            e_theta_device = cuda.to_device(np.ascontiguousarray(e_theta))
-            e_phi_device = cuda.to_device(np.ascontiguousarray(e_phi))
-            sfc_device = cuda.to_device(
-                np.ascontiguousarray(self.scattered_field_coefficients)
-            )
-
-            field_real_device = cuda.to_device(field_real)
-            field_imag_device = cuda.to_device(field_imag)
-
-            threads_per_block = (16, 16, 2)
-            blocks_per_grid = (
-                sampling_points.shape[0],
-                sph_h.shape[1] * 2 * self.numerics.lmax * (self.numerics.lmax + 2),
-                self.parameters.k_medium.size,
-            )
-            # blocks_per_grid = tuple(
-            #     [
-            #         ceil(blocks_per_grid[i] / threads_per_block[i])
-            #         for i in range(len(threads_per_block))
-            #     ]
-            # )
-            blocks_per_grid = tuple(
-                ceil(blocks_per_grid[i] / threads_per_block[i])
-                for i in range(len(threads_per_block))
-            )
-
-            compute_field_gpu[blocks_per_grid, threads_per_block](
-                self.numerics.lmax,
-                idx_device,
-                size_parameter_device,
-                sph_h_device,
-                sph_h_derivative_device,
-                e_j_dm_phi_device,
-                p_lm_device,
-                pi_lm_device,
-                tau_lm_device,
-                e_r_device,
-                e_theta_device,
-                e_phi_device,
-                sfc_device,
-                field_real_device,
-                field_imag_device,
-            )
-
-            field_real = field_real_device.copy_to_host()
-            field_imag = field_imag_device.copy_to_host()
-            self.scattered_field = field_real + 1j * field_imag
-
-        else:
-            self.log.info("\t...using CPU")
-            self.scattered_field = compute_field(
-                self.numerics.lmax,
-                self.idx_lookup,
-                size_parameter,
-                sph_h,
-                sph_h_derivative,
-                e_j_dm_phi,
-                p_lm,
-                pi_lm,
-                tau_lm,
-                e_r,
-                e_theta,
-                e_phi,
-                scattered_field_coefficients=self.scattered_field_coefficients,
-            )
-
-        if self.initial_field_electric is not None:
-            self.total_field_electric = self.initial_field_electric + self.scattered_field
-        else:
-            self.total_field_electric = self.scattered_field
-
-        field_time_stop = time()
-        self.log.info(
-            f"\t Time taken for field calculation: {field_time_stop - field_time_start}"
-        )
+        compute_fields(self, sampling_points)

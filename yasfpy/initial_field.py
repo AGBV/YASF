@@ -1,3 +1,10 @@
+"""Incident field definition.
+
+This module defines :class:`~yasfpy.initial_field.InitialField`, which stores
+the incident beam type and polarization metadata used when constructing incident
+field coefficients.
+"""
+
 import logging
 # import yasfpy.log as log
 
@@ -91,6 +98,23 @@ class InitialField:
         self.normal_incidence = np.abs(np.sin(self.polar_angle)) < 1e-5
 
     def set_polarization(self, polarization: str | int) -> None:
+        """Update the incident-field polarization and refresh derived flags.
+
+        Parameters
+        ----------
+        polarization
+            New polarization value. Can be one of:
+
+            - ``"TE"`` / ``1``: transverse electric
+            - ``"TM"`` / ``2``: transverse magnetic
+            - ``"UNP"`` / ``0``: unpolarized
+
+        Notes
+        -----
+        This method recomputes the internal polarization index and the
+        normal-incidence flag.
+        """
+
         self.polarization = polarization
         self.__setup()
 

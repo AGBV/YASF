@@ -1,17 +1,38 @@
+"""Streamlit data explorer for YASF export files.
+
+This app is intended to be launched via ``yasfpy explore``.
+"""
+
 import argparse
 import bz2
+import importlib
 import sys
 from pathlib import Path
+from typing import Any
 
 import _pickle
 import numpy as np
 import plotly.graph_objects as go
-import pyvista as pv
 import streamlit as st
 from plotly import colors
 from plotly.subplots import make_subplots
 from scipy.io import loadmat
-from stpyvista import stpyvista
+
+try:
+    pv: Any = importlib.import_module("pyvista")
+except ImportError:  # pragma: no cover
+    pv = None
+
+try:
+    _stpyvista_mod: Any = importlib.import_module("stpyvista")
+    stpyvista = getattr(_stpyvista_mod, "stpyvista")
+except ImportError:  # pragma: no cover
+    stpyvista = None
+
+if pv is None or stpyvista is None:  # pragma: no cover
+    raise ImportError(
+        "The Streamlit explorer requires optional dependencies 'pyvista' and 'stpyvista'."
+    )
 
 if "IS_XVFB_RUNNING" not in st.session_state:
     pv.start_xvfb()
@@ -21,7 +42,7 @@ CROSS_SECTION_SCALE = 1e6
 
 st.set_page_config(
     page_title="YASF",
-    page_icon="🔬",
+    page_icon="\U0001f52c",
     layout="wide",
 )
 st.title("Yet Another Scattering Framework")
@@ -29,6 +50,20 @@ st.title("Yet Another Scattering Framework")
 
 @st.cache_data
 def load_data(path: str) -> dict:
+    """Load one exported result file.
+
+    Parameters
+    ----------
+    path:
+        Path to an input file. Supported extensions are ``.bz2`` (pickle) and
+        ``.mat`` (MATLAB).
+
+    Returns
+    -------
+    dict
+        Parsed export record.
+    """
+
     p = Path(path)
     match p.suffix:
         case ".bz2":
@@ -36,7 +71,6 @@ def load_data(path: str) -> dict:
                 data = _pickle.load(file)
         case ".mat":
             data = loadmat(path, simplify_cells=True)
-            # print(data)
         case _:
             raise Exception(f"Unknown file type: {p.suffix}")
     return data
@@ -115,7 +149,6 @@ with st.sidebar:
         file = st.multiselect(
             label="File",
             options=files,
-            # default=files[0],
             format_func=lambda x: x.name,
             help="Resize the sidebar if the paths are cut off",
         )
@@ -125,6 +158,7 @@ if len(files) == 0:
 if len(file) == 0:
     st.warning("Please select at least one file to be shown")
     st.stop()
+
 dataset = {f.name: load_data(f) for f in file}
 
 first_key = next(iter(dataset))
@@ -135,13 +169,13 @@ if "scale" in dataset[first_key]:
         case 1e-3:
             length_suffix = "mm"
         case 1e-6:
-            length_suffix = "µm"
+            length_suffix = "\u00b5m"
         case 1e-9:
             length_suffix = "nm"
         case _:
-            length_suffix = f"•{dataset[first_key]['scale']}m"
+            length_suffix = f"\u2022{dataset[first_key]['scale']}m"
 else:
-    length_suffix = "µm"
+    length_suffix = "\u00b5m"
 
 figs = dict(
     particles={},
@@ -157,21 +191,18 @@ with col1:
         label="XY / Polar Plot",
         value=False,
         help="Switch between XY and Polar plot",
-        # key=f"xy_polar_{filename}",
     )
 with col2:
     log_plot = st.toggle(
         label="Log Plot",
         value=False,
         disabled=xy_polar,
-        # key=f"log_plot_{filename}",
     )
     log_plot &= not xy_polar
 with col3:
     scattering_phase_angle = st.toggle(
         label="Scattering Angle / Phase Angle",
         value=True,
-        # key=f"scattering_phase_angle_{filename}",
     )
 
 plot_type = []
@@ -181,7 +212,6 @@ for data in dataset.values():
         for key in data["angle"].keys()
         if key not in ["theta"]
         and len(data["angle"][key]) + len(data["spatial"][key]) > 0
-        # and data["angle"][key].size + data["spatial"][key].size > 0
     ]
     if len(plot_type) == 0:
         plot_type = current_types
@@ -203,10 +233,10 @@ with st.sidebar.form("mini-settings"):
             st.divider()
         st.write(f"**{filename}**")
         st.write(
-            f"Radii distribution (common):    {np.mean(data['particles']['radii'])} ± {np.std(data['particles']['radii'])}"
+            f"Radii distribution (common):    {np.mean(data['particles']['radii'])} \u00b1 {np.std(data['particles']['radii'])}"
         )
         st.write(
-            f"Radii distribution (geometric): {np.exp(np.mean(np.log(data['particles']['radii'])))} ± {np.exp(np.std(np.log(data['particles']['radii'])))}"
+            f"Radii distribution (geometric): {np.exp(np.mean(np.log(data['particles']['radii'])))} \u00b1 {np.exp(np.std(np.log(data['particles']['radii'])))}"
         )
         for key1 in data.keys():
             if key1 == "source" or key1 == "scale" or key1.startswith("__"):
@@ -228,7 +258,6 @@ with st.sidebar.form("mini-settings"):
             key=f"multiselect_{filename}",
         )
         wavelength_filter.sort()
-        # wavelength = np.array(data["wavelength"]["value"][wavelength_filter])
         wavelength = np.array(data["wavelength"]["value"])
         if wavelength.size > 1:
             wavelength_slider = st.slider(
@@ -242,12 +271,6 @@ with st.sidebar.form("mini-settings"):
         else:
             wavelength_slider = 0
         st.write(f"Current wavelength: {wavelength[wavelength_slider]:.2f}&mu;m")
-        # scattering_cross_section = (
-        #     data["wavelength"]["data"]["scattering_cross_section"] * CROSS_SECTION_SCALE**2
-        # )
-        # extinction_cross_section = (
-        #     data["wavelength"]["data"]["extinction_cross_section"] * CROSS_SECTION_SCALE**2
-        # )
 
         sampling_points = None
         scattered_field = None
@@ -280,14 +303,13 @@ with st.sidebar.form("mini-settings"):
 
                 geom = pv.Sphere(theta_resolution=8, phi_resolution=8)
                 glyphed = point_cloud.glyph(
-                    scale="radius",  # type: ignore
+                    scale="radius",
                     geom=geom,
                     orient=False,
                 )
                 pl = pv.Plotter(window_size=[400, 400])
                 pl.add_mesh(
                     glyphed,
-                    # color="white",
                     smooth_shading=True,
                     pbr=True,
                     cmap="winter",
@@ -295,13 +317,11 @@ with st.sidebar.form("mini-settings"):
                     n_colors=n_materials,
                     rng=[0, n_materials - 1],
                 )
-                pl.view_isometric()  # type: ignore
+                pl.view_isometric()
                 pl.link_views()
                 figs["particles"][filename] = pl
-                # stpyvista(pl)
             with col2:
                 if (scattered_field is not None) and (sampling_points is not None):
-                    # %% electric field
                     eps = np.finfo(float).eps
 
                     vals = np.linalg.norm(np.abs(scattered_field), axis=2)
@@ -320,8 +340,8 @@ with st.sidebar.form("mini-settings"):
                             value=vals_log[wavelength_slider, :],
                             isomin=vals_log_min,
                             isomax=vals_log_max,
-                            opacity=0.1,  # needs to be small to see through all surfaces
-                            surface_count=15,  # needs to be a large number for good volume rendering
+                            opacity=0.1,
+                            surface_count=15,
                             colorscale="jet",
                             colorbar=dict(
                                 tickvals=tick_vals_log,
@@ -341,25 +361,21 @@ with st.sidebar.form("mini-settings"):
                     st.plotly_chart(fig, use_container_width=True)
 
         with st.container():
-            # fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.02)
             fig = figs["mixing_components"]
             if isinstance(fig, dict):
                 raise Exception(f"Figure {fig} is of type dict...")
-            # Scattering Cross-Section
             fig.add_trace(
                 go.Scatter(
                     x=wavelength,
                     y=data["wavelength"]["scattering_efficiency"],
                     name="Q<sub>sca</sub>",
                     line=dict(color=cmap_mix[i]),
-                    # text=f"test",
                     legendgrouptitle_text=filename,
                     legendgroup=filename,
                 ),
                 row=1,
                 col=1,
             )
-            # Extinction Cross-Section
             fig.add_trace(
                 go.Scatter(
                     x=wavelength,
@@ -372,7 +388,6 @@ with st.sidebar.form("mini-settings"):
                 row=2,
                 col=1,
             )
-            # Single-Scattering Albedo
             fig.add_trace(
                 go.Scatter(
                     x=wavelength,
@@ -402,11 +417,8 @@ with st.sidebar.form("mini-settings"):
                 ),
                 yaxis3=dict(title="Single-Scattering Albedo"),
             )
-            # st.plotly_chart(fig, use_container_width=True)
 
         with st.container():
-            # print(xy_polar, log_plot, scattering_phase_angle)
-
             col1, col2 = (
                 st.columns(2)
                 if data["spatial"]["azimuthal"].size > 0
@@ -414,7 +426,6 @@ with st.sidebar.form("mini-settings"):
             )
 
             with col1:
-                # fig = go.Figure()
                 fig = figs["angle"]
                 if isinstance(fig, dict):
                     raise Exception(f"Figure {fig} is of type dict...")
@@ -427,12 +438,9 @@ with st.sidebar.form("mini-settings"):
                     theta += 180
                 for wavelength_index in wavelength_filter:
                     p = data["angle"][plot_type][:, wavelength_index]
-                    # p /= 2 * np.pi
                     if not xy_polar:
                         fig.add_trace(
                             go.Scatter(
-                                # x=scattering_angles * 180 / np.pi,
-                                # y=plot_type_options[plot_type]["normal"][:, wavelength_index],
                                 x=theta,
                                 y=p,
                                 line=dict(
@@ -440,8 +448,7 @@ with st.sidebar.form("mini-settings"):
                                     dash=f"{i}px",
                                     width=3,
                                 ),
-                                name=f"p(θ, {wavelength[wavelength_index]:.2f}{length_suffix})",
-                                # text=f"λ = {wavelength[wavelength_index]}",
+                                name=f"p(\u03b8, {wavelength[wavelength_index]:.2f}{length_suffix})",
                                 legendgroup=f"angle_{filename}",
                                 legendgrouptitle_text=f"{filename}",
                             )
@@ -464,8 +471,8 @@ with st.sidebar.form("mini-settings"):
                                 r=p,
                                 line=dict(color=cmap[wavelength_index]),
                                 name="Polar Plot",
-                                text=f"λ = {wavelength[wavelength_index]}",
-                                legendgrouptitle_text=f"p(θ, {wavelength[wavelength_index]:.2f}nm)",
+                                text=f"\u03bb = {wavelength[wavelength_index]}",
+                                legendgrouptitle_text=f"p(\u03b8, {wavelength[wavelength_index]:.2f}nm)",
                                 legendgroup=f"group{wavelength_index}",
                             )
                         )
@@ -478,18 +485,16 @@ with st.sidebar.form("mini-settings"):
                             ),
                         )
                 fig.update_layout(
-                    # title="Log-plot and Polar-plot of the " + plot_type,
                     xaxis1=dict(
                         title="Phase Angle"
                         if scattering_phase_angle
                         else "Scattering Angle",
-                        ticksuffix="°",
+                        ticksuffix="\u00b0",
                         tickmode="linear",
                         tick0=0,
                         dtick=45,
                     ),
                 )
-                # st.plotly_chart(fig, use_container_width=True)
 
             with col2:
                 polar_angles = data["spatial"]["polar"]
@@ -507,7 +512,6 @@ with st.sidebar.form("mini-settings"):
                         ]
                     ).T
 
-                    # phase function
                     p = np.log(data["spatial"][plot_type] + 1)
                     fig = go.Figure(
                         go.Scatter3d(
@@ -523,7 +527,6 @@ with st.sidebar.form("mini-settings"):
                             ),
                         )
                     )
-                    p_max = np.max(p, axis=1)
                     points_extrem = points * np.max(p, axis=1)[:, np.newaxis]
                     fig.update_layout(
                         title="3D representation of the " + plot_type,

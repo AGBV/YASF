@@ -1,3 +1,10 @@
+"""Particle container and derived geometry helpers.
+
+This module defines :class:`~yasfpy.particles.Particles`, a lightweight container
+for particle positions, radii, and material assignments used as input to a
+:class:`~yasfpy.parameters.Parameters` object.
+"""
+
 import logging
 
 import numpy as np
@@ -25,7 +32,7 @@ class Particles:
         position: np.ndarray,
         r: np.ndarray,
         refractive_index: np.ndarray,
-        refractive_index_table: list | None = None,
+        refractive_index_table: npt.NDArray | list | None = None,
         shape_type: str = "sphere",
     ):
         """Initializes an object with position, radius, refractive index, refractive index table, and shape type attributes.
@@ -49,9 +56,8 @@ class Particles:
         # self.log = log.scattering_logger(__name__)
         self.log = logging.getLogger(self.__class__.__module__)
 
-        # TODO: Keep it for now, remove later...
+        # Optional material-table reference data used by some legacy workflows.
         self.refractive_index_table = refractive_index_table
-        print("refractive_index_table", refractive_index_table)
 
         if refractive_index_table is None:
             if len(refractive_index.shape) > 2:
@@ -164,6 +170,19 @@ class Particles:
         self.geometric_projection = np.pi * np.power(np.sum(r3), 2 / 3)
 
     def radius_of_gyration(self):
+        """Compute the radius of gyration for this particle cluster.
+
+        Returns
+        -------
+        float
+            Radius of gyration of the cluster.
+
+        See Also
+        --------
+        radius_of_gyration
+            Functional form operating on arrays.
+        """
+
         return radius_of_gyration(self.position, self.r)
 
     def __setup_impl(self):
@@ -180,6 +199,30 @@ class Particles:
 
 
 def radius_of_gyration(positions: npt.NDArray, radii: npt.NDArray) -> float:
+    """Compute the radius of gyration of a cluster of spheres.
+
+    Parameters
+    ----------
+    positions
+        Array of particle centers with shape ``(n, 3)``.
+    radii
+        Array of particle radii with shape ``(n,)``.
+
+    Returns
+    -------
+    float
+        Radius of gyration of the cluster.
+
+    Raises
+    ------
+    ValueError
+        If input shapes do not match expectations.
+
+    Notes
+    -----
+    Assumes unit density, so particle mass is proportional to volume.
+    """
+
     if positions.shape[0] != radii.shape[0]:
         raise ValueError(
             f"Number of particles {positions.shape[0]} does not match with number of radii {radii.shape[0]}"

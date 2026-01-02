@@ -1,8 +1,98 @@
+"""CPU kernels accelerated with Numba.
+
+This module contains CPU implementations of inner loops used for coupling and
+field/polarization calculations.
+"""
+
 import numpy as np
-from numba import complex128, float64, int64, jit, prange
+from typing import TYPE_CHECKING
+
+from numba import jit
 from scipy.special import hankel1, lpmv, spherical_jn
 
 from yasfpy.functions.misc import single_index2multi
+
+if TYPE_CHECKING:
+    prange = range  # type: ignore[assignment]
+else:
+    from numba import prange
+
+
+@jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
+def particle_interaction_scalar(
+    lmax: int,
+    particle_number: int,
+    idx: np.ndarray,
+    x: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi,
+):
+    """Compute Wx = coupling_matrix @ x for a single channel.
+
+    This specialization avoids per-row array allocations and inner loops over
+    the wavelength axis, which noticeably helps the common `channels==1` case.
+    """
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
+
+    # Column views reduce repeated idx[j, :] row slicing overhead.
+    idx_s = idx[:, 0]
+    idx_n = idx[:, 1]
+    idx_tau = idx[:, 2]
+    idx_l = idx[:, 3]
+    idx_m = idx[:, 4]
+
+    wx = np.zeros(jmax, dtype=np.complex128)
+
+    for j1 in prange(jmax):
+        s1 = idx_s[j1]
+        n1 = idx_n[j1]
+        tau1 = idx_tau[j1]
+        l1 = idx_l[j1]
+        m1 = idx_m[j1]
+
+        acc = 0.0j
+
+        for s2 in range(particle_number):
+            if s2 == s1:
+                continue
+
+            base = s2 * nmax
+            end = base + nmax
+            for j2 in range(base, end):
+                n2 = idx_n[j2]
+                tau2 = idx_tau[j2]
+                l2 = idx_l[j2]
+                m2 = idx_m[j2]
+
+                delta_tau = abs(tau1 - tau2)
+                delta_l = abs(l1 - l2)
+                dm = m1 - m2
+                if dm < 0:
+                    dm = -dm
+                delta_m = dm
+
+                p_start = delta_m
+                tmp = delta_l + delta_tau
+                if tmp > p_start:
+                    p_start = tmp
+
+                phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+
+                for p in range(p_start, l1 + l2 + 1):
+                    acc += (
+                        translation_table[n2, n1, p]
+                        * plm[p * (p + 1) // 2 + delta_m, s1, s2]
+                        * phase_x
+                        * sph_h[p, s1, s2, 0]
+                    )
+
+        wx[j1] = acc
+
+    return wx
 
 
 @jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
@@ -16,93 +106,291 @@ def particle_interaction(
     sph_h: np.ndarray,
     e_j_dm_phi,
 ):
-    """Calculates the interaction between particles based on their properties and returns the result.
+    """Compute Wx = coupling_matrix @ x.
 
-    Args:
-        lmax (int): The maximum value of the angular momentum quantum number `l`. It determines the size of the arrays `plm` and `sph_h`.
-        particle_number (int): The number of particles in the system.
-        idx (np.ndarray): A numpy array of shape `(jmax, 5)`, where `jmax` is the total number of interactions between particles. Each row of `idx` represents an interaction and contains the following information:
-            - s1 (int): The index of the first particle.
-            - n1 (int): The index of the first particle's property.
-            - tau1 (int): The tau value of the first particle.
-            - l1 (int): The l value of the first particle.
-            - m1 (int): The m value of the first particle.
-        x (np.ndarray): A numpy array representing the positions of the particles. It has shape `(particle_number,)` and contains the x-coordinates of the particles.
-        translation_table (np.ndarray): A 3-dimensional numpy array that stores the translation coefficients used in the calculation. It has shape `(n2, n1, p)` where `n2` and `n1` are the indices of the translation coefficients, and `p` is the maximum.
-        plm (np.ndarray): A numpy array representing the associated Legendre polynomials. It has shape `(pmax * (pmax + 1) // 2, s1max, s2max)`, where `pmax` is the maximum degree of the Legendre polynomials.
-        sph_h (np.ndarray): A numpy array representing the spherical harmonics. It has shape `(jmax, jmax, channels)`, where `jmax` is the maximum number of particles, `channels` is the number of channels.
-        e_j_dm_phi (np.ndarray): The parameter `e_j_dm_phi` is not defined in the code snippet you provided. Could you please provide the definition or explanation of what `e_j_dm_phi` represents?
+    Notes
+    -----
+    This routine is performance-critical. The implementation is structured so
+    that the outer `prange` writes to disjoint output rows, which allows Numba
+    to parallelize safely.
 
-    Returns:
-        wx (np.ndarray): The array `wx`, which represents the result of the particle interaction calculations.
+    The implementation avoids redundant work by:
+    - computing per-(j1, j2) scalars once (not once per channel)
+    - skipping same-particle blocks by construction
     """
-    jmax = particle_number * 2 * lmax * (lmax + 2)
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
     channels = sph_h.shape[-1]
 
-    wx = np.zeros(x.size * channels, dtype=complex128).reshape(x.shape + (channels,))
+    # Column views reduce repeated idx[j, :] row slicing overhead.
+    idx_s = idx[:, 0]
+    idx_n = idx[:, 1]
+    idx_tau = idx[:, 2]
+    idx_l = idx[:, 3]
+    idx_m = idx[:, 4]
 
-    for w_idx in prange(jmax * jmax * channels):
-        w = w_idx % channels
-        j_idx = w_idx // channels
-        j1 = j_idx // jmax
-        j2 = j_idx % jmax
-        s1, n1, tau1, l1, m1 = idx[j1, :]
-        s2, n2, tau2, l2, m2 = idx[j2, :]
+    wx = np.zeros((jmax, channels), dtype=np.complex128)
 
-        if s1 == s2:
-            continue
+    for j1 in prange(jmax):
+        s1 = idx_s[j1]
+        n1 = idx_n[j1]
+        tau1 = idx_tau[j1]
+        l1 = idx_l[j1]
+        m1 = idx_m[j1]
 
-        delta_tau = np.absolute(tau1 - tau2)
-        delta_l = np.absolute(l1 - l2)
-        delta_m = np.absolute(m1 - m2)
+        acc = np.zeros(channels, dtype=np.complex128)
 
-        val = 0j
-        for p in range(np.maximum(delta_m, delta_l + delta_tau), l1 + l2 + 1):
-            val += (
-                translation_table[n2, n1, p]
-                * plm[p * (p + 1) // 2 + delta_m, s1, s2]
-                * sph_h[p, s1, s2, w]
-            )
-        val *= e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+        for s2 in range(particle_number):
+            if s2 == s1:
+                continue
 
-        wx[j1, w] += val
+            base = s2 * nmax
+            end = base + nmax
+            for j2 in range(base, end):
+                n2 = idx_n[j2]
+                tau2 = idx_tau[j2]
+                l2 = idx_l[j2]
+                m2 = idx_m[j2]
+
+                delta_tau = abs(tau1 - tau2)
+                delta_l = abs(l1 - l2)
+                dm = m1 - m2
+                if dm < 0:
+                    dm = -dm
+                delta_m = dm
+
+                p_start = delta_m
+                tmp = delta_l + delta_tau
+                if tmp > p_start:
+                    p_start = tmp
+
+                phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+
+                for p in range(p_start, l1 + l2 + 1):
+                    coeff_phase = (
+                        translation_table[n2, n1, p]
+                        * plm[p * (p + 1) // 2 + delta_m, s1, s2]
+                        * phase_x
+                    )
+                    for w in range(channels):
+                        acc[w] += coeff_phase * sph_h[p, s1, s2, w]
+
+        wx[j1, :] = acc
 
     return wx
 
 
-@jit(nopython=True, parallel=True, fastmath=True)
-def compute_idx_lookups(lmax: int, particle_number: int):
+@jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
+def particle_interaction_tiled(
+    lmax: int,
+    tile_s1_start: int,
+    tile_s1_end: int,
+    tile_s2_start: int,
+    tile_s2_end: int,
+    idx: np.ndarray,
+    x: np.ndarray,
+    translation_table: np.ndarray,
+    plm_tile: np.ndarray,
+    sph_h_tile: np.ndarray,
+    e_j_dm_phi_tile: np.ndarray,
+    wx: np.ndarray,
+):
+    """Accumulate a coupling-matvec block into wx.
+
+    This is the tiled counterpart to `particle_interaction`.
+
+    Parameters
+    ----------
+    tile_s1_start/tile_s1_end:
+        Global particle index range for output rows.
+    tile_s2_start/tile_s2_end:
+        Global particle index range for input columns.
+
+    Notes
+    -----
+    `plm_tile`, `sph_h_tile`, and `e_j_dm_phi_tile` must be computed for the
+    cross product of the two particle ranges (same ordering as mutual_lookup).
     """
-    The function `compute_idx_lookups` generates an index lookup table for a given `lmax` and
-    `particle_number` using parallel processing.
 
-    Args:
-        lmax (int): The maximum value of the angular momentum quantum number `l`. It determines the range of values for `l` in the nested loop.
-        particle_number (int): The number of particles in the system.
+    nmax = 2 * lmax * (lmax + 2)
+    channels = sph_h_tile.shape[-1]
 
-    Returns:
-        idx (np.ndarray): A NumPy array `idx` which contains the computed index lookups.
+    idx_n = idx[:, 1]
+    idx_tau = idx[:, 2]
+    idx_l = idx[:, 3]
+    idx_m = idx[:, 4]
+
+    s1_count = tile_s1_end - tile_s1_start
+
+    for j1_local in prange(s1_count * nmax):
+        j1 = tile_s1_start * nmax + j1_local
+        s1 = tile_s1_start + (j1_local // nmax)
+        s1_local = s1 - tile_s1_start
+
+        n1 = idx_n[j1]
+        tau1 = idx_tau[j1]
+        l1 = idx_l[j1]
+        m1 = idx_m[j1]
+
+        acc = np.zeros(channels, dtype=np.complex128)
+
+        for s2 in range(tile_s2_start, tile_s2_end):
+            if s2 == s1:
+                continue
+
+            s2_local = s2 - tile_s2_start
+            base = s2 * nmax
+            end = base + nmax
+
+            for j2 in range(base, end):
+                n2 = idx_n[j2]
+                tau2 = idx_tau[j2]
+                l2 = idx_l[j2]
+                m2 = idx_m[j2]
+
+                delta_tau = abs(tau1 - tau2)
+                delta_l = abs(l1 - l2)
+
+                dm = m1 - m2
+                if dm < 0:
+                    dm = -dm
+                delta_m = dm
+
+                p_start = delta_m
+                tmp = delta_l + delta_tau
+                if tmp > p_start:
+                    p_start = tmp
+
+                phase_x = (
+                    e_j_dm_phi_tile[m2 - m1 + 2 * lmax, s1_local, s2_local] * x[j2]
+                )
+
+                for p in range(p_start, l1 + l2 + 1):
+                    coeff_phase = (
+                        translation_table[n2, n1, p]
+                        * plm_tile[p * (p + 1) // 2 + delta_m, s1_local, s2_local]
+                        * phase_x
+                    )
+                    for w in range(channels):
+                        acc[w] += coeff_phase * sph_h_tile[p, s1_local, s2_local, w]
+
+        wx[j1, :] += acc
+
+
+@jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
+def particle_interaction_sparse(
+    lmax: int,
+    tile_s1_start: int,
+    tile_s1_end: int,
+    s2_indices: np.ndarray,
+    near_mask: np.ndarray,
+    idx: np.ndarray,
+    x: np.ndarray,
+    translation_table: np.ndarray,
+    plm_tile: np.ndarray,
+    sph_h_tile: np.ndarray,
+    e_j_dm_phi_tile: np.ndarray,
+    wx: np.ndarray,
+):
+    """Accumulate a coupling-matvec block into wx for sparse targets.
+
+    `s2_indices` lists which global particle blocks are included. `near_mask`
+    controls which (s1_local, s2_local) pairs contribute.
     """
     nmax = 2 * lmax * (lmax + 2)
-    idx = np.zeros(nmax * particle_number * 5, dtype=int64).reshape(
+    channels = sph_h_tile.shape[-1]
+
+    idx_n = idx[:, 1]
+    idx_tau = idx[:, 2]
+    idx_l = idx[:, 3]
+    idx_m = idx[:, 4]
+
+    s1_count = tile_s1_end - tile_s1_start
+    s2_count = s2_indices.shape[0]
+
+    for j1_local in prange(s1_count * nmax):
+        j1 = tile_s1_start * nmax + j1_local
+        s1 = tile_s1_start + (j1_local // nmax)
+        s1_local = s1 - tile_s1_start
+
+        n1 = idx_n[j1]
+        tau1 = idx_tau[j1]
+        l1 = idx_l[j1]
+        m1 = idx_m[j1]
+
+        acc = np.zeros(channels, dtype=np.complex128)
+
+        for s2_local in range(s2_count):
+            if not near_mask[s1_local, s2_local]:
+                continue
+
+            s2 = s2_indices[s2_local]
+            if s2 == s1:
+                continue
+
+            base = s2 * nmax
+            end = base + nmax
+
+            for j2 in range(base, end):
+                n2 = idx_n[j2]
+                tau2 = idx_tau[j2]
+                l2 = idx_l[j2]
+                m2 = idx_m[j2]
+
+                delta_tau = abs(tau1 - tau2)
+                delta_l = abs(l1 - l2)
+
+                dm = m1 - m2
+                if dm < 0:
+                    dm = -dm
+                delta_m = dm
+
+                p_start = delta_m
+                tmp = delta_l + delta_tau
+                if tmp > p_start:
+                    p_start = tmp
+
+                phase_x = (
+                    e_j_dm_phi_tile[m2 - m1 + 2 * lmax, s1_local, s2_local] * x[j2]
+                )
+
+                for p in range(p_start, l1 + l2 + 1):
+                    coeff_phase = (
+                        translation_table[n2, n1, p]
+                        * plm_tile[p * (p + 1) // 2 + delta_m, s1_local, s2_local]
+                        * phase_x
+                    )
+                    for w in range(channels):
+                        acc[w] += coeff_phase * sph_h_tile[p, s1_local, s2_local, w]
+
+        wx[j1, :] += acc
+
+
+@jit(nopython=True, parallel=True, fastmath=True)
+def compute_idx_lookups(lmax: int, particle_number: int):
+    r"""Create the (particle, n, tau, l, m) lookup table.
+
+    Notes
+    -----
+    YASF flattens the unknown vector by stacking all vector-spherical-wave-function
+    (VSWF) coefficients for each particle. For a fixed particle ``s`` we enumerate
+    the modes using ``(tau, l, m)`` with ``tau in {1, 2}``, ``l = 1..lmax``, and
+    ``m = -l..l``.
+
+    The per-particle mode index ``n`` follows the CELES ordering
+
+    .. math::
+
+        n = (\tau - 1)\,l_{\max}(l_{\max}+2) + (l-1)(l+1) + l + m.
+
+    The global flat index is then ``i = s * nmax + n`` with
+    ``nmax = 2 * lmax * (lmax + 2)``.
+    """
+    nmax = 2 * lmax * (lmax + 2)
+    idx = np.zeros(nmax * particle_number * 5, dtype=np.int64).reshape(
         (nmax * particle_number, 5)
     )
-
-    # TODO: Needs further testing!
-    # TODO: Make it go brrrr
-    # for i in prange(particle_number * nmax):
-    #     s = i // (2 * lmax * (lmax + 2))
-    #     i_new = i % (2 * lmax * (lmax + 2))
-    #     tau = i_new // (lmax * (lmax + 2)) + 1
-    #     i_new = i_new % (lmax * (lmax + 2))
-    #     l = np.floor(np.sqrt(i_new + 1))
-    #     m = i_new - (l * l + l - 1)
-    #     n = (tau - 1) * lmax * (lmax + 2) + (l - 1) * (l + 1) + l + m
-    #     idx[i, 0] = s
-    #     idx[i, 1] = n
-    #     idx[i, 2] = tau
-    #     idx[i, 3] = l
-    #     idx[i, 4] = m
 
     for s in prange(particle_number):
         for tau in range(1, 3):
@@ -130,55 +418,43 @@ def compute_scattering_cross_section(
     sph_h: np.ndarray,
     e_j_dm_phi: np.ndarray,
 ):
-    """Calculates the scattering cross section for a given set of input parameters.
+    """Compute the scattering cross section.
 
-    Args:
-        lmax (int): The maximum angular momentum quantum number. It determines the maximum value of `l` in the calculations.
-        particle_number (int): The number of particles in the system.
-        idx (np.ndarray): A numpy array of shape `(jmax, 5)`, where `jmax` is the total number of particle pairs. Each row of `idx` represents a particle pair and contains the following information:
-            - s (int): The index of the first particle.
-            - n (int): The index of the second particle.
-            - tau (int): The tau value.
-            - l (int): The l value.
-            - m (int): The m value.
-        sfc (np.ndarray): A numpy array of shape `(s, n, channels)`, where:
-        translation_table (np.ndarray): A 3-dimensional numpy array that stores the translation coefficients used in the computation of the scattering cross section. It has shape `(n2, n1, p)` where `n2` and `n1` are the number of radial functions for the second and first particles, respectively, and `p` is the order of the Legendre polynomial.
-        plm (np.ndarray): A numpy array representing the associated Legendre polynomials. It has shape `(pmax * (pmax + 1) // 2, 2, 2)`, where `pmax` is the maximum value of `p` in the loop.
-        sph_h (np.ndarray): A numpy array of shape `(pmax, s1max, s2max, channels)`. It represents the scattering matrix elements for each combination of `s1`, `s2`, and `p`, where `p` is the order of the Legendre polynomial.
-        e_j_dm_phi (np.ndarray): A numpy array representing the scattering phase function. It has shape `(2*lmax+1, channels, channels)` and contains complex values. The indices `(j, s1, s2)` represent the angular momentum index `j`, and the spin indices `s1` and `s2`.
+    The original implementation performed a parallel loop over all (j1, j2)
+    pairs and accumulated into a shared output array, which is not a safe
+    parallel reduction.
 
-    Returns:
-        c_sca_complex (np.ndarray): The complex scattering cross section `c_sca_complex`.
+    This version keeps the parallelism over `j1` (large axis, important for
+    performance) by computing per-`j1` partial sums and reducing at the end.
     """
+
     jmax = particle_number * 2 * lmax * (lmax + 2)
     channels = sph_h.shape[-1]
 
-    c_sca_complex = np.zeros(channels, dtype=complex128)
+    partial = np.zeros((jmax, channels), dtype=np.complex128)
 
-    for j_idx in prange(jmax * jmax):
-        j1 = j_idx // jmax
-        j2 = j_idx % jmax
+    for j1 in prange(jmax):
         s1, n1, _, _, m1 = idx[j1, :]
-        s2, n2, _, _, m2 = idx[j2, :]
 
-        delta_m = np.absolute(m1 - m2)
+        for j2 in range(jmax):
+            s2, n2, _, _, m2 = idx[j2, :]
 
-        p_dependent = np.zeros(channels, dtype=complex128)
-        for p in range(delta_m, 2 * lmax + 1):
-            p_dependent += (
-                translation_table[n2, n1, p]
-                * plm[p * (p + 1) // 2 + delta_m, s1, s2]
-                * sph_h[p, s1, s2, :]
-            )
-        p_dependent *= (
-            np.conj(sfc[s1, n1, :])
-            * e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2]
-            * sfc[s2, n2, :]
-        )
+            delta_m = abs(m1 - m2)
+            phase = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2]
 
-        c_sca_complex += p_dependent
+            for w in range(channels):
+                val = 0.0 + 0.0j
+                for p in range(delta_m, 2 * lmax + 1):
+                    val += (
+                        translation_table[n2, n1, p]
+                        * plm[p * (p + 1) // 2 + delta_m, s1, s2]
+                        * sph_h[p, s1, s2, w]
+                    )
 
-    return c_sca_complex
+                val *= np.conj(sfc[s1, n1, w]) * phase * sfc[s2, n2, w]
+                partial[j1, w] += val
+
+    return np.sum(partial, axis=0)
 
 
 @jit(nopython=True, parallel=True, nogil=True, fastmath=True)
@@ -215,7 +491,7 @@ def compute_radial_independent_scattered_field_legacy(
 
     """
     e_1_sca = np.zeros(
-        azimuthal_angles.size * 3 * k_medium.size, dtype=complex128
+        azimuthal_angles.size * 3 * k_medium.size, dtype=np.complex128
     ).reshape((azimuthal_angles.size, 3, k_medium.size))
     jmax = particles_position.shape[0] * 2 * lmax * (lmax + 2)
 
@@ -286,7 +562,7 @@ def compute_electric_field_angle_components(
         e_field_phi (np.ndarray): The electric field component in the phi direction.
     """
     e_field_theta = np.zeros(
-        azimuthal_angles.size * k_medium.size, dtype=complex128
+        azimuthal_angles.size * k_medium.size, dtype=np.complex128
     ).reshape((azimuthal_angles.size, k_medium.size))
     e_field_phi = np.zeros_like(e_field_theta)
 
@@ -351,8 +627,8 @@ def compute_polarization_components(
             - degree_of_circular_polarization (np.ndarray): The degree of circular polarization.
     """
     # Stokes components
-    # S = np.zeros(4 * number_of_angles * number_of_wavelengths, dtype=complex128).reshape((4, number_of_angles, number_of_wavelengths))
-    I = np.zeros(number_of_angles * number_of_wavelengths, dtype=float64).reshape(
+    # S = np.zeros(4 * number_of_angles * number_of_wavelengths, dtype=np.complex128).reshape((4, number_of_angles, number_of_wavelengths))
+    I = np.zeros(number_of_angles * number_of_wavelengths, dtype=np.float64).reshape(
         (number_of_angles, number_of_wavelengths)
     )
     Q = np.zeros_like(I)
@@ -419,7 +695,7 @@ def compute_radial_independent_scattered_field(
         e_1_sca (np.ndarray): The computed radial independent scattered field.
     """
     e_1_sca = np.zeros(
-        number_of_angles * 3 * number_of_wavelengths, dtype=complex128
+        number_of_angles * 3 * number_of_wavelengths, dtype=np.complex128
     ).reshape((number_of_angles, 3, number_of_wavelengths))
 
     for global_idx in prange(number_of_angles * number_of_wavelengths):
@@ -487,7 +763,7 @@ def compute_lookup_tables(
 
 
 @jit(nopython=True, parallel=True, nogil=True, fastmath=True, cache=True)
-def compute_field(
+def _compute_field_with_coefficients(
     lmax: int,
     idx: np.ndarray,
     size_parameter: np.ndarray,
@@ -500,23 +776,34 @@ def compute_field(
     e_r: np.ndarray,
     e_theta: np.ndarray,
     e_phi: np.ndarray,
-    scattered_field_coefficients: np.ndarray | None = None,
-    initial_field_coefficients: np.ndarray | None = None,
-    scatter_to_internal: np.ndarray | None = None,
+    field_coefficients: np.ndarray,
 ):
-    """Compute the field using the given parameters and coefficients.
+    """Assemble the scattered field from precomputed angular/radial coefficients.
 
-    Parallelization is safe because we parallelize over output elements (w, point)
-    and accumulate locally before writing once.
+    Parameters
+    ----------
+    lmax
+        Maximum multipole degree.
+    idx
+        Index lookup table encoding rows ``(s, n, tau, l, m)``.
+    size_parameter, sph_h, derivative, e_j_dm_phi, p_lm, pi_lm, tau_lm
+        Precomputed special-function lookup tables used by the field evaluator.
+    e_r, e_theta, e_phi
+        Unit-vector components at sampling points.
+    field_coefficients
+        Coefficients per particle/order/channel.
+
+    Returns
+    -------
+    numpy.ndarray
+        Complex field with shape ``(channels, n_points, 3)``.
     """
+
     jmax = sph_h.shape[1] * 2 * lmax * (lmax + 2)
     channels = sph_h.shape[-1]
     n_points = sph_h.shape[2]
 
     field = np.zeros((channels, n_points, 3), dtype=np.complex128)
-
-    if (scattered_field_coefficients is None) and (initial_field_coefficients is None):
-        return field
 
     for out_idx in prange(channels * n_points):
         w = out_idx % channels
@@ -535,7 +822,8 @@ def compute_field(
                 / np.sqrt(2.0 * (l + 1) * l)
                 * e_j_dm_phi[m + 2 * lmax, s, sampling_idx]
             )
-            coeff = scattered_field_coefficients[s, n, w]
+
+            coeff = field_coefficients[s, n, w]
 
             h = sph_h[l, s, sampling_idx, w]
             pi_val = pi_lm[l, absm, s, sampling_idx]
@@ -544,33 +832,130 @@ def compute_field(
             c1 = 1j * m * pi_val
 
             if tau == 1:
-                tx = h * (c1 * e_theta[s, sampling_idx, 0] - tau_val * e_phi[s, sampling_idx, 0])
-                ty = h * (c1 * e_theta[s, sampling_idx, 1] - tau_val * e_phi[s, sampling_idx, 1])
-                tz = h * (c1 * e_theta[s, sampling_idx, 2] - tau_val * e_phi[s, sampling_idx, 2])
-
-                fx += coeff * inv * tx
-                fy += coeff * inv * ty
-                fz += coeff * inv * tz
+                fx += (
+                    coeff
+                    * inv
+                    * h
+                    * (
+                        c1 * e_theta[s, sampling_idx, 0]
+                        - tau_val * e_phi[s, sampling_idx, 0]
+                    )
+                )
+                fy += (
+                    coeff
+                    * inv
+                    * h
+                    * (
+                        c1 * e_theta[s, sampling_idx, 1]
+                        - tau_val * e_phi[s, sampling_idx, 1]
+                    )
+                )
+                fz += (
+                    coeff
+                    * inv
+                    * h
+                    * (
+                        c1 * e_theta[s, sampling_idx, 2]
+                        - tau_val * e_phi[s, sampling_idx, 2]
+                    )
+                )
             else:
                 sp = size_parameter[s, sampling_idx, w]
                 pref = (l * (l + 1)) / sp * h * p_lm[l, absm, s, sampling_idx]
 
-                ptx = pref * e_r[s, sampling_idx, 0]
-                pty = pref * e_r[s, sampling_idx, 1]
-                ptz = pref * e_r[s, sampling_idx, 2]
-
                 d = derivative[l, s, sampling_idx, w] / sp
 
-                btx = d * (tau_val * e_theta[s, sampling_idx, 0] + c1 * e_phi[s, sampling_idx, 0])
-                bty = d * (tau_val * e_theta[s, sampling_idx, 1] + c1 * e_phi[s, sampling_idx, 1])
-                btz = d * (tau_val * e_theta[s, sampling_idx, 2] + c1 * e_phi[s, sampling_idx, 2])
-
-                fx += coeff * inv * (ptx + btx)
-                fy += coeff * inv * (pty + bty)
-                fz += coeff * inv * (ptz + btz)
+                fx += (
+                    coeff
+                    * inv
+                    * (
+                        pref * e_r[s, sampling_idx, 0]
+                        + d
+                        * (
+                            tau_val * e_theta[s, sampling_idx, 0]
+                            + c1 * e_phi[s, sampling_idx, 0]
+                        )
+                    )
+                )
+                fy += (
+                    coeff
+                    * inv
+                    * (
+                        pref * e_r[s, sampling_idx, 1]
+                        + d
+                        * (
+                            tau_val * e_theta[s, sampling_idx, 1]
+                            + c1 * e_phi[s, sampling_idx, 1]
+                        )
+                    )
+                )
+                fz += (
+                    coeff
+                    * inv
+                    * (
+                        pref * e_r[s, sampling_idx, 2]
+                        + d
+                        * (
+                            tau_val * e_theta[s, sampling_idx, 2]
+                            + c1 * e_phi[s, sampling_idx, 2]
+                        )
+                    )
+                )
 
         field[w, sampling_idx, 0] = fx
         field[w, sampling_idx, 1] = fy
         field[w, sampling_idx, 2] = fz
 
     return field
+
+
+def compute_field(
+    lmax: int,
+    idx: np.ndarray,
+    size_parameter: np.ndarray,
+    sph_h: np.ndarray,
+    derivative: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+    p_lm: np.ndarray,
+    pi_lm: np.ndarray,
+    tau_lm: np.ndarray,
+    e_r: np.ndarray,
+    e_theta: np.ndarray,
+    e_phi: np.ndarray,
+    scattered_field_coefficients: np.ndarray | None = None,
+    initial_field_coefficients: np.ndarray | None = None,
+    scatter_to_internal: np.ndarray | None = None,
+):
+    """Compute the field for scattered or initial coefficients.
+
+    This is a lightweight Python dispatcher around a Numba-jitted core.
+    Numba doesn't reliably support `np.ndarray | None` arguments in nopython
+    mode, so the jitted function always receives a concrete coefficient array.
+
+    `scatter_to_internal` is currently unused but kept for API compatibility.
+    """
+
+    if scattered_field_coefficients is not None:
+        coefficients = scattered_field_coefficients
+    elif initial_field_coefficients is not None:
+        coefficients = initial_field_coefficients
+    else:
+        channels = sph_h.shape[-1]
+        n_points = sph_h.shape[2]
+        return np.zeros((channels, n_points, 3), dtype=np.complex128)
+
+    return _compute_field_with_coefficients(
+        lmax,
+        idx,
+        size_parameter,
+        sph_h,
+        derivative,
+        e_j_dm_phi,
+        p_lm,
+        pi_lm,
+        tau_lm,
+        e_r,
+        e_theta,
+        e_phi,
+        coefficients,
+    )

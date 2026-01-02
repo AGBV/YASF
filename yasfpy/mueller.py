@@ -1,3 +1,9 @@
+"""Jones/Mueller matrix utilities.
+
+This module contains helpers to convert between polarization representations,
+including Jones and Mueller matrices.
+"""
+
 from __future__ import annotations
 
 import numpy as np

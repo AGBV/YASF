@@ -1,13 +1,23 @@
+"""High-level YASF front door.
+
+The :class:`~yasfpy.yasf.YASF` class is a convenience wrapper that wires together
+configuration parsing, particle geometry, solver/numerics settings, the core
+simulation, and optics post-processing.
+
+Notes
+-----
+This module currently provides a lightweight imperative API (not a Pydantic
+model). The public surface is intended to stay stable even if underlying
+components evolve.
+"""
+
 import cProfile
 import logging
 import pstats
 from functools import cached_property
-from typing import Any
 
 import numpy as np
-import pandas as pd
 import pyperf
-from pydantic import BaseModel, Field, PrivateAttr
 
 from yasfpy.config import Config
 from yasfpy.initial_field import InitialField
@@ -18,6 +28,7 @@ from yasfpy.particles import Particles
 from yasfpy.simulation import Simulation
 from yasfpy.solver import Solver
 
+
 # from pyinstrument import Profiler
 # from pyinstrument.renderers import SpeedscopeRenderer
 # import speedscope
@@ -25,6 +36,27 @@ from yasfpy.solver import Solver
 
 # class YASF(BaseModel):
 class YASF:
+    """Run a YASF simulation from a configuration file.
+
+    Parameters
+    ----------
+    path_config:
+        Path to the YAML/JSON configuration file.
+    preprocess:
+        If `True`, performs preprocessing steps during configuration loading
+        (e.g., refractive-index interpolation).
+    path_cluster:
+        Optional path to the particle cluster/geometry file. If empty, the path
+        is taken from the configuration.
+    quiet:
+        If `True`, reduces logging verbosity.
+
+    Notes
+    -----
+    This class constructs the core objects (:class:`~yasfpy.simulation.Simulation`,
+    :class:`~yasfpy.optics.Optics`, etc.) eagerly in ``__init__``.
+    """
+
     path_config: str
     path_cluster: str
     preprocess: bool
@@ -38,16 +70,21 @@ class YASF:
         path_config: str,
         preprocess: bool = True,
         path_cluster: str = "",
+        *,
+        quiet: bool = False,
     ):
+        """Initialize the simulation pipeline from configuration."""
         # def model_post_init(self, __context: Any) -> None:
         self.path_config = path_config
         self.preprocess = preprocess
         self.path_cluster = path_cluster
+        self.quiet = quiet
         # self.config = Config(path_config, preprocess, path_cluster)
         self._config = Config(
             path_config=self.path_config,
             path_cluster=self.path_cluster,
             preprocess=self.preprocess,
+            quiet=self.quiet,
         )
 
         self.particles = Particles(
@@ -70,35 +107,49 @@ class YASF:
             particles=self.particles,
             initial_field=self.initial_field,
         )
+        solver_cfg = self.config.config["solver"]
         self.solver = Solver(
-            solver_type=self.config.config["solver"]["type"],
-            tolerance=self.config.config["solver"]["tolerance"],
-            max_iter=self.config.config["solver"]["max_iter"],
-            restart=self.config.config["solver"]["restart"],
+            solver_type=solver_cfg["type"],
+            tolerance=solver_cfg["tolerance"],
+            max_iter=solver_cfg["max_iter"],
+            restart=solver_cfg["restart"],
+            warm_start=bool(solver_cfg.get("warm_start", True)),
         )
+        numerics_cfg = self.config.config["numerics"]
         self.numerics = Numerics(
-            lmax=self.config.config["numerics"]["lmax"],
-            sampling_points_number=self.config.config["numerics"]["sampling_points"],
-            particle_distance_resolution=self.config.config["numerics"][
-                "particle_distance_resolution"
-            ],
-            gpu=self.config.config["numerics"]["gpu"],
+            lmax=numerics_cfg["lmax"],
+            sampling_points_number=numerics_cfg["sampling_points"],
+            particle_distance_resolution=numerics_cfg["particle_distance_resolution"],
+            gpu=numerics_cfg["gpu"],
             solver=self.solver,
+            coupling_backend=str(numerics_cfg.get("coupling_backend", "dense")),
+            coupling_tile_size=int(numerics_cfg.get("coupling_tile_size", 64)),
+            coupling_near_field_radius=numerics_cfg.get("coupling_near_field_radius"),
         )
         self.simulation = Simulation(self.parameters, self.numerics)
         self.optics = Optics(self.simulation)
 
     @cached_property
     def config(self) -> Config:
+        """Loaded :class:`~yasfpy.config.Config` instance (cached)."""
         if self._config is None:
             self._config = Config(
                 path_config=self.path_config,
                 path_cluster=self.path_cluster,
                 preprocess=self.preprocess,
+                quiet=self.quiet,
             )
         return self._config
 
-    def run(self, points: np.ndarray | None = None):
+    def run(self, points: np.ndarray | None = None) -> None:
+        """Execute the simulation and (optionally) compute derived optics.
+
+        Parameters
+        ----------
+        points:
+            Optional Cartesian coordinates ``(M, 3)`` at which the total/scattered
+            fields are evaluated. This is a legacy path and may be removed.
+        """
         self.particles.compute_volume_equivalent_area()
         self.numerics.compute_spherical_unity_vectors()
         self.numerics.compute_translation_table()
@@ -106,10 +157,23 @@ class YASF:
         self.simulation.compute_initial_field_coefficients()
         self.simulation.compute_right_hand_side()
         self.simulation.compute_scattered_field_coefficients()
-        if self.config.config["optics"]:
-            self.optics.compute_cross_sections()
-            self.optics.compute_efficiencies()
-            self.optics.compute_phase_funcition()
+        optics_cfg = self.config.config.get("optics", True)
+        if optics_cfg:
+            if isinstance(optics_cfg, dict):
+                enabled = bool(optics_cfg.get("enabled", True))
+                do_cross_sections = bool(optics_cfg.get("cross_sections", True))
+                do_phase_function = bool(optics_cfg.get("phase_function", True))
+            else:
+                enabled = True
+                do_cross_sections = True
+                do_phase_function = True
+
+            if enabled and do_cross_sections:
+                self.optics.compute_cross_sections()
+                self.optics.compute_efficiencies()
+
+            if enabled and do_phase_function:
+                self.optics.compute_phase_funcition()
 
         # NOTE: Legacy, needs to be removed
         if points is not None:
@@ -126,31 +190,117 @@ class YASF:
             )
             self.optics.simulation.compute_fields(points)
 
-    def export(self):
+    def export(self) -> None:
+        """Export results to a serializable record.
+
+        Notes
+        -----
+        Not implemented yet. Intended to use :class:`yasfpy.export.Export`.
+        """
         raise NotImplementedError(
             "Export needs to be implemented yet using the Export class!"
         )
 
     @staticmethod
-    def benchmark(config_path: str | None = None, runner: pyperf.Runner | None = None):
+    def benchmark(
+        config_path: str | None = None,
+        runner: pyperf.Runner | None = None,
+    ) -> None:
+        """Benchmark initialization and run time with :mod:`pyperf`."""
         if config_path is None:
             raise Exception("Plase provide a config file!")
         if runner is None:
             raise Exception("Plase provide a runner for benchmarking!")
-        runner.bench_func("yasf_init", lambda: YASF(config_path))
-        yasf_instance = YASF(config_path)
+        runner.bench_func("yasf_init", lambda: YASF(config_path, quiet=True))
+        yasf_instance = YASF(config_path, quiet=True)
         runner.bench_func("yasf_run", lambda: yasf_instance.run())
 
     @staticmethod
-    def profiler(config_path: str | None = None, output: str | None = None):
+    def profiler(
+        config_path: str | None = None,
+        *,
+        cluster_path: str = "",
+        output: str | None = None,
+        sort: str = "cumtime",
+        limit: int = 50,
+        warmup: int = 1,
+        include_init: bool = False,
+        quiet: bool = True,
+    ) -> "YASF":
+        """Profile a run with :mod:`cProfile`.
+
+        Parameters
+        ----------
+        config_path:
+            Path to the configuration file.
+        cluster_path:
+            Optional override for the cluster/geometry path.
+        output:
+            If given, dumps stats to this file (``pstats`` format). If omitted,
+            prints stats to stdout.
+        sort:
+            Sorting key for ``pstats`` (default ``"cumtime"``).
+        limit:
+            Limit number of printed lines.
+        warmup:
+            Number of warm-up runs before profiling.
+        include_init:
+            If `True`, include object construction in the profile.
+        quiet:
+            If `True`, reduce logging verbosity.
+
+        Returns
+        -------
+        YASF
+            The profiled simulation instance.
+        """
         if config_path is None:
-            raise Exception("Plase provide a config file!")
-        with cProfile.Profile() as pr:
-            yasf_instance = YASF(config_path)
+            raise ValueError("Please provide a config file path")
+
+        sort_key_map = {
+            "time": pstats.SortKey.TIME,
+            "cumtime": pstats.SortKey.CUMULATIVE,
+            "calls": pstats.SortKey.CALLS,
+        }
+        if sort not in sort_key_map:
+            raise ValueError(
+                f"Unsupported sort='{sort}'. Use one of: {sorted(sort_key_map)}"
+            )
+
+        if include_init:
+            with cProfile.Profile() as pr:
+                yasf_instance = YASF(
+                    path_config=config_path,
+                    path_cluster=cluster_path,
+                    quiet=quiet,
+                )
+                for _ in range(max(int(warmup), 0)):
+                    yasf_instance.run()
+
+                stats = pstats.Stats(pr).sort_stats(sort_key_map[sort])
+                if output is None:
+                    stats.print_stats(int(limit))
+                else:
+                    stats.dump_stats(output)
+                return yasf_instance
+
+        yasf_instance = YASF(
+            path_config=config_path,
+            path_cluster=cluster_path,
+            quiet=quiet,
+        )
+        for _ in range(max(int(warmup), 0)):
             yasf_instance.run()
-            stats = pstats.Stats(pr).sort_stats(pstats.SortKey.TIME)
-            stats.print_stats() if output is None else stats.dump_stats(output)
-            return yasf_instance
+
+        with cProfile.Profile() as pr:
+            yasf_instance.run()
+
+        stats = pstats.Stats(pr).sort_stats(sort_key_map[sort])
+        if output is None:
+            stats.print_stats(int(limit))
+        else:
+            stats.dump_stats(output)
+        return yasf_instance
 
         # with Profiler() as profiler:
         #     yasf_instance = YASF(config_path)

@@ -1,16 +1,37 @@
+"""Streamlit app for rendering particle clusters.
+
+This app is intended to be launched via ``yasfpy explore``.
+"""
+
 import argparse
 import bz2
+import importlib
 import re
 import sys
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import _pickle
 import numpy as np
-import pyvista as pv
 import streamlit as st
 from scipy.io import loadmat
-from stpyvista import stpyvista
+
+try:
+    pv: Any = importlib.import_module("pyvista")
+except ImportError:  # pragma: no cover
+    pv = None
+
+try:
+    _stpyvista_mod: Any = importlib.import_module("stpyvista")
+    stpyvista = getattr(_stpyvista_mod, "stpyvista")
+except ImportError:  # pragma: no cover
+    stpyvista = None
+
+if pv is None or stpyvista is None:  # pragma: no cover
+    raise ImportError(
+        "The particle viewer requires optional dependencies 'pyvista' and 'stpyvista'."
+    )
 
 if "IS_XVFB_RUNNING" not in st.session_state:
     pv.start_xvfb()
@@ -21,6 +42,20 @@ st.set_page_config(layout="wide")
 
 @st.cache_data
 def load_data(path: str) -> dict:
+    """Load one exported result file.
+
+    Parameters
+    ----------
+    path:
+        Path to an input file. Supported extensions are ``.bz2`` (pickle) and
+        ``.mat`` (MATLAB).
+
+    Returns
+    -------
+    dict
+        Parsed export record.
+    """
+
     p = Path(path)
     match p.suffix:
         case ".bz2":
@@ -63,7 +98,6 @@ with st.sidebar:
         file = st.multiselect(
             label="File(s)",
             options=files,
-            # default=files[0],
             format_func=lambda x: x.name,
             help="Resize the sidebar if the paths are cut off",
             disabled=all_files,
@@ -79,7 +113,6 @@ with st.sidebar:
     font_size = st.number_input(
         label="Font size",
         min_value=6,
-        # max_value=24,
         value=12,
         step=1,
         help="Font size for titles and labels",
@@ -87,7 +120,6 @@ with st.sidebar:
     scale = st.number_input(
         label="Scale",
         min_value=1,
-        # max_value=10,
         value=4,
         step=1,
         help="Scale of the plot screenshot",
@@ -95,7 +127,6 @@ with st.sidebar:
     columns = st.number_input(
         label="Columns",
         min_value=1,
-        # max_value=10,
         value=int(np.ceil(np.sqrt(len(file)))),
         step=1,
         help="Number of columns in the plot grid",
@@ -113,7 +144,6 @@ for f in file:
     )
 file.sort(key=lambda x: (sort_keys[x.name]["N"], sort_keys[x.name]["Df"]))
 
-# n = int(np.ceil(np.sqrt(len(file))))
 rows = int(len(file) // columns)
 st.write(rows, columns)
 pl = pv.Plotter(
@@ -128,21 +158,16 @@ for k, f in enumerate(file):
     match f.suffix:
         case ".dat":
             data = np.loadtxt(f)
-            # m = re.findall(
-            #     r"N(\d+)|Df([p\d]+)",
-            #     f.name,
-            # )
-            # df = float(m[1][1].replace("p", "."))
-            # N = int(m[0][0])
         case _:
             raise Exception("Unsupported file type for particles display")
+
     radii = data[:, 3]
     position = data[:, :3]
     position -= np.mean(position, axis=0)
     point_cloud = pv.PolyData(position)
     point_cloud["radius"] = [2 * i for i in radii]
     glyphed = point_cloud.glyph(
-        scale="radius",  # type: ignore
+        scale="radius",
         geom=geom,
         orient=False,
     )
@@ -157,17 +182,13 @@ for k, f in enumerate(file):
         smooth_shading=True,
         pbr=True,
         cmap="winter",
-        # scalars="material_index",
-        # n_colors=n_materials,
-        # rng=[0, n_materials - 1],
     )
-    pl.view_isometric()  # type: ignore
+    pl.view_isometric()
     if link_views:
         pl.link_views()
 st.write(stpyvista(pl))
 
 plot_data = BytesIO()
-# pl.show(screenshot=plot_data)
 pl.screenshot(plot_data, transparent_background=True, scale=scale)
 
 with st.sidebar:

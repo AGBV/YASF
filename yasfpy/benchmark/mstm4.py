@@ -1,3 +1,9 @@
+"""Convenience wrapper around the MSTM4 binary.
+
+Provides a manager object that prepares inputs, launches MSTM4, and parses
+outputs for comparison with YASF.
+"""
+
 import copy
 import logging
 import os
@@ -6,7 +12,7 @@ import subprocess
 import sys
 from io import StringIO
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import numpy.typing as npt
@@ -24,6 +30,16 @@ from yasfpy.particles import radius_of_gyration
 
 
 class MSTM4Manager(BaseModel):
+    """Manage MSTM4 benchmark runs.
+
+    The manager constructs an MSTM4 input file from a YASF configuration, runs
+    the external MSTM4 binary, and parses the output into a structured dict.
+
+    Notes
+    -----
+    This class is designed for benchmarking/comparisons with YASF. It does not
+    aim to expose the full MSTM4 input space.
+    """
     path_config: str = Field(default="")
     path_cluster: str = Field(default="")
     cluster_scale: float = Field(default=1.0)
@@ -31,8 +47,10 @@ class MSTM4Manager(BaseModel):
     binary: str = Field(default="mstm")
     input_file: str = Field(default="mstm4.inp")
     output_file: str = Field(default="mstm4.dat")
+    workdir: Path | None = Field(default=None)
     parallel: int = Field(default=4, multiple_of=4)
     nix: bool = Field(default=True)
+    quiet: bool = Field(default=True)
 
     print_sphere_data: bool = Field(default=False)
     random_orientation: bool = Field(default=False)
@@ -45,21 +63,52 @@ class MSTM4Manager(BaseModel):
     log: logging.Logger | None = None
     config: Config | None = None
     output: dict = {}
-    model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
 
     def model_post_init(self, __context: Any) -> None:
+        """Finalize configuration after Pydantic initialization.
+
+        Notes
+        -----
+        This resolves ``workdir`` and constructs :class:`yasfpy.config.Config` from the
+        configured paths and scaling factors.
+        """
         if self.log is None:
             self.log = logging.getLogger(self.__class__.__module__)
+
+        if self.workdir is not None:
+            self.workdir = self.workdir.expanduser().resolve()
+
         self.config = Config(
             path_config=self.path_config,
             path_cluster=self.path_cluster,
             cluster_scale=self.cluster_scale,
             cluster_dimensional_scale=self.cluster_dimensional_scale,
+            quiet=bool(self.quiet),
         )
         if self.random_orientation and self.incidence_average:
             self.log.warning("Random orientation and incidence average are both set!")
             self.log.warning("Random orientation will be turned off")
             self.random_orientation = False
+
+    def _resolve_path(self, path: str) -> Path:
+        """Resolve a path relative to ``workdir``.
+
+        Parameters
+        ----------
+        path:
+            Absolute path or path relative to ``workdir`` (or CWD if unset).
+
+        Returns
+        -------
+        pathlib.Path
+            Resolved absolute path.
+        """
+        candidate = Path(path)
+        if candidate.is_absolute():
+            return candidate
+        base = self.workdir if self.workdir is not None else Path.cwd()
+        return (base / candidate).resolve()
 
     def __write(
         self,
@@ -132,17 +181,26 @@ class MSTM4Manager(BaseModel):
             else:
                 mstm_config += "new_run\n"
 
-        with open(self.input_file, "w") as fh:
-            fh.write(mstm_config)
+        input_path = self._resolve_path(self.input_file)
+        input_path.parent.mkdir(parents=True, exist_ok=True)
+        input_path.write_text(mstm_config)
 
         return mstm_config
 
-    def __exec(self, runner: pyperf.Runner | None = None, silent: bool = False):
+    def __exec(
+        self,
+        runner: pyperf.Runner | None = None,
+        *,
+        silent: bool = False,
+    ):
+        input_path = self._resolve_path(self.input_file)
+        cwd = self.workdir if self.workdir is not None else None
+
         if self.nix:
             command = [
                 self.binary,
                 str(self.parallel),
-                self.input_file,
+                str(input_path),
             ]
         else:
             command = [
@@ -150,16 +208,22 @@ class MSTM4Manager(BaseModel):
                 "-n",
                 str(self.parallel),
                 self.binary,
-                self.input_file,
+                str(input_path),
             ]
 
+        def _run() -> None:
+            subprocess.run(
+                command,
+                check=True,
+                cwd=cwd,
+                stdout=subprocess.DEVNULL if silent else None,
+                stderr=subprocess.DEVNULL if silent else None,
+            )
+
         if runner is None:
-            if silent:
-                subprocess.check_output(" ".join(command), shell=True)
-            else:
-                os.system(" ".join(command))
+            _run()
         else:
-            runner.bench_command(f"mstm4_exec_{self.parallel}", command)
+            runner.bench_func(f"mstm4_exec_{self.parallel}", _run)
 
     @staticmethod
     def __parse_input(input):
@@ -327,9 +391,8 @@ class MSTM4Manager(BaseModel):
         )
 
     def __read(self):
-        output = None
-        with open(self.output_file, "r") as fh:
-            output = fh.read()
+        output_path = self._resolve_path(self.output_file)
+        output = output_path.read_text()
 
         if output is None:
             raise Exception("Could not read file")
@@ -419,18 +482,52 @@ class MSTM4Manager(BaseModel):
         self.output = mstm
 
     def clean(self):
-        os.system(f"rm -f {self.input_file} {self.output_file} temp_pos.dat")
+        """Delete generated MSTM4 input/output files."""
+        self._resolve_path(self.input_file).unlink(missing_ok=True)
+        self._resolve_path(self.output_file).unlink(missing_ok=True)
+        self._resolve_path("temp_pos.dat").unlink(missing_ok=True)
 
-    def run(self, runner: pyperf.Runner | None = None, cleanup: bool = True):
+    def run(
+        self,
+        runner: pyperf.Runner | None = None,
+        cleanup: bool = True,
+        *,
+        silent: bool = False,
+        parse: bool = True,
+    ):
+        """Run MSTM4 and optionally parse output.
+
+        Parameters
+        ----------
+        runner:
+            Optional :class:`pyperf.Runner` to benchmark execution.
+        cleanup:
+            If True, delete generated files after the run.
+        silent:
+            If True, suppress subprocess output.
+        parse:
+            If True, parse the output file into ``self.output``.
+        """
         self.__write()
-        self.__exec(runner)
-        if runner is None:
+        self.__exec(runner, silent=silent)
+        if runner is None and parse:
             self.__read()
 
         if cleanup:
             self.clean()
 
+    def read_output(self) -> None:
+        """Parse the MSTM4 output file into ``output``."""
+        self.__read()
+
     def export(self, cleanup: bool = False):
+        """Export MSTM4 results to a YASF :class:`yasfpy.export.Export` bundle.
+
+        Parameters
+        ----------
+        cleanup:
+            If True, remove generated MSTM4 files after exporting.
+        """
         if self.config is None:
             raise Exception("Config isn't set")
         elif self.config.output_filename is None:
@@ -492,12 +589,6 @@ class MSTM4Manager(BaseModel):
                 degree_of_linear_polarization=(
                     -self.output["scattering_matrix"]["12"]
                 ).tolist(),
-                # degree_of_linear_polarization=(
-                #     -self.output["scattering_matrix"]["12"]
-                #     / self.output["scattering_matrix"]["11"]
-                # ).tolist(),
-                # degree_of_linear_polarization_q=1,
-                # degree_of_linear_polarization_u=1,
                 degree_of_circular_polarization=(
                     self.output["scattering_matrix"]["41"]
                 ).tolist()

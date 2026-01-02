@@ -1,3 +1,10 @@
+"""Numerical helper routines and lookup-table generation.
+
+The :class:`~yasfpy.numerics.Numerics` class owns the numerical settings for a
+simulation (harmonic/truncation orders, sampling grids, lookup tables) and
+provides methods to generate the various precomputed tables needed by YASF.
+"""
+
 import logging
 import os
 import pickle
@@ -30,6 +37,9 @@ class Numerics:
         gpu: bool = False,
         particle_distance_resolution=10.0,
         solver=None,
+        coupling_backend: str = "dense",
+        coupling_tile_size: int = 64,
+        coupling_near_field_radius: float | None = None,
     ):
         """The `__init__` function initializes the Numerics class with various parameters and sets up the
         necessary attributes.
@@ -105,13 +115,32 @@ class Numerics:
         self.gpu = gpu
         self.particle_distance_resolution = particle_distance_resolution
         self.solver = solver
+        self.coupling_backend = coupling_backend
+        self.coupling_tile_size = int(coupling_tile_size)
+        self.coupling_near_field_radius = coupling_near_field_radius
 
         if self.gpu:
             from numba import cuda
 
-            if not cuda.is_available():
+            cuda_ok = cuda.is_available()
+            if cuda_ok:
+                try:
+                    cuda.get_current_device()
+                except Exception:
+                    cuda_ok = False
+
+            if not cuda_ok and os.environ.get("NUMBA_CUDA_DRIVER") is None:
+                os.environ["NUMBA_CUDA_DRIVER"] = "/run/opengl-driver/lib/libcuda.so"
+                cuda_ok = cuda.is_available()
+                if cuda_ok:
+                    try:
+                        cuda.get_current_device()
+                    except Exception:
+                        cuda_ok = False
+
+            if not cuda_ok:
                 self.log.warning(
-                    "No supported GPU in numba detected! Falling back to the CPU implementation."
+                    "Numba CUDA not available in this process; falling back to CPU."
                 )
                 self.gpu = False
 
@@ -183,9 +212,9 @@ class Numerics:
                 (jmax, jmax, 2 * self.lmax + 1), dtype=complex
             )
 
-            # No idea why or how this value for max_two_j works,
-            # but got it through trial and error.
-            # If you get any Wigner errors, change this value (e.g. 4*lmax or lmax**2)
+            # `wig_table_init` needs an upper bound for the doubled angular-momentum
+            # quantum number. The chosen heuristic covers the (l1, l2, p) ranges used
+            # below; increase if Wigner table init fails for larger `lmax`.
             max_two_j = 3 * self.lmax + 1
             wig.wig_table_init(max_two_j, 3)
             wig.wig_temp_init(max_two_j)

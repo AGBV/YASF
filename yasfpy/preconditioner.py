@@ -47,7 +47,9 @@ def sph_bessel(nu: int, l: int, z: np.ndarray) -> np.ndarray:
         result = np.zeros_like(z, dtype=complex)
         nonzero = z != 0
         if np.any(nonzero):
-            result[nonzero] = np.sqrt(np.pi / (2 * z[nonzero])) * hankel1(l + 0.5, z[nonzero])
+            result[nonzero] = np.sqrt(np.pi / (2 * z[nonzero])) * hankel1(
+                l + 0.5, z[nonzero]
+            )
         return result
     else:
         raise ValueError(f"nu must be 1 or 3, got {nu}")
@@ -115,8 +117,7 @@ class BlockDiagonalPreconditioner:
         # Step 1: Spatial partitioning
         self.log.info("  Computing spatial partitioning...")
         self.partitioning = make_particle_partition(
-            particle_positions,
-            self.partition_edge_sizes
+            particle_positions, self.partition_edge_sizes
         )
         self.log.info(f"  Created {len(self.partitioning)} blocks")
 
@@ -127,7 +128,7 @@ class BlockDiagonalPreconditioner:
         for jp, particle_indices in enumerate(self.partitioning):
             num_block_particles = len(particle_indices)
             self.log.info(
-                f"  Block {jp+1}/{len(self.partitioning)}: "
+                f"  Block {jp + 1}/{len(self.partitioning)}: "
                 f"{num_block_particles} particles"
             )
 
@@ -139,11 +140,15 @@ class BlockDiagonalPreconditioner:
             self.partitioning_idcs.append(block_idcs)
 
             # Build master matrix M = I - TW for this block
-            self.log.info(f"    Building master matrix ({num_block_particles*nmax}x{num_block_particles*nmax})...")
+            self.log.info(
+                f"    Building master matrix ({num_block_particles * nmax}x{num_block_particles * nmax})..."
+            )
 
             # Get block positions and parameters
             block_positions = particle_positions[particle_indices]
-            block_mie_idcs = simulation.parameters.particles.single_unique_array_idx[particle_indices]
+            block_mie_idcs = simulation.parameters.particles.single_unique_array_idx[
+                particle_indices
+            ]
 
             # Pre-compute geometry for all pairs
             geometry = compute_pairwise_geometry(block_positions, k_medium, lmax)
@@ -151,20 +156,18 @@ class BlockDiagonalPreconditioner:
             # Build the matrix
             M = build_master_matrix_from_geometry_wrapper(
                 geometry,
-                simulation.mie_coefficients[block_mie_idcs, :, 0],  # [particles, nmax, wavelengths] -> squeeze wavelength
+                simulation.mie_coefficients[
+                    block_mie_idcs, :, 0
+                ],  # [particles, nmax, wavelengths] -> squeeze wavelength
                 simulation.numerics.translation_ab5,
-                lmax
+                lmax,
             )
 
             # LU factorization
             self.log.info(f"    Computing LU factorization...")
             L, U, P = lu_factorize(M)
 
-            self.factorized_matrices.append({
-                'L': L,
-                'U': U,
-                'P': P
-            })
+            self.factorized_matrices.append({"L": L, "U": U, "P": P})
 
         elapsed = time() - start_time
         self.log.info(f"Preconditioner preparation complete in {elapsed:.2f}s")
@@ -184,27 +187,30 @@ class BlockDiagonalPreconditioner:
         Returns:
             result: Preconditioned vector M^{-1} @ rhs
         """
-        if self.factorized_matrices is None:
+        if self.factorized_matrices is None or self.partitioning_idcs is None:
             raise RuntimeError("Preconditioner not prepared. Call prepare() first.")
 
         rhs = np.asarray(rhs).ravel()
         result = np.zeros_like(rhs)
 
-        for jp, block_data in enumerate(self.factorized_matrices):
+        partitioning_idcs = self.partitioning_idcs
+        factorized_matrices = self.factorized_matrices
+
+        for jp, block_data in enumerate(factorized_matrices):
             # Extract block RHS
-            block_idcs = self.partitioning_idcs[jp]
+            block_idcs = partitioning_idcs[jp]
             rhs_block = rhs[block_idcs]
 
             # Apply permutation
-            P = block_data['P']
+            P = block_data["P"]
             rhs_permuted = rhs_block[P]
 
             # Solve L @ y = rhs_permuted
-            L = block_data['L']
+            L = block_data["L"]
             y = solve_lower_triangular(L, rhs_permuted)
 
             # Solve U @ x = y
-            U = block_data['U']
+            U = block_data["U"]
             x = solve_upper_triangular(U, y)
 
             # Store result
@@ -214,8 +220,7 @@ class BlockDiagonalPreconditioner:
 
 
 def make_particle_partition(
-    positions: np.ndarray,
-    edge_sizes: np.ndarray
+    positions: np.ndarray, edge_sizes: np.ndarray
 ) -> List[np.ndarray]:
     """
     Partition particles into spatial cuboids.
@@ -261,9 +266,7 @@ def make_particle_partition(
 
 
 def compute_pairwise_geometry(
-    positions: np.ndarray,
-    k_medium: float,
-    lmax: int
+    positions: np.ndarray, k_medium: float, lmax: int
 ) -> dict:
     """
     Pre-compute all pairwise geometric quantities for a block of particles.
@@ -283,7 +286,7 @@ def compute_pairwise_geometry(
             - cos_theta: (N, N) cosine of polar angle
             - sin_theta: (N, N) sine of polar angle
             - phi: (N, N) azimuthal angle
-            - legendre: dict mapping (p, |m|) -> (N, N) Legendre polynomial values
+            - legendre: dict mapping (p, abs(m)) -> (N, N) Legendre polynomial values
             - sph_hankel: dict mapping p -> (N, N) spherical Hankel values
     """
     num_particles = positions.shape[0]
@@ -328,12 +331,12 @@ def compute_pairwise_geometry(
         sph_hankel[p] = h_p
 
     return {
-        'distances': distances,
-        'cos_theta': cos_theta,
-        'sin_theta': sin_theta,
-        'phi': phi,
-        'legendre': legendre,
-        'sph_hankel': sph_hankel
+        "distances": distances,
+        "cos_theta": cos_theta,
+        "sin_theta": sin_theta,
+        "phi": phi,
+        "legendre": legendre,
+        "sph_hankel": sph_hankel,
     }
 
 
@@ -342,34 +345,28 @@ def build_master_matrix_from_geometry(
     geometry_dict: dict,
     mie_coefficients: np.ndarray,
     translation_table: np.ndarray,
-    lmax: int
+    lmax: int,
 ) -> np.ndarray:
+    """Build master matrix ``M = I - T W`` using pre-computed geometry.
+
+    Notes
+    -----
+    This function is kept as an API placeholder for a future Numba-friendly
+    implementation. Numba does not support ordinary Python ``dict`` objects in
+    ``nopython`` mode, so the current implementation lives in
+    :func:`build_master_matrix_from_geometry_wrapper`.
     """
-    Build master matrix M = I - TW using pre-computed geometry.
-
-    This is the Numba-compiled core loop that builds the dense interaction
-    matrix for a block of particles.
-
-    Args:
-        geometry_dict: Pre-computed geometric quantities (cannot be dict in Numba)
-        mie_coefficients: Mie T-matrix for particles in block, shape (N, nmax)
-        translation_table: Translation coefficients ab5
-        lmax: Maximum multipole order
-
-    Returns:
-        M: Master matrix, shape (N * nmax, N * nmax)
-    """
-    # Note: This function signature won't work directly with Numba due to dict
-    # We'll need to unpack the dict before calling
-    # This is a placeholder - will be fixed in next iteration
-    pass
+    raise NotImplementedError(
+        "build_master_matrix_from_geometry is not available in nopython mode. "
+        "Use build_master_matrix_from_geometry_wrapper instead."
+    )
 
 
 def build_master_matrix_from_geometry_wrapper(
     geometry: dict,
     mie_coefficients: np.ndarray,
     translation_table: np.ndarray,
-    lmax: int
+    lmax: int,
 ) -> np.ndarray:
     """
     Build the master matrix M = I - TW for a block of particles.
@@ -394,9 +391,9 @@ def build_master_matrix_from_geometry_wrapper(
     M = np.eye(size, dtype=np.complex64)
 
     # Extract geometry
-    phi = geometry['phi']
-    legendre = geometry['legendre']
-    sph_hankel = geometry['sph_hankel']
+    phi = geometry["phi"]
+    legendre = geometry["legendre"]
+    sph_hankel = geometry["sph_hankel"]
 
     # Build the matrix (nested loops over particles and modes)
     for s1 in range(num_particles):
@@ -425,10 +422,17 @@ def build_master_matrix_from_geometry_wrapper(
                                         h_p_val = sph_hankel[p][s1, s2]
                                         trans_coeff = translation_table[n2, n1, p]
                                         mie_coeff = mie_coefficients[s2, n1]
-                                        exp_factor = np.exp(1j * (m2 - m1) * phi[s1, s2])
+                                        exp_factor = np.exp(
+                                            1j * (m2 - m1) * phi[s1, s2]
+                                        )
 
-                                        tw_sum += (mie_coeff * trans_coeff *
-                                                  plm_val * h_p_val * exp_factor)
+                                        tw_sum += (
+                                            mie_coeff
+                                            * trans_coeff
+                                            * plm_val
+                                            * h_p_val
+                                            * exp_factor
+                                        )
 
                                     # Update matrix element
                                     row = s1 * nmax + n1

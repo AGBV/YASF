@@ -1,3 +1,8 @@
+"""Material table helpers.
+
+Contains utilities for reading/interpolating refractive index tables used by YASF.
+"""
+
 import hashlib
 import io
 import os

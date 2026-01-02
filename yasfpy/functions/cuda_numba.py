@@ -1,3 +1,13 @@
+# pyright: ignore
+
+"""CUDA kernels accelerated with Numba.
+
+This module contains GPU implementations of inner loops used for coupling and
+field/polarization calculations.
+"""
+
+
+
 import numpy as np
 from numba import cuda
 from cmath import exp, sqrt
@@ -18,24 +28,16 @@ def particle_interaction_gpu(
     sph_h: np.ndarray,
     e_j_dm_phi,
 ):
-    """
-    Perform particle interaction calculations on the GPU.
+    """Dense coupling kernel using atomics.
 
-    Args:
-        lmax (int): Maximum angular momentum quantum number.
-        particle_number (int): Number of particles.
-        idx (np.ndarray): Array containing particle indices.
-        x (np.ndarray): Array of particle positions.
-        wx_real (np.ndarray): Array to store the real part of the result.
-        wx_imag (np.ndarray): Array to store the imaginary part of the result.
-        translation_table (np.ndarray): Array containing translation table.
-        plm (np.ndarray): Array containing associated Legendre polynomials.
-        sph_h (np.ndarray): Array containing spherical harmonics.
-        e_j_dm_phi (np.ndarray): Additional parameter for the calculation.
+    This kernel launches one thread per (j1, j2, w) contribution and accumulates
+    into `wx_*` using atomic adds. It is simple but can be slow due to the huge
+    number of threads and atomic contention.
 
-    Todo:
-        Implement data batching for GPUs with smaller memory
+    For the solver's single-wavelength matvec path, prefer
+    `particle_interaction_gpu_single_wavelength()`.
     """
+
     j1, j2, w = cuda.grid(3)
 
     jmax = particle_number * 2 * lmax * (lmax + 2)
@@ -54,18 +56,617 @@ def particle_interaction_gpu(
     delta_l = abs(l1 - l2)
     delta_m = abs(m1 - m2)
 
-    p_dependent = complex(0)
+    p_real = 0.0
+    p_imag = 0.0
     for p in range(max(delta_m, delta_l + delta_tau), l1 + l2 + 1):
-        p_dependent += (
+        term = (
             translation_table[n2, n1, p]
             * plm[p * (p + 1) // 2 + delta_m, s1, s2]
             * sph_h[p, s1, s2, w]
         )
-    p_dependent *= e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+        p_real += term.real
+        p_imag += term.imag
 
-    # atomic.add performs the += operation in sync
-    cuda.atomic.add(wx_real, (j1, w), p_dependent.real)
-    cuda.atomic.add(wx_imag, (j1, w), p_dependent.imag)
+    phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+
+    out_real = p_real * phase_x.real - p_imag * phase_x.imag
+    out_imag = p_real * phase_x.imag + p_imag * phase_x.real
+
+    # `wx_real` and `wx_imag` are expected to be 1D flattened buffers of size
+    # (jmax * channels) to avoid reshaping inside the CUDA kernel.
+    flat_idx = j1 * channels + w
+    cuda.atomic.add(wx_real, flat_idx, out_real)
+    cuda.atomic.add(wx_imag, flat_idx, out_imag)
+
+
+@cuda.jit(fastmath=True)
+def particle_interaction_gpu_single_wavelength(
+    lmax: int,
+    particle_number: int,
+    w_idx: int,
+    idx: np.ndarray,
+    x: np.ndarray,
+    wx: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+):
+    """Dense coupling matvec for a single wavelength channel.
+
+    This is the baseline GPU kernel: one thread computes one output row.
+
+    For small/moderate problems this can underutilize the GPU, so we also provide
+    a block-per-row reduction kernel: `particle_interaction_gpu_single_wavelength_block_row()`.
+    """
+
+    j1 = cuda.grid(1)
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
+
+    if j1 >= jmax:
+        return
+
+    s1 = idx[j1, 0]
+    n1 = idx[j1, 1]
+    tau1 = idx[j1, 2]
+    l1 = idx[j1, 3]
+    m1 = idx[j1, 4]
+
+    acc_real = 0.0
+    acc_imag = 0.0
+
+    for s2 in range(particle_number):
+        if s2 == s1:
+            continue
+
+        base = s2 * nmax
+        end = base + nmax
+        for j2 in range(base, end):
+            n2 = idx[j2, 1]
+            tau2 = idx[j2, 2]
+            l2 = idx[j2, 3]
+            m2 = idx[j2, 4]
+
+            delta_tau = abs(tau1 - tau2)
+            delta_l = abs(l1 - l2)
+
+            dm = m1 - m2
+            if dm < 0:
+                dm = -dm
+            delta_m = dm
+
+            p_start = delta_m
+            tmp = delta_l + delta_tau
+            if tmp > p_start:
+                p_start = tmp
+
+            phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+            phase_x_real = phase_x.real
+            phase_x_imag = phase_x.imag
+
+            for p in range(p_start, l1 + l2 + 1):
+                trans = translation_table[n2, n1, p]
+                leg = plm[p * (p + 1) // 2 + delta_m, s1, s2]
+                hank = sph_h[p, s1, s2, w_idx]
+
+                # coeff = trans * leg * hank (manual complex multiply)
+                tmp_real = trans.real * leg.real - trans.imag * leg.imag
+                tmp_imag = trans.real * leg.imag + trans.imag * leg.real
+                coeff_real = tmp_real * hank.real - tmp_imag * hank.imag
+                coeff_imag = tmp_real * hank.imag + tmp_imag * hank.real
+
+                # term = coeff * phase_x
+                term_real = coeff_real * phase_x_real - coeff_imag * phase_x_imag
+                term_imag = coeff_real * phase_x_imag + coeff_imag * phase_x_real
+
+                acc_real += term_real
+                acc_imag += term_imag
+
+    wx[j1] = acc_real + 1j * acc_imag
+
+
+@cuda.jit(fastmath=True)
+def particle_interaction_gpu_single_wavelength_block_row_256(
+    lmax: int,
+    particle_number: int,
+    w_idx: int,
+    idx: np.ndarray,
+    x: np.ndarray,
+    wx: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+):
+    """Dense coupling matvec for a single wavelength using block-per-row reduction.
+
+    Mapping:
+    - Each CUDA block computes one output row j1.
+    - Threads in the block iterate over j2 in a strided loop and accumulate partial sums.
+    - Partial sums are reduced in shared memory and written once.
+
+    This generally improves GPU occupancy for small/moderate jmax by increasing
+    parallelism per row.
+
+    Notes
+    -----
+    - Requires blocks of exactly 256 threads.
+    """
+
+    t = cuda.threadIdx.x
+    j1 = cuda.blockIdx.x
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
+    if j1 >= jmax:
+        return
+
+    s1 = idx[j1, 0]
+    n1 = idx[j1, 1]
+    tau1 = idx[j1, 2]
+    l1 = idx[j1, 3]
+    m1 = idx[j1, 4]
+
+    acc_real = 0.0
+    acc_imag = 0.0
+
+    # Flatten j2 across all particles except self.
+    # Iterate in stripes over the full j2 range.
+    for j2 in range(t, jmax, 256):
+        s2 = idx[j2, 0]
+        if s2 == s1:
+            continue
+
+        n2 = idx[j2, 1]
+        tau2 = idx[j2, 2]
+        l2 = idx[j2, 3]
+        m2 = idx[j2, 4]
+
+        delta_tau = abs(tau1 - tau2)
+        delta_l = abs(l1 - l2)
+
+        dm = m1 - m2
+        if dm < 0:
+            dm = -dm
+        delta_m = dm
+
+        p_start = delta_m
+        tmp = delta_l + delta_tau
+        if tmp > p_start:
+            p_start = tmp
+
+        phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+        phase_x_real = phase_x.real
+        phase_x_imag = phase_x.imag
+
+        for p in range(p_start, l1 + l2 + 1):
+            trans = translation_table[n2, n1, p]
+            leg = plm[p * (p + 1) // 2 + delta_m, s1, s2]
+            hank = sph_h[p, s1, s2, w_idx]
+
+            tmp_real = trans.real * leg.real - trans.imag * leg.imag
+            tmp_imag = trans.real * leg.imag + trans.imag * leg.real
+            coeff_real = tmp_real * hank.real - tmp_imag * hank.imag
+            coeff_imag = tmp_real * hank.imag + tmp_imag * hank.real
+
+            term_real = coeff_real * phase_x_real - coeff_imag * phase_x_imag
+            term_imag = coeff_real * phase_x_imag + coeff_imag * phase_x_real
+
+            acc_real += term_real
+            acc_imag += term_imag
+
+    smem_real = cuda.shared.array(256, dtype=np.float64)
+    smem_imag = cuda.shared.array(256, dtype=np.float64)
+    smem_real[t] = acc_real
+    smem_imag[t] = acc_imag
+    cuda.syncthreads()
+
+    offset = 128
+    while offset > 0:
+        if t < offset:
+            smem_real[t] += smem_real[t + offset]
+            smem_imag[t] += smem_imag[t + offset]
+        cuda.syncthreads()
+        offset //= 2
+
+    if t == 0:
+        wx[j1] = smem_real[0] + 1j * smem_imag[0]
+
+
+@cuda.jit(fastmath=True)
+def particle_interaction_gpu_single_wavelength_lut(
+    lmax: int,
+    particle_number: int,
+    w_idx: int,
+    tau_lut: np.ndarray,
+    l_lut: np.ndarray,
+    m_lut: np.ndarray,
+    x: np.ndarray,
+    wx: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+):
+    """Dense coupling matvec for a single wavelength using compact nmax lookup tables.
+
+    Compared to `particle_interaction_gpu_single_wavelength`, this avoids loading
+    a large `idx` matrix from global memory. Instead we compute (s, n) from the
+    flattened index j and use small lookup tables of size nmax for (tau, l, m).
+
+    Mapping: one thread computes one output row.
+    """
+
+    j1 = cuda.grid(1)
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
+
+    if j1 >= jmax:
+        return
+
+    s1 = j1 // nmax
+    n1 = j1 - s1 * nmax
+    tau1 = tau_lut[n1]
+    l1 = l_lut[n1]
+    m1 = m_lut[n1]
+
+    acc_real = 0.0
+    acc_imag = 0.0
+
+    for s2 in range(particle_number):
+        if s2 == s1:
+            continue
+
+        base = s2 * nmax
+        end = base + nmax
+        for j2 in range(base, end):
+            n2 = j2 - base
+            tau2 = tau_lut[n2]
+            l2 = l_lut[n2]
+            m2 = m_lut[n2]
+
+            delta_tau = abs(tau1 - tau2)
+            delta_l = abs(l1 - l2)
+
+            dm = m1 - m2
+            if dm < 0:
+                dm = -dm
+            delta_m = dm
+
+            p_start = delta_m
+            tmp = delta_l + delta_tau
+            if tmp > p_start:
+                p_start = tmp
+
+            phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+            phase_x_real = phase_x.real
+            phase_x_imag = phase_x.imag
+
+            for p in range(p_start, l1 + l2 + 1):
+                trans = translation_table[n2, n1, p]
+                leg = plm[p * (p + 1) // 2 + delta_m, s1, s2]
+                hank = sph_h[p, s1, s2, w_idx]
+
+                tmp_real = trans.real * leg.real - trans.imag * leg.imag
+                tmp_imag = trans.real * leg.imag + trans.imag * leg.real
+                coeff_real = tmp_real * hank.real - tmp_imag * hank.imag
+                coeff_imag = tmp_real * hank.imag + tmp_imag * hank.real
+
+                term_real = coeff_real * phase_x_real - coeff_imag * phase_x_imag
+                term_imag = coeff_real * phase_x_imag + coeff_imag * phase_x_real
+
+                acc_real += term_real
+                acc_imag += term_imag
+
+    wx[j1] = acc_real + 1j * acc_imag
+
+
+@cuda.jit(fastmath=True)
+def particle_interaction_gpu_single_wavelength_block_row_256_lut(
+    lmax: int,
+    particle_number: int,
+    w_idx: int,
+    tau_lut: np.ndarray,
+    l_lut: np.ndarray,
+    m_lut: np.ndarray,
+    x: np.ndarray,
+    wx: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+):
+    """Block-per-row single wavelength matvec using compact nmax lookup tables.
+
+    This is the LUT-based counterpart to
+    `particle_interaction_gpu_single_wavelength_block_row_256`.
+
+    Notes
+    -----
+    - Requires blocks of exactly 256 threads.
+    """
+
+    t = cuda.threadIdx.x
+    j1 = cuda.blockIdx.x
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
+    if j1 >= jmax:
+        return
+
+    s1 = j1 // nmax
+    n1 = j1 - s1 * nmax
+    tau1 = tau_lut[n1]
+    l1 = l_lut[n1]
+    m1 = m_lut[n1]
+
+    acc_real = 0.0
+    acc_imag = 0.0
+
+    for j2 in range(t, jmax, 256):
+        s2 = j2 // nmax
+        if s2 == s1:
+            continue
+
+        base = s2 * nmax
+        n2 = j2 - base
+        tau2 = tau_lut[n2]
+        l2 = l_lut[n2]
+        m2 = m_lut[n2]
+
+        delta_tau = abs(tau1 - tau2)
+        delta_l = abs(l1 - l2)
+
+        dm = m1 - m2
+        if dm < 0:
+            dm = -dm
+        delta_m = dm
+
+        p_start = delta_m
+        tmp = delta_l + delta_tau
+        if tmp > p_start:
+            p_start = tmp
+
+        phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+        phase_x_real = phase_x.real
+        phase_x_imag = phase_x.imag
+
+        for p in range(p_start, l1 + l2 + 1):
+            trans = translation_table[n2, n1, p]
+            leg = plm[p * (p + 1) // 2 + delta_m, s1, s2]
+            hank = sph_h[p, s1, s2, w_idx]
+
+            tmp_real = trans.real * leg.real - trans.imag * leg.imag
+            tmp_imag = trans.real * leg.imag + trans.imag * leg.real
+            coeff_real = tmp_real * hank.real - tmp_imag * hank.imag
+            coeff_imag = tmp_real * hank.imag + tmp_imag * hank.real
+
+            term_real = coeff_real * phase_x_real - coeff_imag * phase_x_imag
+            term_imag = coeff_real * phase_x_imag + coeff_imag * phase_x_real
+
+            acc_real += term_real
+            acc_imag += term_imag
+
+    smem_real = cuda.shared.array(256, dtype=np.float64)
+    smem_imag = cuda.shared.array(256, dtype=np.float64)
+    smem_real[t] = acc_real
+    smem_imag[t] = acc_imag
+    cuda.syncthreads()
+
+    offset = 128
+    while offset > 0:
+        if t < offset:
+            smem_real[t] += smem_real[t + offset]
+            smem_imag[t] += smem_imag[t + offset]
+        cuda.syncthreads()
+        offset //= 2
+
+    if t == 0:
+        wx[j1] = smem_real[0] + 1j * smem_imag[0]
+
+
+@cuda.jit(fastmath=True)
+def particle_interaction_gpu_single_wavelength_lut_chunk(
+    lmax: int,
+    particle_number: int,
+    w_idx: int,
+    j1_offset: int,
+    j1_count: int,
+    tau_lut: np.ndarray,
+    l_lut: np.ndarray,
+    m_lut: np.ndarray,
+    x: np.ndarray,
+    wx: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+):
+    """Single-wavelength LUT matvec for a contiguous chunk of output rows.
+
+    Computes rows `[j1_offset, j1_offset + j1_count)` and stores them into
+    `wx[0:j1_count]`.
+
+    Intended for pipelining kernels and host transfers across chunks.
+    """
+
+    j_local = cuda.grid(1)
+    if j_local >= j1_count:
+        return
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
+
+    j1 = j1_offset + j_local
+    if j1 >= jmax:
+        return
+
+    s1 = j1 // nmax
+    n1 = j1 - s1 * nmax
+    tau1 = tau_lut[n1]
+    l1 = l_lut[n1]
+    m1 = m_lut[n1]
+
+    acc_real = 0.0
+    acc_imag = 0.0
+
+    for s2 in range(particle_number):
+        if s2 == s1:
+            continue
+
+        base = s2 * nmax
+        end = base + nmax
+        for j2 in range(base, end):
+            n2 = j2 - base
+            tau2 = tau_lut[n2]
+            l2 = l_lut[n2]
+            m2 = m_lut[n2]
+
+            delta_tau = abs(tau1 - tau2)
+            delta_l = abs(l1 - l2)
+
+            dm = m1 - m2
+            if dm < 0:
+                dm = -dm
+            delta_m = dm
+
+            p_start = delta_m
+            tmp = delta_l + delta_tau
+            if tmp > p_start:
+                p_start = tmp
+
+            phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+            phase_x_real = phase_x.real
+            phase_x_imag = phase_x.imag
+
+            for p in range(p_start, l1 + l2 + 1):
+                trans = translation_table[n2, n1, p]
+                leg = plm[p * (p + 1) // 2 + delta_m, s1, s2]
+                hank = sph_h[p, s1, s2, w_idx]
+
+                tmp_real = trans.real * leg.real - trans.imag * leg.imag
+                tmp_imag = trans.real * leg.imag + trans.imag * leg.real
+                coeff_real = tmp_real * hank.real - tmp_imag * hank.imag
+                coeff_imag = tmp_real * hank.imag + tmp_imag * hank.real
+
+                term_real = coeff_real * phase_x_real - coeff_imag * phase_x_imag
+                term_imag = coeff_real * phase_x_imag + coeff_imag * phase_x_real
+
+                acc_real += term_real
+                acc_imag += term_imag
+
+    wx[j_local] = acc_real + 1j * acc_imag
+
+
+@cuda.jit(fastmath=True)
+def particle_interaction_gpu_single_wavelength_block_row_256_lut_chunk(
+    lmax: int,
+    particle_number: int,
+    w_idx: int,
+    j1_offset: int,
+    j1_count: int,
+    tau_lut: np.ndarray,
+    l_lut: np.ndarray,
+    m_lut: np.ndarray,
+    x: np.ndarray,
+    wx: np.ndarray,
+    translation_table: np.ndarray,
+    plm: np.ndarray,
+    sph_h: np.ndarray,
+    e_j_dm_phi: np.ndarray,
+):
+    """Block-per-row LUT matvec for a contiguous output chunk.
+
+    Notes
+    -----
+    - Requires blocks of exactly 256 threads.
+    - Launch with `blocks_per_grid = j1_count`.
+    """
+
+    t = cuda.threadIdx.x
+    j_local = cuda.blockIdx.x
+    if j_local >= j1_count:
+        return
+
+    nmax = 2 * lmax * (lmax + 2)
+    jmax = particle_number * nmax
+
+    j1 = j1_offset + j_local
+    if j1 >= jmax:
+        return
+
+    s1 = j1 // nmax
+    n1 = j1 - s1 * nmax
+    tau1 = tau_lut[n1]
+    l1 = l_lut[n1]
+    m1 = m_lut[n1]
+
+    acc_real = 0.0
+    acc_imag = 0.0
+
+    for j2 in range(t, jmax, 256):
+        s2 = j2 // nmax
+        if s2 == s1:
+            continue
+
+        base = s2 * nmax
+        n2 = j2 - base
+        tau2 = tau_lut[n2]
+        l2 = l_lut[n2]
+        m2 = m_lut[n2]
+
+        delta_tau = abs(tau1 - tau2)
+        delta_l = abs(l1 - l2)
+
+        dm = m1 - m2
+        if dm < 0:
+            dm = -dm
+        delta_m = dm
+
+        p_start = delta_m
+        tmp = delta_l + delta_tau
+        if tmp > p_start:
+            p_start = tmp
+
+        phase_x = e_j_dm_phi[m2 - m1 + 2 * lmax, s1, s2] * x[j2]
+        phase_x_real = phase_x.real
+        phase_x_imag = phase_x.imag
+
+        for p in range(p_start, l1 + l2 + 1):
+            trans = translation_table[n2, n1, p]
+            leg = plm[p * (p + 1) // 2 + delta_m, s1, s2]
+            hank = sph_h[p, s1, s2, w_idx]
+
+            tmp_real = trans.real * leg.real - trans.imag * leg.imag
+            tmp_imag = trans.real * leg.imag + trans.imag * leg.real
+            coeff_real = tmp_real * hank.real - tmp_imag * hank.imag
+            coeff_imag = tmp_real * hank.imag + tmp_imag * hank.real
+
+            term_real = coeff_real * phase_x_real - coeff_imag * phase_x_imag
+            term_imag = coeff_real * phase_x_imag + coeff_imag * phase_x_real
+
+            acc_real += term_real
+            acc_imag += term_imag
+
+    smem_real = cuda.shared.array(256, dtype=np.float64)
+    smem_imag = cuda.shared.array(256, dtype=np.float64)
+    smem_real[t] = acc_real
+    smem_imag[t] = acc_imag
+    cuda.syncthreads()
+
+    offset = 128
+    while offset > 0:
+        if t < offset:
+            smem_real[t] += smem_real[t + offset]
+            smem_imag[t] += smem_imag[t + offset]
+        cuda.syncthreads()
+        offset //= 2
+
+    if t == 0:
+        wx[j_local] = smem_real[0] + 1j * smem_imag[0]
 
 
 @cuda.jit(fastmath=True)
@@ -109,24 +710,33 @@ def compute_scattering_cross_section_gpu(
 
     delta_m = abs(m1 - m2)
 
-    p_dependent = complex(0)
+    p_real = 0.0
+    p_imag = 0.0
     # for p in range(delta_m, 2 * lmax + 1):
     for p in range(delta_m, m1 + m2 + 1):
-        p_dependent += (
-            # translation_table[n2, n1, p]
+        term = (
             translation_table[n1, n2, p]
             * plm[p * (p + 1) // 2 + delta_m, s1, s2]
             * sph_h[p, s1, s2, w]
         )
-    p_dependent *= (
-        sfc[s1, n1, w].conjugate()
-        * e_j_dm_phi[m1 - m2 + 2 * lmax, s1, s2]
-        * sfc[s2, n2, w]
-    )
+        p_real += term.real
+        p_imag += term.imag
 
-    # atomic.add performs the += operation in sync
-    cuda.atomic.add(c_sca_real, (j1, w), p_dependent.real)
-    cuda.atomic.add(c_sca_imag, (j1, w), p_dependent.imag)
+    a = sfc[s1, n1, w]
+    b = e_j_dm_phi[m1 - m2 + 2 * lmax, s1, s2]
+    c = sfc[s2, n2, w]
+
+    # conj(a) * b * c
+    tmp = b * c
+    scale_real = a.real * tmp.real + a.imag * tmp.imag
+    scale_imag = a.real * tmp.imag - a.imag * tmp.real
+
+    out_real = p_real * scale_real - p_imag * scale_imag
+    out_imag = p_real * scale_imag + p_imag * scale_real
+
+    flat_idx = j1 * channels + w
+    cuda.atomic.add(c_sca_real.ravel(), flat_idx, out_real)
+    cuda.atomic.add(c_sca_imag.ravel(), flat_idx, out_imag)
 
 
 @cuda.jit(fastmath=True)
@@ -206,8 +816,9 @@ def compute_radial_independent_scattered_field_gpu(
                 + e_theta[a_idx, c] * taulm[l, abs(m), a_idx]
             )
 
-        cuda.atomic.add(e_1_sca_real, (a_idx, c, w_idx), e_1_sca.real)
-        cuda.atomic.add(e_1_sca_imag, (a_idx, c, w_idx), e_1_sca.imag)
+        flat_idx = (a_idx * 3 + c) * k_medium.size + w_idx
+        cuda.atomic.add(e_1_sca_real.ravel(), flat_idx, e_1_sca.real)
+        cuda.atomic.add(e_1_sca_imag.ravel(), flat_idx, e_1_sca.imag)
 
 
 @cuda.jit(fastmath=True)
@@ -276,10 +887,11 @@ def compute_electric_field_angle_components_gpu(
         e_field_theta = t * taulm[l, abs(m), a_idx]
         e_field_phi = t * pilm[l, abs(m), a_idx] * 1j * m
 
-    cuda.atomic.add(e_field_theta_real, (a_idx, w_idx), e_field_theta.real)
-    cuda.atomic.add(e_field_theta_imag, (a_idx, w_idx), e_field_theta.imag)
-    cuda.atomic.add(e_field_phi_real, (a_idx, w_idx), e_field_phi.real)
-    cuda.atomic.add(e_field_phi_imag, (a_idx, w_idx), e_field_phi.imag)
+    flat_idx = a_idx * k_medium.size + w_idx
+    cuda.atomic.add(e_field_theta_real.ravel(), flat_idx, e_field_theta.real)
+    cuda.atomic.add(e_field_theta_imag.ravel(), flat_idx, e_field_theta.imag)
+    cuda.atomic.add(e_field_phi_real.ravel(), flat_idx, e_field_phi.real)
+    cuda.atomic.add(e_field_phi_imag.ravel(), flat_idx, e_field_phi.imag)
 
 
 @cuda.jit(fastmath=True)
@@ -375,7 +987,9 @@ def compute_plane_wave_field_gpu(
     rx = points[p_idx, 0] - focal_point[0]
     ry = points[p_idx, 1] - focal_point[1]
     rz = points[p_idx, 2] - focal_point[2]
-    phase = k_medium[w_idx] * (rx * direction[0] + ry * direction[1] + rz * direction[2])
+    phase = k_medium[w_idx] * (
+        rx * direction[0] + ry * direction[1] + rz * direction[2]
+    )
 
     c = cos(phase)
     s = sin(phase)
@@ -525,5 +1139,6 @@ def compute_field_gpu(
 
             term *= p_term + b_term
 
-        cuda.atomic.add(field_real, (w, sampling_idx, c), term.real)
-        cuda.atomic.add(field_imag, (w, sampling_idx, c), term.imag)
+        flat_idx = (w * sph_h.shape[2] + sampling_idx) * 3 + c
+        cuda.atomic.add(field_real.ravel(), flat_idx, term.real)
+        cuda.atomic.add(field_imag.ravel(), flat_idx, term.imag)

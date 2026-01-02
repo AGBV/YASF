@@ -1,3 +1,9 @@
+"""Translation-entry helper routines.
+
+Implements utilities for constructing translation operator entries used by the
+multiple-scattering coupling.
+"""
+
 import sys, os
 
 sys.path.append(os.getcwd())
@@ -21,28 +27,27 @@ def t_entry(tau, l, k_medium, k_sphere, radius, field_type="scattered"):
     Returns:
         (float): The computed entry in the T Matrix.
 
-    Note:
-        [scipy.special](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.spherical_jn.html#scipy.special.spherical_jn){:target="_blank"}
-        has also derivative function. Why is it not the same?
-
-        Now:      `djx  = x *  spherical_jn(l-1, x)  - l * jx`<br>
-        Possible: `djx  = spherical_jn(l, x, derivative=True)`
-
-    Raises:
-        ValueError: If an invalid field type is provided.
-
     """
     m = k_sphere / k_medium
     x = k_medium * radius
     mx = k_sphere * radius
 
+    # Use SciPy derivatives to avoid extra Bessel evaluations.
     jx = spherical_jn(l, x)
-    jmx = spherical_jn(l, mx)
-    hx = spherical_jn(l, x) + 1j * spherical_yn(l, x)
+    jx_prime = spherical_jn(l, x, derivative=True)
+    yx = spherical_yn(l, x)
+    yx_prime = spherical_yn(l, x, derivative=True)
 
-    djx = x * spherical_jn(l - 1, x) - l * jx
-    djmx = mx * spherical_jn(l - 1, mx) - l * jmx
-    dhx = x * (spherical_jn(l - 1, x) + 1j * spherical_yn(l - 1, x)) - l * hx
+    jmx = spherical_jn(l, mx)
+    jmx_prime = spherical_jn(l, mx, derivative=True)
+
+    hx = jx + 1j * yx
+    hx_prime = jx_prime + 1j * yx_prime
+
+    # Riccati-Bessel derivatives: d/dz [z * f_l(z)]
+    djx = jx + x * jx_prime
+    djmx = jmx + mx * jmx_prime
+    dhx = hx + x * hx_prime
 
     # if (field_type, tau) == ("scattered", 1):
     #     return -(jmx * djx - jx * djmx) / (jmx * dhx - hx * djmx)  # -b

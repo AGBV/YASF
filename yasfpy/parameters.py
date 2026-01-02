@@ -1,3 +1,10 @@
+"""Physical parameters for a YASF simulation.
+
+The :class:`~yasfpy.parameters.Parameters` class groups wavelengths, medium
+properties, particles, and the incident field definition into a single object
+used throughout the simulation pipeline.
+"""
+
 from yasfpy.particles import Particles
 from yasfpy.initial_field import InitialField
 

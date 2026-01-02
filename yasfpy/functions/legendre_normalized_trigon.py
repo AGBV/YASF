@@ -1,3 +1,8 @@
+"""Normalized associated Legendre functions (trigonometric form).
+
+Provides helpers used in spherical-harmonic related computations.
+"""
+
 import numpy as np
 import math
 

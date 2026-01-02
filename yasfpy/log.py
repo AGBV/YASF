@@ -1,3 +1,9 @@
+"""Logging helpers and custom log levels.
+
+This module defines two additional log levels (``NUMERICS`` and ``SCATTER``) and
+a helper for creating configured loggers.
+"""
+
 import logging
 
 NUMERICS = 15
