@@ -11,6 +11,18 @@ model). The public surface is intended to stay stable even if underlying
 components evolve.
 """
 
+# ==============================================================================
+#   __   __   ___    ____
+#   \ \ / /  / _ \  / ___|   Y A S F
+#    \ V /  | | | | \___ \   Yet Another Scattering Framework
+#     | |   | |_| |  ___) |  (classic ASCII edition)
+#     |_|    \___/  |____/
+#
+#   Joke from my friends (EE): "motorboating" oscillation
+#   Low-frequency parasitic oscillation in an amplifier/power supply loop:
+#   put a scope on it and it goes "putt-putt-putt".
+# ==============================================================================
+
 import cProfile
 import logging
 import pstats
@@ -71,6 +83,8 @@ class YASF:
         preprocess: bool = True,
         path_cluster: str = "",
         *,
+        cluster_scale: float | None = None,
+        cluster_dimensional_scale: float | None = None,
         quiet: bool = False,
     ):
         """Initialize the simulation pipeline from configuration."""
@@ -84,6 +98,8 @@ class YASF:
             path_config=self.path_config,
             path_cluster=self.path_cluster,
             preprocess=self.preprocess,
+            cluster_scale=cluster_scale,
+            cluster_dimensional_scale=cluster_dimensional_scale,
             quiet=self.quiet,
         )
 
@@ -137,6 +153,8 @@ class YASF:
                 path_config=self.path_config,
                 path_cluster=self.path_cluster,
                 preprocess=self.preprocess,
+                cluster_scale=None,
+                cluster_dimensional_scale=None,
                 quiet=self.quiet,
             )
         return self._config

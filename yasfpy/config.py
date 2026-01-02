@@ -15,15 +15,32 @@ import pandas as pd
 import yaml
 from numba import jit
 
-try:
-    from refidxdb.handler import Handler as RefIdxHandler
-except ImportError:  # pragma: no cover
-    RefIdxHandler = None  # type: ignore[assignment]
+from refidxdb.handler import Handler as RefIdxHandler
 
 # from pydantic import BaseModel
 # from yasfpy.functions.misc import generate_refractive_index_table
 
 OVERLAP_MULTIPLICATOR = 0.95
+
+# ==============================================================================
+#    _____            __ _
+#   / ____|          / _(_)
+#  | |     ___  _ __| |_ _  __ _
+#  | |    / _ \| '__|  _| |/ _` |
+#  | |___| (_) | |  | | | | (_| |
+#   \_____\___/|_|  |_| |_|\__, |
+#                           __/ |
+#                          |___/
+#
+#   Joke from my friends: Configuration loader & preprocessing.
+#   (No particles were harmed while parsing this file.)
+#
+#        .~~~~.
+#       i====i_
+#       |cccc|_)
+#       |cccc|
+#       `-==-'   "Ein schönes Bier" (ASCII edition)
+# ==============================================================================
 
 
 class Config:
@@ -33,7 +50,7 @@ class Config:
     config: dict = {}
     path_config: Path
     path_cluster: Path
-    cluster_scale: float
+    particles_scale: float
     cluster_dimensional_scale: float
     preprocess: bool = True
 
@@ -45,8 +62,8 @@ class Config:
         path_config: str = "",
         preprocess: bool = True,
         path_cluster: str = "",
-        cluster_scale: float = 1.0,
-        cluster_dimensional_scale: float = 1.0,
+        cluster_scale: float | None = None,
+        cluster_dimensional_scale: float | None = None,
         *,
         quiet: bool = False,
     ):
@@ -82,8 +99,19 @@ class Config:
                 "The cluster file needs to be provided either in the config file or as an argument."
             )
 
-        self.particles_scale = cluster_scale
-        self.cluster_dimensional_scale = cluster_dimensional_scale
+        geometry_cfg = self.config.get("particles", {}).get("geometry", {})
+
+        if cluster_scale is None:
+            self.particles_scale = float(geometry_cfg.get("scale", 1.0))
+        else:
+            self.particles_scale = float(cluster_scale)
+
+        if cluster_dimensional_scale is None:
+            self.cluster_dimensional_scale = float(
+                geometry_cfg.get("dimensional_scale", 1.0)
+            )
+        else:
+            self.cluster_dimensional_scale = float(cluster_dimensional_scale)
 
         # self.path_cluster = Path(
         #     self.config["particles"]["geometry"]["file"]
@@ -141,12 +169,6 @@ class Config:
         # refractive indices of particles
         self.material = []
         for mat in self.config["particles"]["material"]:
-            if ("url" in mat or "path" in mat) and RefIdxHandler is None:
-                raise ImportError(
-                    "Loading material tables via 'url'/'path' requires the optional dependency "
-                    "'refidxdb'. Install with 'pip install yasfpy[explore]'."
-                )
-
             if "url" in mat:
                 handle = RefIdxHandler(url=mat["url"])  # type: ignore[misc]
             elif "path" in mat:
@@ -171,11 +193,6 @@ class Config:
         if isinstance(self.config["parameters"]["medium"], dict) and (
             "url" in self.config["parameters"]["medium"]
         ):
-            if RefIdxHandler is None:
-                raise ImportError(
-                    "Loading medium refractive index via 'url' requires the optional dependency "
-                    "'refidxdb'. Install with 'pip install yasfpy[explore]'."
-                )
             self.medium = RefIdxHandler(url=self.config["parameters"]["medium"]["url"])  # type: ignore[misc]
         else:
             self.medium = self.config["parameters"]["medium"]
@@ -251,8 +268,6 @@ class Config:
         #     if "scale" in self.config["particles"]["geometry"]
         #     else 1
         # )
-        if "scale" in self.config["particles"]["geometry"]:
-            self.particles_scale = self.config["particles"]["geometry"]["scale"]
 
         # self.spheres = spheres.to_numpy()
         self.spheres = spheres * self.cluster_dimensional_scale
@@ -494,17 +509,23 @@ def fix_overlap(
     positions: npt.NDArray,
     radii: npt.NDArray,
 ):
-    ind, counter = sphere_overlap_check(positions, radii)
     MAX_ITER = 100
     for i in range(MAX_ITER):
-        ind, counter = sphere_overlap_check(positions, radii)
+        _, counter = sphere_overlap_check(positions, radii)
+        overlap_count = int(np.sum(counter > 0))
+        if overlap_count == 0:
+            print("Done!")
+            break
+
         max_count = np.max(counter)
+        if max_count <= 0:
+            print("Done!")
+            break
+
         mask = counter == max_count
         radii[mask] *= OVERLAP_MULTIPLICATOR
         print(
-            f"Iteration {i: 3.0f} | relative number of overlaps: {np.sum(counter > 0) / counter.size: 0.6f} | max count: {max_count: 8.0f}"
+            f"Iteration {i: 3.0f} | relative number of overlaps: {overlap_count / counter.size: 0.6f} | max count: {max_count: 8.0f}"
         )
-        if np.sum(counter > 0) == 0:
-            print("Done!")
-            break
+
     return radii

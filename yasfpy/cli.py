@@ -19,6 +19,21 @@ logger = logging.getLogger("yasfpy")
 logger.addHandler(console)
 logger.setLevel(logging.INFO)
 
+# ------------------------------------------------------------------------------
+#          __
+#         /  \
+#        /____\
+#        \    /
+#         \  /
+#          \/
+#          ||
+#          ||
+#        __||__
+#       |______|
+#
+#   Joke from my friends: half-filled glass of red wine (ASCII art).
+# ------------------------------------------------------------------------------
+
 # install(show_locals=True)
 
 
@@ -67,8 +82,14 @@ def compute(
 ) -> None:
     match backend:
         case "yasf":
-            handler = YASF(path_config=config, path_cluster=cluster)
+            handler = YASF(
+                path_config=config,
+                path_cluster=cluster,
+                cluster_scale=cluster_scale,
+                cluster_dimensional_scale=cluster_dimensional_scale,
+            )
             handler.run()
+            handler.export()
         case "mstm":
             handler = MSTM4Manager(
                 path_config=config,
@@ -83,7 +104,7 @@ def compute(
                 azimuthal_average=True,
             )
             handler.run(cleanup=False)
-    handler.export()
+            handler.export()
     # print(handler.output)
 
     # cm^2
@@ -162,7 +183,7 @@ def explore(path: str = ""):  # pragma: no cover
         from streamlit.web import cli as stcli
     except ModuleNotFoundError as exc:
         raise click.ClickException(
-            "Streamlit is not installed. Install with 'pip install yasfpy[explore]' to enable 'yasf explore'."
+            "Streamlit is not installed. Install with 'pip install yasfpy[explore]' to enable the optional 'yasf explore' dashboard."
         ) from exc
 
     if not runtime.exists():
