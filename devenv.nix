@@ -48,12 +48,12 @@ in
     yasf.exec = ''uv run yasf "$@"'';
     numba.exec = ''uv run numba "$@"'';
 
-    docs.exec = ''rm -rf docs_sphinx/_build docs_sphinx/source/autoapi; uv run --group docs sphinx-build -b html docs_sphinx/source docs_sphinx/_build/html -W --keep-going'';
-    docs-live.exec = ''rm -rf docs_sphinx/_build docs_sphinx/source/autoapi; uv run --group docs sphinx-autobuild docs_sphinx/source docs_sphinx/_build/html --host ${sphinx-host} --port ${sphinx-port} --watch yasfpy'';
+    docs.exec = ''rm -rf docs/_build docs/source/autoapi; uv run --group docs sphinx-build -b html docs/source docs/_build/html -W --keep-going'';
+    docs-live.exec = ''rm -rf docs/_build docs/source/autoapi; uv run --group docs sphinx-autobuild docs/source docs/_build/html --host ${sphinx-host} --port ${sphinx-port} --watch yasfpy'';
   };
 
   processes = {
-    docs-live.exec = ''rm -rf docs_sphinx/_build docs_sphinx/source/autoapi; uv run --group docs sphinx-autobuild docs_sphinx/source docs_sphinx/_build/html --host ${sphinx-host} --port ${sphinx-port} --watch yasfpy'';
+    docs-live.exec = ''rm -rf docs/_build docs/source/autoapi; uv run --group docs sphinx-autobuild docs/source docs/_build/html --host ${sphinx-host} --port ${sphinx-port} --watch yasfpy'';
   };
 
   enterShell = ''

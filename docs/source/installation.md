@@ -13,7 +13,18 @@ uv pip install yasfpy
 ## Optional extras
 
 - GPU support (CUDA bindings): `uv pip install "yasfpy[cuda]"`
-- Interactive exploration dashboard dependencies: `uv pip install "yasfpy[explore]"`
+- Interactive exploration dashboard + material-table loading via config
+  `url`/`path`: `uv pip install "yasfpy[explore]"`
+
+The `explore` extra includes:
+
+- **refidxdb** – load refractive-index tables from local CSV files or
+  [refractiveindex.info](https://refractiveindex.info) URLs directly in your
+  config.
+- **Streamlit / Plotly / PyVista** – power the `yasf explore` dashboard.
+
+If you only need the core solver (with refractive indices passed
+programmatically), the base install is sufficient.
 
 ## GPU (CUDA)
 

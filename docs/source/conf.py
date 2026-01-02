@@ -10,10 +10,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+__version__: str = "unknown"
 try:
-    from yasfpy import __version__
+    from yasfpy import __version__ as _yasfpy_version
 except Exception:  # pragma: no cover
-    __version__ = "unknown"
+    pass
+else:
+    __version__ = _yasfpy_version
 
 # -----------------------------------------------------------------------------
 # Project information
@@ -44,6 +47,8 @@ templates_path = ["_templates"]
 exclude_patterns: list[str] = [
     "_build",
     "**/.ipynb_checkpoints",
+    # Stale AutoAPI output from removed modules.
+    "autoapi/yasfpy/computers/**",
 ]
 
 language = "en"
@@ -79,6 +84,15 @@ napoleon_include_private_with_doc = False
 napoleon_include_special_with_doc = True
 napoleon_preprocess_types = False
 napoleon_attr_annotations = True
+napoleon_use_ivar = True
+
+# Keep the docs build clean when AutoAPI generates auxiliary pages.
+# These warnings are expected in this setup and are non-actionable.
+suppress_warnings = [
+    "toc.not_included",
+    "ref.duplicate",
+    "autodoc.duplicate_object",
+]
 
 # -----------------------------------------------------------------------------
 # autodoc
@@ -192,5 +206,5 @@ html_context = {
     "github_user": "AGBV",
     "github_repo": "YASF",
     "github_version": "main",
-    "doc_path": "docs_sphinx/source",
+    "doc_path": "docs/source",
 }

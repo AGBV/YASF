@@ -1,10 +1,10 @@
 <p align="center" width="100%">
-<img height="400" width="49%" src="docs_sphinx/source/_static/logo_white.svg#gh-dark-mode-only">
-<img height="400" width="49%" src="docs_sphinx/source/_static/yasf_white.svg#gh-dark-mode-only">
+<img height="400" width="49%" src="docs/source/_static/logo_white.svg#gh-dark-mode-only">
+<img height="400" width="49%" src="docs/source/_static/yasf_white.svg#gh-dark-mode-only">
 </p>
 <p align="center" width="100%">
-<img height="400" width="49%" src="docs_sphinx/source/_static/logo_black.svg#gh-light-mode-only">
-<img height="400" width="49%" src="docs_sphinx/source/_static/yasf_black.svg#gh-light-mode-only">
+<img height="400" width="49%" src="docs/source/_static/logo_black.svg#gh-light-mode-only">
+<img height="400" width="49%" src="docs/source/_static/yasf_black.svg#gh-light-mode-only">
 </p>
 
 [![PyPI version](https://badge.fury.io/py/yasfpy.svg)](https://badge.fury.io/py/yasfpy)
@@ -69,7 +69,7 @@ uv run yasf --help
 ## Documentation
 
 ```sh
-uv run --group docs sphinx-build -b html docs_sphinx/source docs_sphinx/_build/html -W --keep-going
+uv run --group docs sphinx-build -b html docs/source docs/_build/html -W --keep-going
 ```
 
 The project documentation is built with Sphinx (needed for BibTeX citations).
