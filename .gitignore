@@ -87,8 +87,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-docs_sphinx/_build/
-docs_sphinx/source/autoapi/
+docs/source/autoapi/
 
 # PyBuilder
 .pybuilder/
@@ -183,14 +182,17 @@ cython_debug/
 devenv.local.nix
 devenv.local.yaml
 
-# direnv
-.direnv
-
 # pre-commit
 .pre-commit-config.yaml
 
 # Local scratch / tooling
 .tmp_compare/
+.tmp_paper/
+.tmp_profile/
+.tmp_warmstart/
+
+# Local reference PDFs / papers
+papers/
 
 # Keep CELES around locally but not in git
 celes/
@@ -199,3 +201,4 @@ celes/
 examples/**/*.mat
 examples/**/*.zip
 
+MSTM/
