@@ -85,6 +85,9 @@ lint.ignore = ["F722"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 norecursedirs = ["PyFracVAL", "docs", "docs/_build", ".devenv", ".venv"]
+markers = [
+  "smoke: fast end-to-end sanity checks",
+]
 log_cli = false
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"

@@ -79,6 +79,39 @@ def _yasf_single_sphere_qext_qsca(
     return float(np.real(optics.q_ext[0])), float(np.real(optics.q_sca[0]))
 
 
+@pytest.mark.smoke
+def test_smoke_single_sphere_efficiencies_match_miepython(
+    numerics_lmax8: Numerics,
+):
+    """Fast end-to-end check against miepython.
+
+    This uses a single parameter set (instead of the full parametrized matrix)
+    so it can serve as a quick release/install sanity test.
+    """
+
+    # Use n_medium=1 to avoid convention differences (YASF multiplies by |n_medium|).
+    n_medium = 1.0 + 0j
+    m_sphere = 1.5 + 0j
+    wavelength = 1.0
+    radius = 0.10
+
+    qext_yasf, qsca_yasf = _yasf_single_sphere_qext_qsca(
+        wavelength=wavelength,
+        radius=radius,
+        refractive_index=m_sphere,
+        medium_refractive_index=n_medium,
+        numerics=numerics_lmax8,
+    )
+
+    # miepython takes relative refractive index m (sphere/medium) and size x = 2π r n_medium / λ.
+    m_rel = m_sphere / n_medium
+    x = 2 * np.pi * radius * np.real(n_medium) / wavelength
+    qext_mie, qsca_mie, _, _ = mie.efficiencies_mx(m_rel, x)
+
+    npt.assert_allclose(qext_yasf, qext_mie)
+    npt.assert_allclose(qsca_yasf, qsca_mie)
+
+
 @pytest.mark.parametrize(
     ("m_sphere", "wavelength", "radius"),
     [
