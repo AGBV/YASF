@@ -13,12 +13,12 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import yaml
-from numba import jit, prange
+from numba import jit
 
 try:
     from refidxdb.handler import Handler as RefIdxHandler
 except ImportError:  # pragma: no cover
-    RefIdxHandler = None
+    RefIdxHandler = None  # type: ignore[assignment]
 
 # from pydantic import BaseModel
 # from yasfpy.functions.misc import generate_refractive_index_table
@@ -47,6 +47,8 @@ class Config:
         path_cluster: str = "",
         cluster_scale: float = 1.0,
         cluster_dimensional_scale: float = 1.0,
+        *,
+        quiet: bool = False,
     ):
         # if type(path_config) != str:
         if not isinstance(path_config, str):
@@ -100,7 +102,10 @@ class Config:
         # self.path_cluster = str(_path_config.parent / self.path_cluster)
 
         self.log = logging.getLogger(self.__class__.__module__)
+        if quiet:
+            self.log.setLevel(logging.WARNING)
         self.__read()
+
         self.__folder()
         if preprocess:
             self.__interpolate()
@@ -467,7 +472,7 @@ def sphere_overlap_check(
     ind = np.stack(np.triu_indices(radii.size, k=1), axis=-1)
     mask = np.zeros(ind.shape[0], dtype=np.bool_)
     counter = np.zeros(radii.size)
-    for i in prange(ind.shape[0]):
+    for i in range(ind.shape[0]):
         if np.sum((positions[ind[i, 0], :] - positions[ind[i, 1], :]) ** 2) < (
             (radii[ind[i, 0]] + radii[ind[i, 1]]) ** 2
         ):
