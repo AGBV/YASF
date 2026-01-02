@@ -40,6 +40,7 @@ class MSTM4Manager(BaseModel):
     This class is designed for benchmarking/comparisons with YASF. It does not
     aim to expose the full MSTM4 input space.
     """
+
     path_config: str = Field(default="")
     path_cluster: str = Field(default="")
     cluster_scale: float = Field(default=1.0)
