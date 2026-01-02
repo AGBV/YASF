@@ -2,6 +2,23 @@ name: Coverage Reporting
 
 on:
   workflow_call:
+    inputs:
+      run_codacy:
+        type: boolean
+        required: false
+        default: false
+      run_deepsource:
+        type: boolean
+        required: false
+        default: false
+      run_codecov:
+        type: boolean
+        required: false
+        default: false
+      artifact_name:
+        type: string
+        required: false
+        default: coverage-report
     secrets:
       CODACY_PROJECT_TOKEN:
         required: false
@@ -11,13 +28,11 @@ on:
         required: false
 
 jobs:
-  report:
-    name: Upload coverage reports
+  codacy:
+    name: Codacy coverage reporter
     runs-on: ubuntu-latest
-    env:
-      CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
-      DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    if: ${{ inputs.run_codacy }}
+    continue-on-error: true
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v4
@@ -28,31 +43,64 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: coverage-report
+          name: ${{ inputs.artifact_name }}
 
       - name: Run codacy-coverage-reporter
-        if: ${{ env.CODACY_PROJECT_TOKEN != '' }}
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         uses: codacy/codacy-coverage-reporter-action@v1
         with:
           project-token: ${{ env.CODACY_PROJECT_TOKEN }}
           coverage-reports: ./coverage.xml
 
+  deepsource:
+    name: DeepSource coverage reporter
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run_deepsource }}
+    continue-on-error: true
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
       - name: Report test coverage to DeepSource
-        if: ${{ env.DEEPSOURCE_DSN != '' }}
+        env:
+          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
         uses: deepsourcelabs/test-coverage-action@master
         with:
           key: python
           coverage-file: coverage.xml
           dsn: ${{ env.DEEPSOURCE_DSN }}
 
+  codecov:
+    name: Codecov coverage reporter
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run_codecov }}
+    continue-on-error: true
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
       - name: Upload coverage reports to Codecov
-        if: ${{ env.CODECOV_TOKEN != '' }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         uses: codecov/codecov-action@v5
         with:
           token: ${{ env.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
-        if: ${{ env.CODECOV_TOKEN != '' && !cancelled() }}
+        if: ${{ !cancelled() }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ env.CODECOV_TOKEN }}
