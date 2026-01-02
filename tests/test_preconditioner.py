@@ -43,7 +43,9 @@ def setup_simulation(matlab_data, use_preconditioner=False):
     # Extract parameters
     lmax = int(matlab_data["lmax"][0, 0])
     wavelength = np.array([float(matlab_data["wavelength"][0, 0])])
-    medium_refractive_index = np.array([float(matlab_data["mediumRefractiveIndex"][0, 0])])
+    medium_refractive_index = np.array(
+        [float(matlab_data["mediumRefractiveIndex"][0, 0])]
+    )
 
     # Particle data
     positions = matlab_data["particles_position"]
@@ -86,7 +88,7 @@ def setup_simulation(matlab_data, use_preconditioner=False):
         # Target ~5 particles per block
         target_blocks = max(1, num_particles // 5)
         block_volume = total_volume / target_blocks
-        edge_size = block_volume ** (1/3)
+        edge_size = block_volume ** (1 / 3)
 
         partition_sizes = np.array([edge_size, edge_size, edge_size])
         print(f"\nPreconditioner configuration:")
@@ -129,13 +131,15 @@ def test_preconditioner_correctness(matlab_data):
     Compares scattered field coefficients with and without preconditioner.
     They should match within numerical tolerance.
     """
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST: Preconditioner Correctness")
-    print("="*70)
+    print("=" * 70)
 
     # Run WITHOUT preconditioner
     print("\n1. Running simulation WITHOUT preconditioner...")
-    sim_no_prec, solver_no_prec, _ = setup_simulation(matlab_data, use_preconditioner=False)
+    sim_no_prec, solver_no_prec, _ = setup_simulation(
+        matlab_data, use_preconditioner=False
+    )
 
     start = time()
     sim_no_prec.compute_mie_coefficients()
@@ -145,7 +149,9 @@ def test_preconditioner_correctness(matlab_data):
     time_no_prec = time() - start
 
     # Get iteration count
-    iter_no_prec = solver_no_prec.run.__code__.co_consts  # This won't work, need better way
+    iter_no_prec = (
+        solver_no_prec.run.__code__.co_consts
+    )  # This won't work, need better way
     # For now, just check convergence
 
     coeffs_no_prec = sim_no_prec.scattered_field_coefficients.squeeze()
@@ -155,7 +161,9 @@ def test_preconditioner_correctness(matlab_data):
 
     # Run WITH preconditioner
     print("\n2. Running simulation WITH preconditioner...")
-    sim_with_prec, solver_with_prec, preconditioner = setup_simulation(matlab_data, use_preconditioner=True)
+    sim_with_prec, solver_with_prec, preconditioner = setup_simulation(
+        matlab_data, use_preconditioner=True
+    )
 
     start = time()
     sim_with_prec.compute_mie_coefficients()
@@ -180,7 +188,9 @@ def test_preconditioner_correctness(matlab_data):
     # Compare results
     print("\n3. Comparing results...")
     max_abs_diff = np.max(np.abs(coeffs_no_prec - coeffs_with_prec))
-    max_rel_diff = np.max(np.abs((coeffs_no_prec - coeffs_with_prec) / (coeffs_no_prec + 1e-10)))
+    max_rel_diff = np.max(
+        np.abs((coeffs_no_prec - coeffs_with_prec) / (coeffs_no_prec + 1e-10))
+    )
 
     print(f"   Max absolute difference: {max_abs_diff:.2e}")
     print(f"   Max relative difference: {max_rel_diff:.2e}")
@@ -191,15 +201,15 @@ def test_preconditioner_correctness(matlab_data):
         coeffs_no_prec,
         rtol=1e-3,  # Relaxed tolerance due to iterative solver differences
         atol=1e-5,
-        err_msg="Preconditioner changed results beyond acceptable tolerance"
+        err_msg="Preconditioner changed results beyond acceptable tolerance",
     )
 
     print("\n✓ Results match! Preconditioner is working correctly.")
 
     # Performance summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("PERFORMANCE SUMMARY")
-    print("="*70)
+    print("=" * 70)
     print(f"Without preconditioner: {time_no_prec:.2f}s")
     print(f"With preconditioner:    {time_with_prec:.2f}s (prep: {prec_time:.2f}s)")
 
@@ -210,7 +220,7 @@ def test_preconditioner_correctness(matlab_data):
         slowdown = time_with_prec / time_no_prec
         print(f"\n⚠ SLOWDOWN: {slowdown:.2f}x slower (problem may be too small)")
 
-    print("="*70)
+    print("=" * 70)
 
 
 def test_preconditioner_vs_matlab(matlab_data):
@@ -219,12 +229,14 @@ def test_preconditioner_vs_matlab(matlab_data):
 
     Verifies that preconditioned solution still matches MATLAB.
     """
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST: Preconditioner vs MATLAB Reference")
-    print("="*70)
+    print("=" * 70)
 
     # Run with preconditioner
-    simulation, solver, preconditioner = setup_simulation(matlab_data, use_preconditioner=True)
+    simulation, solver, preconditioner = setup_simulation(
+        matlab_data, use_preconditioner=True
+    )
 
     simulation.compute_mie_coefficients()
     simulation.compute_initial_field_coefficients()
@@ -239,7 +251,9 @@ def test_preconditioner_vs_matlab(matlab_data):
     # Compare
     print("\nComparing preconditioned Python vs MATLAB...")
     max_abs_diff = np.max(np.abs(python_scattered - matlab_scattered))
-    max_rel_diff = np.max(np.abs((python_scattered - matlab_scattered) / (matlab_scattered + 1e-10)))
+    max_rel_diff = np.max(
+        np.abs((python_scattered - matlab_scattered) / (matlab_scattered + 1e-10))
+    )
 
     print(f"  Max absolute difference: {max_abs_diff:.2e}")
     print(f"  Max relative difference: {max_rel_diff:.2e}")
@@ -249,25 +263,25 @@ def test_preconditioner_vs_matlab(matlab_data):
         matlab_scattered,
         rtol=1e-3,
         atol=1e-5,
-        err_msg="Preconditioned results don't match MATLAB"
+        err_msg="Preconditioned results don't match MATLAB",
     )
 
     print("\n✓ Preconditioned results match MATLAB!")
-    print("="*70)
+    print("=" * 70)
 
 
 if __name__ == "__main__":
     # Run tests
     data = sio.loadmat("tests/data/full_simulation_data.mat")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("BLOCK-DIAGONAL PRECONDITIONER TESTS")
-    print("="*70)
+    print("=" * 70)
 
     test_preconditioner_correctness(data)
     print("\n")
     test_preconditioner_vs_matlab(data)
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("ALL TESTS PASSED!")
-    print("="*70)
+    print("=" * 70)
