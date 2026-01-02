@@ -4,6 +4,11 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
+pytest.importorskip(
+    "refidxdb",
+    reason="refidxdb (yasfpy[explore]) is required for compare_mstm4 tests",
+)
+
 from yasfpy.benchmark.compare_mstm4 import compare_single_sphere
 
 

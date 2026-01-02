@@ -22,7 +22,6 @@ dependencies = [
   "pyperf>=2.7.0",
   "pyinstrument>=4.7.3",
   # "speedscope>=1.0",
-  "refidxdb>=0.4.0",
   "click>=8.1.7",
   "intel-cmplr-lib-rt>=2025.3.1",
 ]
@@ -30,6 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 cuda = ["cuda-python>=12.6.0", "pynvjitlink-cu12>=0.2.3"]
 explore = [
+  "refidxdb>=0.4.0",
   "streamlit>=1.40.1",
   "plotly>=5.24.1",
   "pyvista<0.45.0",
@@ -84,7 +84,7 @@ lint.ignore = ["F722"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-norecursedirs = ["PyFracVAL", "docs_sphinx", "docs_sphinx/_build", ".devenv", ".venv"]
+norecursedirs = ["PyFracVAL", "docs", "docs/_build", ".devenv", ".venv"]
 log_cli = false
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
@@ -93,7 +93,7 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 requires = ["uv_build >= 0.8.0, <0.10.0"]
 build-backend = "uv_build"
 
-[semantic_release]
+[tool.semantic_release]
 version_variable = ["yasfpy/__init__.py:__version__"]
 version_toml = ["pyproject.toml:project.version:nf"]
 major_on_zero = false

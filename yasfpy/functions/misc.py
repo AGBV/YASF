@@ -1,6 +1,5 @@
 import numba as nb
 import numpy as np
-from refidxdb.handler import Handler
 from scipy.special import hankel1, lpmv, spherical_jn, spherical_yn
 
 from yasfpy.functions.legendre_normalized_trigon import legendre_normalized_trigon
@@ -181,7 +180,9 @@ def mutual_lookup(
     else:
         # SciPy's spherical_yn does not reliably broadcast over an array of orders,
         # so compute per-order (matches CELES sph_bessel for nu=3).
-        spherical_hankel = np.zeros((2 * lmax + 1,) + size_parameter.shape, dtype=complex)
+        spherical_hankel = np.zeros(
+            (2 * lmax + 1,) + size_parameter.shape, dtype=complex
+        )
         spherical_bessel = np.zeros_like(spherical_hankel)
         nz = size_parameter != 0
         for p in range(2 * lmax + 1):
@@ -198,7 +199,8 @@ def mutual_lookup(
                 if p == 0:
                     continue
                 spherical_hankel_derivative[p, :, :, :] = (
-                    size_parameter * spherical_hankel[p - 1, :, :, :] - p * spherical_hankel[p, :, :, :]
+                    size_parameter * spherical_hankel[p - 1, :, :, :]
+                    - p * spherical_hankel[p, :, :, :]
                 )
 
             p_lm = legendre_normalized_trigon(lmax, cosine_theta, sine_theta)
@@ -208,7 +210,9 @@ def mutual_lookup(
             # The lpmv-based implementation has a bug in the normalization/phase.
             # Replace it with the trusted legendre_normalized_trigon function,
             # computed up to the required order of 2*lmax.
-            plm_unflattened = legendre_normalized_trigon(2 * lmax, cosine_theta, sine_theta)
+            plm_unflattened = legendre_normalized_trigon(
+                2 * lmax, cosine_theta, sine_theta
+            )
 
             # Flatten the result to match the format expected by particle_interaction
             p_lm = np.zeros(

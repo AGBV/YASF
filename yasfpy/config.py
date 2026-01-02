@@ -14,7 +14,11 @@ import numpy.typing as npt
 import pandas as pd
 import yaml
 from numba import jit, prange
-from refidxdb.handler import Handler
+
+try:
+    from refidxdb.handler import Handler as RefIdxHandler
+except ImportError:  # pragma: no cover
+    RefIdxHandler = None
 
 # from pydantic import BaseModel
 # from yasfpy.functions.misc import generate_refractive_index_table
@@ -132,8 +136,14 @@ class Config:
         # refractive indices of particles
         self.material = []
         for mat in self.config["particles"]["material"]:
+            if ("url" in mat or "path" in mat) and RefIdxHandler is None:
+                raise ImportError(
+                    "Loading material tables via 'url'/'path' requires the optional dependency "
+                    "'refidxdb'. Install with 'pip install yasfpy[explore]'."
+                )
+
             if "url" in mat:
-                handle = Handler(url=mat["url"])
+                handle = RefIdxHandler(url=mat["url"])  # type: ignore[misc]
             elif "path" in mat:
                 path = Path(mat["path"])
                 if not path.is_absolute():
@@ -141,7 +151,7 @@ class Config:
                 w_column = mat.get("w_column", mat.get("wavelength", True))
                 # `refidxdb` expects `w_column` as bool or one of {"wl","wn"}.
                 # Keep backward compatibility with older configs using `wavelength`.
-                handle = Handler(
+                handle = RefIdxHandler(  # type: ignore[misc]
                     path=path.absolute().as_posix(),
                     w_column=w_column,
                 )
@@ -156,7 +166,12 @@ class Config:
         if isinstance(self.config["parameters"]["medium"], dict) and (
             "url" in self.config["parameters"]["medium"]
         ):
-            self.medium = Handler(url=self.config["parameters"]["medium"]["url"])
+            if RefIdxHandler is None:
+                raise ImportError(
+                    "Loading medium refractive index via 'url' requires the optional dependency "
+                    "'refidxdb'. Install with 'pip install yasfpy[explore]'."
+                )
+            self.medium = RefIdxHandler(url=self.config["parameters"]["medium"]["url"])  # type: ignore[misc]
         else:
             self.medium = self.config["parameters"]["medium"]
 

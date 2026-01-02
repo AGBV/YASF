@@ -8,8 +8,6 @@ import _pickle
 import click
 
 # from rich.traceback import install
-from streamlit import runtime
-from streamlit.web import cli as stcli
 
 from yasfpy import YASF
 from yasfpy.benchmark import MSTM4Manager
@@ -159,6 +157,14 @@ def compute(
     help="Path where to look for data files to be displayed",
 )
 def explore(path: str = ""):  # pragma: no cover
+    try:
+        from streamlit import runtime
+        from streamlit.web import cli as stcli
+    except ModuleNotFoundError as exc:
+        raise click.ClickException(
+            "Streamlit is not installed. Install with 'pip install yasfpy[explore]' to enable 'yasf explore'."
+        ) from exc
+
     if not runtime.exists():
         print(Path(__file__).parent)
         sys.argv = [
