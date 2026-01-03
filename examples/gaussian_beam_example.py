@@ -23,9 +23,9 @@ def run_gaussian_beam_simulation():
     """
     Simulate scattering from particles illuminated by a Gaussian beam.
     """
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("GAUSSIAN BEAM SCATTERING EXAMPLE")
-    print("="*70)
+    print("=" * 70)
 
     # =========================================================================
     # 1. Define particles
@@ -33,12 +33,14 @@ def run_gaussian_beam_simulation():
     print("\n1. Setting up particle configuration...")
 
     # Create a simple cluster of particles
-    positions = np.array([
-        [0.0, 0.0, 0.0],       # Particle 1: at beam focus
-        [100.0, 0.0, 0.0],     # Particle 2: off-axis
-        [0.0, 100.0, 0.0],     # Particle 3: off-axis
-        [0.0, 0.0, 200.0],     # Particle 4: along beam axis
-    ])
+    positions = np.array(
+        [
+            [0.0, 0.0, 0.0],  # Particle 1: at beam focus
+            [100.0, 0.0, 0.0],  # Particle 2: off-axis
+            [0.0, 100.0, 0.0],  # Particle 3: off-axis
+            [0.0, 0.0, 200.0],  # Particle 4: along beam axis
+        ]
+    )
 
     # All particles have same size and material
     radii = np.array([50.0, 50.0, 50.0, 50.0])  # 50 nm radius
@@ -100,7 +102,9 @@ def run_gaussian_beam_simulation():
     # sampling_points_number = [azimuthal, polar]
     numerics = Numerics(
         lmax=3,  # Multipole expansion order
-        sampling_points_number=np.array([15, 40]),  # Angular grid for wavebundle integration
+        sampling_points_number=np.array(
+            [15, 40]
+        ),  # Angular grid for wavebundle integration
         particle_distance_resolution=1,
         gpu=False,
         solver=solver,
@@ -143,12 +147,14 @@ def run_gaussian_beam_simulation():
     print("\n5. Analyzing results...")
 
     # Initial field coefficients for each particle
-    initial_coeffs = simulation.initial_field_coefficients[:, :, 0]  # Shape: (particles, nmax)
+    initial_coeffs = simulation.initial_field_coefficients[
+        :, :, 0
+    ]  # Shape: (particles, nmax)
 
     print("\n   Initial field strength at each particle:")
     for i in range(particles.number):
         magnitude = np.linalg.norm(initial_coeffs[i, :])
-        print(f"   Particle {i+1}: {magnitude:.3e}")
+        print(f"   Particle {i + 1}: {magnitude:.3e}")
 
     # Scattered field coefficients
     scattered_coeffs = simulation.scattered_field_coefficients[:, :, 0]
@@ -156,7 +162,7 @@ def run_gaussian_beam_simulation():
     print("\n   Scattered field strength from each particle:")
     for i in range(particles.number):
         magnitude = np.linalg.norm(scattered_coeffs[i, :])
-        print(f"   Particle {i+1}: {magnitude:.3e}")
+        print(f"   Particle {i + 1}: {magnitude:.3e}")
 
     # =========================================================================
     # 6. Compare with plane wave
@@ -192,11 +198,11 @@ def run_gaussian_beam_simulation():
     print(f"\n   Total scattered field magnitude:")
     print(f"   Gaussian beam: {scattered_gauss:.3e}")
     print(f"   Plane wave:    {scattered_plane:.3e}")
-    print(f"   Ratio (Gauss/Plane): {scattered_gauss/scattered_plane:.3f}")
+    print(f"   Ratio (Gauss/Plane): {scattered_gauss / scattered_plane:.3f}")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("SIMULATION COMPLETE!")
-    print("="*70)
+    print("=" * 70)
 
     return simulation, simulation_pw
 

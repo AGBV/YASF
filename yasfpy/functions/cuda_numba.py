@@ -6,8 +6,6 @@ This module contains GPU implementations of inner loops used for coupling and
 field/polarization calculations.
 """
 
-
-
 import numpy as np
 from numba import cuda
 from cmath import exp, sqrt

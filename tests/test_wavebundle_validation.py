@@ -46,9 +46,9 @@ def test_wavebundle_vs_matlab(matlab_data):
     Compares initial_field_coefficients computed by YASFPY with those
     from CELES for identical Gaussian beam configuration.
     """
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("WAVEBUNDLE VALIDATION vs CELES/MATLAB")
-    print("="*70)
+    print("=" * 70)
 
     # =========================================================================
     # 1. Extract MATLAB parameters
@@ -57,7 +57,9 @@ def test_wavebundle_vs_matlab(matlab_data):
 
     lmax = int(matlab_data["lmax"][0, 0])
     wavelength = np.array([float(matlab_data["wavelength"][0, 0])])
-    medium_refractive_index = np.array([float(matlab_data["mediumRefractiveIndex"][0, 0])])
+    medium_refractive_index = np.array(
+        [float(matlab_data["mediumRefractiveIndex"][0, 0])]
+    )
 
     # Particle data (convert to float64 for calculations)
     positions = matlab_data["particles_position"].astype(np.float64)
@@ -74,7 +76,9 @@ def test_wavebundle_vs_matlab(matlab_data):
     # MATLAB stores strings as arrays, need to convert
     polarization_array = matlab_data["initial_field_polarization"]
     if isinstance(polarization_array, np.ndarray):
-        polarization = str(polarization_array[0]) if polarization_array.size > 0 else "TE"
+        polarization = (
+            str(polarization_array[0]) if polarization_array.size > 0 else "TE"
+        )
     else:
         polarization = str(polarization_array)
 
@@ -93,7 +97,9 @@ def test_wavebundle_vs_matlab(matlab_data):
     print(f"   Beam width: {beam_width} nm")
     print(f"   Polarization: {polarization}")
     print(f"   Focal point: {focal_point}")
-    print(f"   Angular grid: {len(azimuthal_angles_matlab)} × {len(polar_angles_matlab)}")
+    print(
+        f"   Angular grid: {len(azimuthal_angles_matlab)} × {len(polar_angles_matlab)}"
+    )
     print(f"   MATLAB coefficients shape: {matlab_coefficients.shape}")
 
     # =========================================================================
@@ -153,7 +159,9 @@ def test_wavebundle_vs_matlab(matlab_data):
     simulation.compute_mie_coefficients()
     simulation.compute_initial_field_coefficients()
 
-    yasfpy_coefficients = simulation.initial_field_coefficients[:, :, 0]  # Shape: (particles, nmax)
+    yasfpy_coefficients = simulation.initial_field_coefficients[
+        :, :, 0
+    ]  # Shape: (particles, nmax)
 
     print(f"   ✓ YASFPY coefficients shape: {yasfpy_coefficients.shape}")
     print(f"   ✓ Max magnitude: {np.max(np.abs(yasfpy_coefficients)):.3e}")
@@ -164,8 +172,9 @@ def test_wavebundle_vs_matlab(matlab_data):
     print("\n4. Comparing YASFPY vs MATLAB...")
 
     # MATLAB format is (particles, nmax) - same as YASFPY
-    assert matlab_coefficients.shape == yasfpy_coefficients.shape, \
+    assert matlab_coefficients.shape == yasfpy_coefficients.shape, (
         f"Shape mismatch: MATLAB {matlab_coefficients.shape} vs YASFPY {yasfpy_coefficients.shape}"
+    )
 
     # Compute differences
     abs_diff = np.abs(yasfpy_coefficients - matlab_coefficients)
@@ -186,7 +195,7 @@ def test_wavebundle_vs_matlab(matlab_data):
     # Print some example coefficients for inspection
     print(f"\n   Sample coefficients comparison:")
     print(f"   {'Index':<8} {'MATLAB':<20} {'YASFPY':<20} {'Rel Diff':<12}")
-    print(f"   {'-'*8} {'-'*20} {'-'*20} {'-'*12}")
+    print(f"   {'-' * 8} {'-' * 20} {'-' * 20} {'-' * 12}")
 
     # Find indices with largest coefficients
     matlab_flat = matlab_coefficients.flatten()
@@ -197,8 +206,10 @@ def test_wavebundle_vs_matlab(matlab_data):
         yasfpy_val = yasfpy_coefficients.flatten()[idx]
         rel_diff_val = abs(yasfpy_val - matlab_val) / (abs(matlab_val) + 1e-10)
 
-        print(f"   {idx:<8} {matlab_val.real:+.3e}{matlab_val.imag:+.3e}j  "
-              f"{yasfpy_val.real:+.3e}{yasfpy_val.imag:+.3e}j  {rel_diff_val:.3e}")
+        print(
+            f"   {idx:<8} {matlab_val.real:+.3e}{matlab_val.imag:+.3e}j  "
+            f"{yasfpy_val.real:+.3e}{yasfpy_val.imag:+.3e}j  {rel_diff_val:.3e}"
+        )
 
     # =========================================================================
     # 5. Assert correctness
@@ -215,7 +226,7 @@ def test_wavebundle_vs_matlab(matlab_data):
             matlab_coefficients,
             rtol=rtol,
             atol=atol,
-            err_msg=f"Wavebundle coefficients don't match MATLAB (max rel diff: {max_rel_diff:.3e})"
+            err_msg=f"Wavebundle coefficients don't match MATLAB (max rel diff: {max_rel_diff:.3e})",
         )
         print(f"\n   ✓ VALIDATION PASSED!")
         print(f"   All coefficients within tolerance (rtol={rtol}, atol={atol})")
@@ -229,13 +240,15 @@ def test_wavebundle_vs_matlab(matlab_data):
         print(f"   Number of coefficients: {yasfpy_coefficients.size}")
         failing_mask = rel_diff > rtol
         num_failing = np.sum(failing_mask)
-        print(f"   Coefficients exceeding rtol: {num_failing} ({100*num_failing/yasfpy_coefficients.size:.1f}%)")
+        print(
+            f"   Coefficients exceeding rtol: {num_failing} ({100 * num_failing / yasfpy_coefficients.size:.1f}%)"
+        )
 
         raise
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("VALIDATION COMPLETE")
-    print("="*70)
+    print("=" * 70)
 
 
 def test_wavebundle_planewave_comparison(matlab_data):
@@ -253,9 +266,9 @@ def test_wavebundle_planewave_comparison(matlab_data):
     if matlab_pw.size == 0:
         pytest.skip("Plane wave coefficients not computed in MATLAB")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("GAUSSIAN BEAM vs PLANE WAVE COMPARISON")
-    print("="*70)
+    print("=" * 70)
 
     # This test would compare the relative difference between wavebundle
     # and plane wave in both MATLAB and YASFPY
@@ -269,12 +282,12 @@ if __name__ == "__main__":
     print("\nLoading MATLAB data...")
     data = sio.loadmat("tests/data/wavebundle_test_data.mat")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("WAVEBUNDLE VALIDATION TESTS")
-    print("="*70)
+    print("=" * 70)
 
     test_wavebundle_vs_matlab(data)
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("ALL VALIDATION TESTS PASSED!")
-    print("="*70)
+    print("=" * 70)

@@ -37,7 +37,9 @@ def setup_simulation(matlab_data):
     # Extract parameters
     lmax = int(matlab_data["lmax"][0, 0])
     wavelength = np.array([float(matlab_data["wavelength"][0, 0])])
-    medium_refractive_index = np.array([float(matlab_data["mediumRefractiveIndex"][0, 0])])
+    medium_refractive_index = np.array(
+        [float(matlab_data["mediumRefractiveIndex"][0, 0])]
+    )
 
     # Particle data
     positions = matlab_data["particles_position"]
@@ -164,7 +166,9 @@ def test_right_hand_side(matlab_data):
     # rhs = T * aI (element-wise multiplication)
     matlab_initial = matlab_data["initial_field_coefficients"]
     matlab_mie = matlab_data["mie_coefficients"]
-    matlab_single_unique = matlab_data["single_unique_array_index"].flatten() - 1  # 0-indexed
+    matlab_single_unique = (
+        matlab_data["single_unique_array_index"].flatten() - 1
+    )  # 0-indexed
 
     # Apply Mie coefficients to initial field
     matlab_rhs = matlab_mie[matlab_single_unique, :] * matlab_initial
