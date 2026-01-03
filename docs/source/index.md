@@ -1,6 +1,6 @@
 # Welcome to YASF
 
-YASF is a T-Matrix implementation in Python based on {cite}`Egel2017Celes`.
+YASF is a T-Matrix implementation in Python based on {cite}`Egel-2017-ID1`.
 
 <img src="_static/logo.svg" alt="YASF logo" width="50%">
 
