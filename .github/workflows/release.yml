@@ -1,0 +1,69 @@
+name: Continuous Delivery
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  testing:
+    uses: ./.github/workflows/testing.yml
+    secrets: inherit
+
+  release:
+    name: Semantic release
+    needs: testing
+    runs-on: ubuntu-latest
+    concurrency:
+      group: semantic-release
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install semantic-release
+        run: uv tool install python-semantic-release
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Semantic Release
+        id: semrel
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # When there are no release-worthy changes, python-semantic-release prints
+          # a "No release" message and exits successfully.
+          out="$(semantic-release version 2>&1 || true)"
+          echo "$out"
+
+          if echo "$out" | grep -qi "no release"; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "released=true" >> "$GITHUB_OUTPUT"
+          semantic-release publish
+
+      - name: Build
+        if: ${{ steps.semrel.outputs.released == 'true' }}
+        run: uv build --no-sources
+
+      - name: Publish to PyPI
+        if: ${{ steps.semrel.outputs.released == 'true' }}
+        run: uv publish
