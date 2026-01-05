@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from io import StringIO
 from pathlib import Path
 from typing import Any, ClassVar
@@ -40,6 +41,7 @@ class MSTM4Manager(BaseModel):
     This class is designed for benchmarking/comparisons with YASF. It does not
     aim to expose the full MSTM4 input space.
     """
+
     path_config: str = Field(default="")
     path_cluster: str = Field(default="")
     cluster_scale: float = Field(default=1.0)
@@ -47,7 +49,9 @@ class MSTM4Manager(BaseModel):
     binary: str = Field(default="mstm")
     input_file: str = Field(default="mstm4.inp")
     output_file: str = Field(default="mstm4.dat")
-    workdir: Path | None = Field(default=None)
+    workdir: Path | None = Field(
+        default_factory=lambda: Path(tempfile.mkdtemp(prefix="yasfpy_mstm4_"))
+    )
     parallel: int = Field(default=4, multiple_of=4)
     nix: bool = Field(default=True)
     quiet: bool = Field(default=True)
@@ -78,6 +82,7 @@ class MSTM4Manager(BaseModel):
 
         if self.workdir is not None:
             self.workdir = self.workdir.expanduser().resolve()
+            self.workdir.mkdir(parents=True, exist_ok=True)
 
         self.config = Config(
             path_config=self.path_config,
@@ -610,9 +615,13 @@ class MSTM4Manager(BaseModel):
 
 
 if __name__ == "__main__":
+    import tempfile
+
+    workdir_tmp = tempfile.TemporaryDirectory()
     mstm = MSTM4Manager(
         path_config=str(project_root / "examples/graphite/config.json"),
         parallel=4,
+        workdir=Path(workdir_tmp.name),
     )
     # See params at
     # https://pyperf.readthedocs.io/en/latest/api.html#runner-class

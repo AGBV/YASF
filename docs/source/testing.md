@@ -177,14 +177,24 @@ uv run python -m yasfpy.benchmark.bench_fmm_treecode --numba-threads 1
 
 Some benchmarks/comparisons call external binaries and tend to be more brittle
 (they depend on the installed executable, CPU affinity, and filesystem IO).
-Prefer running these in an isolated work directory.
+
+By default, YASF's benchmark wrappers that invoke external solvers now use an
+**auto-created temporary work directory** (via Python's `tempfile`) when no
+explicit `--workdir` is provided. This avoids writing MSTM/ADDA inputs and
+outputs into the repo.
 
 - `yasfpy.benchmark.compare_mstm4` (helper used by tests)
 - `yasfpy.benchmark.bench_yasf_vs_mstm4`
 - `yasfpy.benchmark.adda`
 
-Tip: when a benchmark writes inputs/outputs, run it in a temporary directory
-(e.g. `mktemp -d`) to avoid polluting the repo.
+Tip: you can still override the work directory explicitly:
+
+```sh
+uv run python -m yasfpy.benchmark.bench_yasf_vs_mstm4 --workdir /tmp/yasf_bench
+```
+
+If you're using a script/helper that does not expose `--workdir`, wrap it in an
+external temp directory (e.g. `mktemp -d`) to avoid polluting the repo.
 
 ## Reference test data
 

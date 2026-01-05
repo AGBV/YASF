@@ -207,14 +207,19 @@ def main() -> None:
     if shutil.which(str(args.mstm_binary)) is None:
         raise FileNotFoundError(f"MSTM binary '{args.mstm_binary}' not found in PATH")
 
+    workdir_tmp: tempfile.TemporaryDirectory[str] | None = None
     workdir = args.workdir
     if workdir is not None:
         workdir = Path(workdir).expanduser().resolve()
         workdir.mkdir(parents=True, exist_ok=True)
+    else:
+        workdir_tmp = tempfile.TemporaryDirectory()
+        workdir = Path(workdir_tmp.name)
 
     # For large clusters, the default optics + GPU path can be very slow or
     # fail when CUDA isn't available. Keep the benchmark script robust by
     # allowing a lightweight optics path.
+    config_tmp: tempfile.TemporaryDirectory[str] | None = None
     config_for_yasf = config_path
     if args.yasf_no_phase_function or args.yasf_force_cpu:
         cfg = json.loads(config_path.read_text())
@@ -229,8 +234,8 @@ def main() -> None:
                 "phase_function": False,
             }
 
-        tmpdir = tempfile.TemporaryDirectory()
-        config_for_yasf = Path(tmpdir.name) / config_path.name
+        config_tmp = tempfile.TemporaryDirectory()
+        config_for_yasf = Path(config_tmp.name) / config_path.name
         config_for_yasf.write_text(json.dumps(cfg))
 
     runner.bench_func(
