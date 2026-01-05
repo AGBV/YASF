@@ -3,18 +3,6 @@ name: Coverage Reporting
 on:
   workflow_call:
     inputs:
-      run_codacy:
-        type: boolean
-        required: false
-        default: false
-      run_deepsource:
-        type: boolean
-        required: false
-        default: false
-      run_codecov:
-        type: boolean
-        required: false
-        default: false
       artifact_name:
         type: string
         required: false
@@ -31,7 +19,7 @@ jobs:
   codacy:
     name: Codacy coverage reporter
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_codacy }}
+    if: ${{ secrets.CODACY_PROJECT_TOKEN != '' }}
     continue-on-error: true
     steps:
       - name: Set up Git repository
@@ -56,7 +44,7 @@ jobs:
   deepsource:
     name: DeepSource coverage reporter
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_deepsource }}
+    if: ${{ secrets.DEEPSOURCE_DSN != '' }}
     continue-on-error: true
     steps:
       - name: Set up Git repository
@@ -82,7 +70,7 @@ jobs:
   codecov:
     name: Codecov coverage reporter
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_codecov }}
+    if: ${{ secrets.CODECOV_TOKEN != '' }}
     continue-on-error: true
     steps:
       - name: Download artifact

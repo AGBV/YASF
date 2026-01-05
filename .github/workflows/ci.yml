@@ -17,8 +17,4 @@ jobs:
     name: Coverage reporting
     needs: testing
     uses: ./.github/workflows/coverage.yml
-    with:
-      run_codacy: ${{ secrets.CODACY_PROJECT_TOKEN != '' }}
-      run_deepsource: ${{ secrets.DEEPSOURCE_DSN != '' }}
-      run_codecov: ${{ secrets.CODECOV_TOKEN != '' }}
     secrets: inherit
