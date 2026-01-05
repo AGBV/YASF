@@ -47,17 +47,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          # When there are no release-worthy changes, python-semantic-release prints
-          # a "No release" message and exits successfully.
-          out="$(semantic-release version 2>&1 || true)"
-          echo "$out"
+          # Determine whether a release will be made first (no-op), then only run
+          # the real version/publish steps when required.
+          noop_out="$(semantic-release -v --noop version 2>&1 || true)"
+          echo "$noop_out"
 
-          if echo "$out" | grep -qi "no release"; then
+          if echo "$noop_out" | grep -qi "no release"; then
             echo "released=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "released=true" >> "$GITHUB_OUTPUT"
+          semantic-release version
           semantic-release publish
 
       - name: Build
